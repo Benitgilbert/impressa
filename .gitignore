@@ -1,0 +1,33 @@
+# Root ignores for impressa monorepo
+
+# Node modules and caches
+**/node_modules/
+**/.pnpm-store/
+**/.turbo/
+**/.parcel-cache/
+**/.cache/
+**/.eslintcache
+
+# Build outputs
+**/dist/
+**/build/
+impressa-frontend/.next/
+impressa-frontend/out/
+
+# Env and secrets
+**/.env
+**/.env.*
+.env
+.env.*
+
+# Logs
+**/npm-debug.log*
+**/yarn-debug.log*
+**/yarn-error.log*
+**/pnpm-debug.log*
+
+# OS files
+**/.DS_Store
+**/Thumbs.db
+
+

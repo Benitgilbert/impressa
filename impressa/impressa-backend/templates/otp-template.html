@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="UTF-8" />
+    <title>impressa OTP</title>
+    <style>
+      body {
+        font-family: 'Poppins', sans-serif;
+        background-color: #f4f4f4;
+        padding: 40px;
+      }
+      .card {
+        max-width: 480px;
+        margin: auto;
+        background: white;
+        border-radius: 8px;
+        padding: 32px;
+        text-align: center;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+      }
+      .otp {
+        font-size: 28px;
+        font-weight: bold;
+        letter-spacing: 8px;
+        color: #007BFF;
+        margin: 24px 0;
+      }
+      .footer {
+        font-size: 12px;
+        color: #aaa;
+        margin-top: 32px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="card">
+      <img src="cid:impressa-logo" alt="impressa" style="height: 40px; margin-bottom: 16px;" />
+      <h2>Admin Login OTP</h2>
+      <p>Use this code to securely log in to impressa Admin.<br />This code will expire in <strong>20 minutes</strong>.</p>
+      <div class="otp">{{otp}}</div>
+      <p>This code will securely log you in using:<br /><span style="color: #007BFF;">{{email}}</span></p>
+      <p class="footer">If you didn’t request this email, you can safely ignore it.</p>
+    </div>
+  </body>
+</html>
