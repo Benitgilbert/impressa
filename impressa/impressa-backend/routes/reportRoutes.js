@@ -1,4 +1,5 @@
 import express from "express";
+import path from "path";
 import { createimpressaPDF } from "../utils/pdfLayout.js";
 import { verifyAdmin } from "../middleware/authMiddleware.js";
 import User from "../models/User.js";
@@ -19,30 +20,23 @@ router.get("/generate", verifyAdmin, async (req, res) => {
         createdAt: user.createdAt,
       }));
 
-      const contentBuilder = (doc) => {
-        doc.fontSize(14).text("User Table", { underline: true, align: "center" });
-        doc.moveDown(0.5);
+      const contentBuilder = (doc, helpers) => {
+        doc.fontSize(14).fillColor("#111827").font("Helvetica-Bold").text("User Table", { underline: true, align: "center" });
+        doc.moveDown(0.6);
 
-        const columns = [
-          { label: "Name", x: 50 },
-          { label: "Email", x: 200 },
-          { label: "Role", x: 370 },
-          { label: "Created At", x: 450 },
-        ];
-
-        doc.font("Helvetica-Bold").fontSize(10);
-        const headerY = doc.y;
-        columns.forEach(col => doc.text(col.label, col.x, headerY));
-        doc.moveDown(0.5);
-
-        doc.font("Helvetica").fontSize(10);
-        userRows.forEach(user => {
-          const y = doc.y;
-          doc.text(user.name || "", columns[0].x, y);
-          doc.text(user.email || "", columns[1].x, y);
-          doc.text(user.role || "", columns[2].x, y);
-          doc.text(new Date(user.createdAt).toLocaleDateString(), columns[3].x, y);
-          doc.moveDown(0.5);
+        helpers.table({
+          columns: [
+            { key: "name", header: "Name", width: 140 },
+            { key: "email", header: "Email", width: 180 },
+            { key: "role", header: "Role", width: 90 },
+            { key: "createdAt", header: "Created At", width: 90 },
+          ],
+          rows: userRows.map(u => ({
+            name: u.name || "",
+            email: u.email || "",
+            role: u.role || "",
+            createdAt: new Date(u.createdAt).toLocaleDateString()
+          }))
         });
       };
 
@@ -53,7 +47,7 @@ router.get("/generate", verifyAdmin, async (req, res) => {
         stampImage: null,
       };
 
-      const logoPath = "assets/logo.png";
+      const logoPath = path.join(path.resolve(), "assets/logo.png");
 
       const doc = createimpressaPDF({
         title: "User Table Report",

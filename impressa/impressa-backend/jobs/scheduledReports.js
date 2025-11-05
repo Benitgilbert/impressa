@@ -30,24 +30,97 @@ cron.schedule("0 8 1 * *", async () => {
     });
 
     const logoPath = path.join(path.resolve(), "assets/logo.png");
-    const filePath = path.join(path.resolve(), `reports/monthly-${month}-${year}.pdf`);
+    const reportsDir = path.join(path.resolve(), "reports");
+    if (!fs.existsSync(reportsDir)) {
+      fs.mkdirSync(reportsDir, { recursive: true });
+    }
+    const filePath = path.join(reportsDir, `monthly-${month}-${year}.pdf`);
 
-    const doc = generateReportPDF(
-      orders,
-      summary,
+    const doc = createimpressaPDF({
+      title: `Monthly Report - ${month}/${year}`,
       logoPath,
-      {
+      signatory: {
         name: admin.name,
         title: admin.title || "impressa Administrator",
         signatureImage: admin.signatureImage,
         stampImage: admin.stampImage,
       },
-      `Monthly Report - ${month}/${year}`
-    );
+      contentBuilder: (doc, helpers) => {
+        // Executive summary
+        doc.fillColor("#1E40AF").fontSize(10).font("Helvetica-Bold");
+        doc.text("Executive Summary", { underline: true });
+        doc.font("Helvetica").moveDown(0.2);
+        doc.fillColor("#374151").fontSize(9);
+        doc.text(aiSummary);
+        doc.moveDown(0.8);
+
+        // Key metrics (2 columns)
+        doc.fillColor("#111827").fontSize(11).font("Helvetica-Bold");
+        doc.text("Key Metrics", { underline: true });
+        doc.font("Helvetica").moveDown(0.3);
+
+        doc.fillColor("#374151").fontSize(9);
+        const summaryEntries = Object.entries(summary);
+        const midpoint = Math.ceil(summaryEntries.length / 2);
+        const leftColumn = summaryEntries.slice(0, midpoint);
+        const rightColumn = summaryEntries.slice(midpoint);
+
+        const startY = doc.y;
+        const leftX = doc.page.margins.left;
+        const rightX = doc.page.width / 2 + 10;
+        const lineHeight = 12;
+
+        leftColumn.forEach(([k, v], idx) => {
+          const key = k.replace(/([A-Z])/g, ' $1').replace(/^./, s => s.toUpperCase());
+          const val = typeof v === "number" ? v.toLocaleString() : String(v);
+          doc.text(`${key}: ${val}`, leftX, startY + (idx * lineHeight), { width: rightX - leftX - 30, lineBreak: false });
+        });
+        rightColumn.forEach(([k, v], idx) => {
+          const key = k.replace(/([A-Z])/g, ' $1').replace(/^./, s => s.toUpperCase());
+          const val = typeof v === "number" ? v.toLocaleString() : String(v);
+          doc.text(`${key}: ${val}`, rightX, startY + (idx * lineHeight), { width: rightX - 30, lineBreak: false });
+        });
+
+        const maxRows = Math.max(leftColumn.length, rightColumn.length);
+        doc.y = startY + (maxRows * lineHeight);
+        doc.moveDown(0.8);
+
+        // Orders table (first 30 rows)
+        doc.fillColor("#111827").fontSize(11).font("Helvetica-Bold");
+        doc.text("Order Details", { underline: true });
+        doc.font("Helvetica").moveDown(0.3);
+
+        const tableRows = orders.slice(0, 30).map(o => ({
+          id: o._id.toString().slice(-6).toUpperCase(),
+          product: (o.product?.name || "N/A").substring(0, 22),
+          customer: (o.customer?.name || o.customer?.email || "N/A").substring(0, 18),
+          qty: String(o.quantity),
+          status: o.status.charAt(0).toUpperCase() + o.status.slice(1),
+          date: new Date(o.createdAt).toLocaleDateString("en-US", { month: "short", day: "2-digit" })
+        }));
+
+        helpers.table({
+          columns: [
+            { key: "id", header: "ID", width: 50 },
+            { key: "product", header: "Product", width: 130 },
+            { key: "customer", header: "Customer", width: 110 },
+            { key: "qty", header: "Qty", width: 35 },
+            { key: "status", header: "Status", width: 70 },
+            { key: "date", header: "Date", width: 60 }
+          ],
+          rows: tableRows
+        });
+
+        if (orders.length > 30) {
+          doc.moveDown(0.3);
+          doc.fillColor("#6B7280").fontSize(8);
+          doc.text(`Showing 30 of ${orders.length} orders. Download CSV for complete report.`, { align: "center" });
+        }
+      }
+    });
 
     doc.pipe(fs.createWriteStream(filePath));
     doc.end();
-
     await sendReportEmail({
       to: admin.email,
       subject: `📊 Monthly Report - ${month}/${year}`,
