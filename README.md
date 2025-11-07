@@ -1,6 +1,6 @@
 # Impressa (MERN) Monorepo
 
-Full‑stack MERN app for customizable product orders with admin analytics and reporting. This repo contains both apps:
+Full‑stack MERN app for customizable product orders with admin analytics,reporting and other features. This repo contains both apps:
 - impressa/impressa-frontend: React admin + dashboards
 - impressa/impressa-backend: Node/Express API + reporting
 
