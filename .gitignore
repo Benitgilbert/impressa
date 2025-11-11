@@ -30,4 +30,7 @@ impressa-frontend/out/
 **/.DS_Store
 **/Thumbs.db
 
+# Uploaded assets
+uploads/
+
 

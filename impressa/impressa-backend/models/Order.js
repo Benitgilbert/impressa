@@ -9,8 +9,12 @@ const orderSchema = new mongoose.Schema({
   customer: {
     type: mongoose.Schema.Types.ObjectId,
     ref: "User",
-    required: true,
+    required: false,
   },
+  guestName: String,
+  guestEmail: String,
+  guestPhone: String,
+  publicId: { type: String, index: true, unique: true },
   quantity: {
     type: Number,
     default: 1,

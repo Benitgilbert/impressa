@@ -18,6 +18,10 @@ function Sidebar() {
           <FaBox className="text-lg" /> 
           <span className="font-medium">Orders</span>
         </Link>
+        <Link to="/admin/products" className="flex items-center gap-3 px-4 py-3 text-gray-700 hover:bg-blue-50 hover:text-blue-600 rounded-lg transition-colors">
+          <FaBox className="text-lg" /> 
+          <span className="font-medium">Products</span>
+        </Link>
         <Link to="/admin/reports" className="flex items-center gap-3 px-4 py-3 text-gray-700 hover:bg-blue-50 hover:text-blue-600 rounded-lg transition-colors">
           <FaFileAlt className="text-lg" /> 
           <span className="font-medium">Reports</span>

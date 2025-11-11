@@ -11,6 +11,8 @@ dotenv.config();
 const app = express();
 app.use(cors());
 app.use(express.json());
+// Static uploads for product images
+app.use("/uploads", express.static("uploads"));
 
 // ✅ Connection events for debugging
 mongoose.connection.on("connected", () => {

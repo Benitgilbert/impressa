@@ -120,13 +120,51 @@ const getRangeReport = async (start, end) => {
 
 // 🧠 Central Dispatcher
 export const buildReportData = async (type, filters) => {
-  switch (type) {
-    case "monthly": return await getMonthlyReport(filters);
-    case "daily": return await getDailyReport(filters);
-    case "custom-range": return await getCustomRangeReport(filters);
-    case "customer": return await getCustomerReport(filters);
-    case "status": return await getStatusReport(filters);
-    case "revenue": return await getRevenueReport(filters);
-    default: throw new Error(`Unsupported report type: ${type}`);
+  try {
+    switch (type) {
+      case "monthly": {
+        if (!filters.month || !filters.year) {
+          const now = new Date();
+          filters.month = filters.month || (now.getMonth() + 1);
+          filters.year = filters.year || now.getFullYear();
+        }
+        return await getMonthlyReport(filters);
+      }
+      case "daily": {
+        if (!filters.date) {
+          filters.date = new Date().toISOString().split('T')[0];
+        }
+        return await getDailyReport(filters);
+      }
+      case "custom-range": {
+        if (!filters.start || !filters.end) {
+          throw new Error("Custom range requires 'start' and 'end' parameters");
+        }
+        return await getCustomRangeReport(filters);
+      }
+      case "customer": {
+        if (!filters.customerId) {
+          throw new Error("Customer report requires 'customerId' parameter");
+        }
+        return await getCustomerReport(filters);
+      }
+      case "status": {
+        if (!filters.status) {
+          throw new Error("Status report requires 'status' parameter");
+        }
+        return await getStatusReport(filters);
+      }
+      case "revenue": {
+        if (!filters.start || !filters.end) {
+          throw new Error("Revenue report requires 'start' and 'end' parameters");
+        }
+        return await getRevenueReport(filters);
+      }
+      default: 
+        throw new Error(`Unsupported report type: ${type}`);
+    }
+  } catch (error) {
+    console.error("buildReportData error:", error.message);
+    throw error;
   }
 };
