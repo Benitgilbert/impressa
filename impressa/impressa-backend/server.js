@@ -3,6 +3,7 @@ import mongoose from "mongoose";
 import cors from "cors";
 import helmet from "helmet";
 import pinoHttp from "pino-http";
+import cookieParser from "cookie-parser";
 import dotenv from "dotenv";
 //import authRoutes from "./routes/authRoutes.js";
 import dashboardRoutes from "./routes/dashboardRoutes.js";
@@ -42,6 +43,7 @@ app.use(cors({
 
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true, limit: "10mb" }));
+app.use(cookieParser()); // For cart session management
 
 // ✅ Request Logging Middleware
 app.use(
@@ -93,6 +95,9 @@ const startServer = async () => {
     const orderRoutes = (await import("./routes/orderRoutes.js")).default;
     const analyticsRoutes = (await import("./routes/analyticsRoutes.js")).default;
     const healthRoutes = (await import("./routes/healthRoutes.js")).default;
+    const cartRoutes = (await import("./routes/cartRoutes.js")).default;
+    const couponRoutes = (await import("./routes/couponRoutes.js")).default;
+    const checkoutRoutes = (await import("./routes/checkoutRoutes.js")).default;
 
     // ✅ Register health checks first (no auth required)
     app.use("/", healthRoutes);
@@ -101,6 +106,9 @@ const startServer = async () => {
     app.use("/api/auth", authRoutes);
     app.use("/api/products", productRoutes);
     app.use("/api/categories", categoryRoutes);
+    app.use("/api/cart", cartRoutes);
+    app.use("/api/coupons", couponRoutes);
+    app.use("/api/checkout", checkoutRoutes);
     app.use("/api/customizations", customizationRoutes);
     app.use("/api/orders", orderRoutes);
     app.use("/api/reports", reportRoutes);
