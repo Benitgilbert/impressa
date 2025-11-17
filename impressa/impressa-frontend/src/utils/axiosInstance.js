@@ -1,11 +1,12 @@
 import axios from "axios";
 
 const instance = axios.create({
-  baseURL: "http://localhost:5000/api", // ✅ include /api if your routes are mounted under /api
+  baseURL: process.env.REACT_APP_API_URL || "http://localhost:8000/api",
+  withCredentials: true,
 });
 
 instance.interceptors.request.use((config) => {
-  const token = localStorage.getItem("authToken"); // ✅ must match login storage key
+  const token = localStorage.getItem("authToken");
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
   }
