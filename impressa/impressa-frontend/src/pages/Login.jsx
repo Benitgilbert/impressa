@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import axios from "axios"; // or use your axiosInstance
+import axios from "../utils/axiosInstance";
 
 function Login() {
   const [step, setStep] = useState("credentials"); // 'credentials' or 'otp'
@@ -14,7 +14,7 @@ function Login() {
   const handleCredentialsSubmit = async (e) => {
     e.preventDefault();
     try {
-      await axios.post("http://localhost:5000/api/auth/admin/login-step1", {
+      await axios.post("/auth/admin/login-step1", {
         email: form.email,
         password: form.password,
       });
@@ -28,7 +28,7 @@ function Login() {
   const handleOtpSubmit = async (e) => {
     e.preventDefault();
     try {
-      const res = await axios.post("http://localhost:5000/api/auth/admin/login-step2", {
+      const res = await axios.post("/auth/admin/login-step2", {
         email: form.email,
         otp: form.otp,
       });

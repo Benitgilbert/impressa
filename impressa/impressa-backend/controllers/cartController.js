@@ -1,3 +1,4 @@
+import mongoose from "mongoose";
 import Cart from "../models/Cart.js";
 import Product from "../models/Product.js";
 import logger from "../config/logger.js";
@@ -44,10 +45,23 @@ export const getCart = async (req, res, next) => {
  */
 export const addToCart = async (req, res, next) => {
   try {
-    const { productId, quantity = 1, customizations } = req.body;
+    const itemData = req.body;
+    if (!itemData) {
+      const error = new Error("Request body is missing");
+      error.statusCode = 400;
+      return next(error);
+    }
+
+    const { productId, quantity = 1, customizations = {} } = itemData;
 
     if (!productId) {
       const error = new Error("Product ID is required");
+      error.statusCode = 400;
+      return next(error);
+    }
+
+    if (!mongoose.Types.ObjectId.isValid(productId)) {
+      const error = new Error("Invalid Product ID");
       error.statusCode = 400;
       return next(error);
     }
@@ -57,7 +71,7 @@ export const addToCart = async (req, res, next) => {
     if (!sessionToken) {
       sessionToken = Cart.generateSessionToken();
     }
-
+    
     const userId = req.user?._id;
 
     // Find or create cart

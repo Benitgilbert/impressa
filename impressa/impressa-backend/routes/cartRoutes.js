@@ -1,4 +1,5 @@
 import express from "express";
+import jwt from "jsonwebtoken";
 import * as cartController from "../controllers/cartController.js";
 import { authMiddleware } from "../middleware/authMiddleware.js";
 
@@ -6,11 +7,18 @@ const router = express.Router();
 
 // Optional auth middleware - if user is logged in, attach user to request
 const optionalAuth = (req, res, next) => {
-  // Try to authenticate, but don't fail if no token
   const token = req.headers.authorization?.split(" ")[1];
-  if (token) {
-    return authMiddleware(["customer", "admin"])(req, res, next);
+  if (!token) {
+    return next();
   }
+
+  try {
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    req.user = { id: decoded.id, role: decoded.role };
+  } catch (err) {
+    // Ignore invalid tokens, just don't authenticate the user
+  }
+
   next();
 };
 

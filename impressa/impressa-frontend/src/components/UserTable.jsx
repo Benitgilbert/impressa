@@ -38,11 +38,8 @@ function UserTable({ onCreate }) {
 
   const fetchUsers = async () => {
     try {
-      const token = localStorage.getItem("accessToken");
-
-      const res = await axios.get("/auth/users", {
-  headers: { Authorization: `Bearer ${token}` }
-});
+      // axiosInstance auto-injects `authToken` from localStorage (key: authToken)
+      const res = await axios.get("/auth/users");
       setUsers(res.data);
       setFiltered(res.data);
     } catch (err) {
@@ -61,7 +58,8 @@ function UserTable({ onCreate }) {
   const handleDelete = async (userId) => {
     if (!window.confirm("Are you sure you want to delete this user?")) return;
     try {
-      await axios.delete(`/users/${userId}`);
+        // route is mounted under /api/auth on the backend
+        await axios.delete(`/auth/users/${userId}`);
       setUsers(users.filter((u) => u._id !== userId));
       setMessage("✅ User deleted");
     } catch (err) {
@@ -104,23 +102,20 @@ const handleExportPDF = async () => {
 };
 const handleExportUserTablePDF = async () => {
   try {
-    const token = localStorage.getItem("accessToken");
+      const res = await axios.get("/reports/generate?type=users&format=pdf", {
+        responseType: "blob",
+      });
 
-    const res = await axios.get("/reports/generate-users-table", {
-      responseType: "blob",
-      headers: { Authorization: `Bearer ${token}` }
-    });
-
-    const url = window.URL.createObjectURL(new Blob([res.data]));
-    const link = document.createElement("a");
-    link.href = url;
-    link.setAttribute("download", "user-table.pdf");
-    document.body.appendChild(link);
-    link.click();
-  } catch (err) {
-    console.error("User table PDF export failed:", err);
-  }
-};
+      const url = window.URL.createObjectURL(new Blob([res.data]));
+      const link = document.createElement("a");
+      link.href = url;
+      link.setAttribute("download", "user-table.pdf");
+      document.body.appendChild(link);
+      link.click();
+    } catch (err) {
+      console.error("User table PDF export failed:", err);
+    }
+  };
 
   const sorted = useMemo(() => {
     const s = [...filtered].sort((a, b) => {

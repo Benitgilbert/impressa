@@ -1,0 +1,60 @@
+@keyframes blob {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  33% { transform: translate(30px, -50px) scale(1.1); }
+  66% { transform: translate(-20px, 20px) scale(0.9); }
+}
+@keyframes float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-20px); }
+}
+@keyframes gentle-float {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
+}
+
+.animate-blob { animation: blob 7s infinite; }
+.animation-delay-2000 { animation-delay: 2s; }
+.animation-delay-4000 { animation-delay: 4s; }
+.animate-float { animation: float 3s ease-in-out infinite; }
+.animate-gentle-float {
+  animation: gentle-float 5s ease-in-out infinite;
+}
+
+/* Define custom properties for colors, to be used in Tailwind, e.g., bg-light-background-color */
+:root {
+    --light-background-color: #e7edf9;
+    --medium-background-color: #cdd8f3;
+}
+
+.bg-light-background-color {
+    background-color: var(--light-background-color);
+}
+
+.bg-medium-background-color {
+    background-color: var(--medium-background-color);
+}
+
+.from-light-background-color {
+    --tw-gradient-from: var(--light-background-color);
+    --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to, rgba(231,237,249, 0));
+}
+
+.via-white {
+    --tw-gradient-stops: var(--tw-gradient-from), #fff, var(--tw-gradient-to, rgba(255,255,255, 0));
+}
+
+.to-medium-background-color {
+    --tw-gradient-to: var(--medium-background-color);
+}
+
+.font-roboto {
+  font-family: 'Roboto', sans-serif;
+}
+
+.font-poppins {
+  font-family: 'Poppins', sans-serif;
+}

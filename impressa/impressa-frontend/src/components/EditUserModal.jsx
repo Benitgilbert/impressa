@@ -10,11 +10,8 @@ function EditUserModal({ user, onClose, onSave }) {
   const handleSubmit = async (e) => {
   e.preventDefault();
   try {
-    const token = localStorage.getItem("accessToken");
-
-    const res = await axios.put(`/auth/users/${user._id}`, form, {
-      headers: { Authorization: `Bearer ${token}` }
-    });
+    // axiosInstance will add Authorization header from localStorage.authToken
+    const res = await axios.put(`/auth/users/${user._id}`, form);
 
     onSave(res.data);
     onClose();
