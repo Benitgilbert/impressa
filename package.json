@@ -1,0 +1,15 @@
+{
+  "name": "workspace",
+  "version": "1.0.0",
+  "description": "Full‑stack MERN app for customizable product orders with admin analytics,reporting and other features. This repo contains both apps: - impressa/impressa-frontend: React admin + dashboards - impressa/impressa-backend: Node/Express API + reporting",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "http-proxy-middleware": "^3.0.5"
+  }
+}

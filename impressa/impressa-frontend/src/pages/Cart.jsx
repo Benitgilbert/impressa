@@ -48,7 +48,7 @@ export default function CartPage() {
                       <td className="p-2 text-center">{formatRwf(it.product.price)}</td>
                       <td className="p-2 text-center">{formatRwf((it.product.price||0)*it.quantity)}</td>
                       <td className="p-2 text-right">
-                        <button onClick={()=>removeItem(it.product._id, idx)} className="text-red-600 hover:underline">Remove</button>
+                        <button onClick={()=>removeItem(idx)} className="text-red-600 hover:underline">Remove</button>
                       </td>
                     </tr>
                   ))}

@@ -15,13 +15,26 @@ export const getCart = async () => {
  * @param {string} productId - Product ID
  * @param {number} quantity - Quantity to add
  * @param {string} variationId - Optional variation ID
+ * @param {Object|null} customizations - Optional customization data (text/cloud/etc.)
  */
-export const addToCart = async (productId, quantity = 1, variationId = null) => {
-  const response = await axios.post("/cart/items", {
+export const addToCart = async (
+  productId,
+  quantity = 1,
+  variationId = null,
+  customizations = null
+) => {
+  const payload = {
     productId,
     quantity,
     variationId,
-  });
+  };
+
+  // Only send customizations if provided so the backend can attach them to the cart item
+  if (customizations && Object.keys(customizations).length > 0) {
+    payload.customizations = customizations;
+  }
+
+  const response = await axios.post("/cart/items", payload);
   return response.data;
 };
 

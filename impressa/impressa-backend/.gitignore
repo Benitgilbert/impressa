@@ -1,6 +1,8 @@
 # Node
 node_modules/
 .env
+.env.*
+!.env.example
 
 # Logs
 logs/
@@ -10,6 +12,9 @@ logs/
 dist/
 coverage/
 reports/
+
+# Uploads
+uploads/
 
 # OS
 .DS_Store

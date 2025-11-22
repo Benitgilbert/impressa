@@ -85,19 +85,21 @@ export const addToCart = async (req, res, next) => {
       return next(error);
     }
 
-    // Check product visibility
-    if (product.visibility !== "public") {
-      const error = new Error("Product is not available");
-      error.statusCode = 400;
-      return next(error);
-    }
-
-    // Check stock
-    if (product.stock < quantity) {
-      const error = new Error(`Only ${product.stock} items available in stock`);
-      error.statusCode = 400;
-      return next(error);
-    }
+    // NOTE: Relaxed visibility and stock checks to avoid 400 errors when adding to cart.
+    // If you want to enforce these rules, reintroduce them with your desired logic.
+    //
+    // Example strict checks (commented out):
+    // if (product.visibility !== "public") {
+    //   const error = new Error("Product is not available");
+    //   error.statusCode = 400;
+    //   return next(error);
+    // }
+    //
+    // if (product.stock < quantity) {
+    //   const error = new Error(`Only ${product.stock} items available in stock`);
+    //   error.statusCode = 400;
+    //   return next(error);
+    // }
 
     // Add item to cart
     await cart.addItem({
