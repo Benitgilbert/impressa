@@ -15,6 +15,10 @@ import CheckoutPage from "./pages/Checkout";
 import TrackOrder from "./pages/TrackOrder";
 import Home from "./pages/Home";
 import Wishlist from "./pages/Wishlist";
+import About from "./pages/About";
+import Contact from "./pages/Contact";
+import Blog from "./pages/Blog";
+import BlogPost from "./pages/BlogPost";
 import { CartProvider } from "./context/CartContext";
 import { WishlistProvider } from "./context/WishlistContext";
 
@@ -31,11 +35,14 @@ function App() {
             <Route path="/checkout" element={<CheckoutPage />} />
             <Route path="/track" element={<TrackOrder />} />
             <Route path="/wishlist" element={<Wishlist />} />
+            <Route path="/about" element={<About />} />
+            <Route path="/contact" element={<Contact />} />
+            <Route path="/blog" element={<Blog />} />
+            <Route path="/blog/:id" element={<BlogPost />} />
 
-            <Route path="/login" element={<Login />} /> 
+            <Route path="/login" element={<Login />} />
             <Route path="/admin" element={<AdminDashboard />} />
-            <Route path="/admin/users" element={<AdminUsers />} />
-            <Route path="/dashboard" element={<UserDashboard />} />
+            <Route path="/admin/users" element={<AdminUsers />} />            <Route path="/dashboard" element={<UserDashboard />} />
             <Route path="/guest" element={<div>Guest Page</div>} />
             <Route path="/forgot-password" element={<ForgotPassword />} />
             <Route path="/logout" element={<Logout />} />

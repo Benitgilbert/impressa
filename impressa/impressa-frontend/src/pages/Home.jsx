@@ -62,7 +62,7 @@ export default function Home() {
             </Link>
             <nav className="hidden lg:flex items-center space-x-8">
               <Link to="/shop" className="text-gray-900 hover:text-blue-800 font-medium transition-colors duration-200">Product Listing</Link>
-              <Link to="/about" className="text-gray-900 hover:text-blue-800 font-medium transition-colors duration-200">About Us</Link>
+              <Link to="/about" className="text-blue-800 font-bold">About Us</Link>
               <Link to="/contact" className="text-gray-900 hover:text-blue-800 font-medium transition-colors duration-200">Contact</Link>
               <Link to="/blog" className="text-gray-900 hover:text-blue-800 font-medium transition-colors duration-200">Blog</Link>
             </nav>
