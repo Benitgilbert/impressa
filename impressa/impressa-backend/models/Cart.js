@@ -123,6 +123,7 @@ cartSchema.methods.addItem = function (itemData) {
       product,
       quantity,
       price,
+      subtotal: price * quantity, // Calculate subtotal on item add
       customizations: customizations || {},
     });
   }
