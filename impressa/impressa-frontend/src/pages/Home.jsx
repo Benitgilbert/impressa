@@ -8,7 +8,6 @@ import { formatRwf } from "../utils/currency";
 import LandingFooter from "../components/LandingFooter";
 import Header from "../components/Header";
 import { useWishlist } from "../context/WishlistContext";
-import "./Home.css";
 
 const getImageUrl = (path) => {
   if (!path) return '';
@@ -29,8 +28,8 @@ const ProductCard = ({ product }) => {
   };
 
   return (
-    <div className="group bg-white rounded-2xl overflow-hidden shadow-sm hover:shadow-xl transition-all duration-300 border border-gray-100">
-      <div className="relative aspect-square bg-gray-50 overflow-hidden">
+    <div className="group bg-white dark:bg-slate-800 rounded-2xl overflow-hidden shadow-sm hover:shadow-xl transition-all duration-300 border border-gray-100 dark:border-slate-700">
+      <div className="relative aspect-square bg-gray-50 dark:bg-slate-900 overflow-hidden">
         <Link to={`/product/${product._id}`}>
           {product.image ? (
             <img
@@ -39,19 +38,19 @@ const ProductCard = ({ product }) => {
               className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
             />
           ) : (
-            <div className="w-full h-full flex items-center justify-center text-gray-300">No Image</div>
+            <div className="w-full h-full flex items-center justify-center text-gray-300 dark:text-gray-600">No Image</div>
           )}
         </Link>
         <button
           onClick={toggleWishlist}
-          className="absolute top-3 right-3 w-10 h-10 bg-white/90 backdrop-blur-sm rounded-full flex items-center justify-center shadow-md hover:bg-white transition text-gray-400 hover:text-red-500"
+          className="absolute top-3 right-3 w-10 h-10 bg-white/90 dark:bg-slate-800/90 backdrop-blur-sm rounded-full flex items-center justify-center shadow-md hover:bg-white dark:hover:bg-slate-700 transition text-gray-400 hover:text-red-500"
         >
           {isWishlisted ? <FaHeart className="text-red-500" /> : <FaRegHeart />}
         </button>
       </div>
       <div className="p-4">
         <Link to={`/product/${product._id}`}>
-          <h3 className="font-semibold text-gray-800 line-clamp-2 mb-2 group-hover:text-violet-600 transition">{product.name}</h3>
+          <h3 className="font-semibold text-gray-800 dark:text-slate-100 line-clamp-2 mb-2 group-hover:text-violet-600 dark:group-hover:text-violet-400 transition">{product.name}</h3>
         </Link>
         <div className="flex items-center gap-1 mb-2">
           {[...Array(5)].map((_, i) => (
@@ -60,10 +59,10 @@ const ProductCard = ({ product }) => {
           <span className="text-xs text-gray-400 ml-1">(24)</span>
         </div>
         <div className="flex items-center justify-between">
-          <span className="text-xl font-bold text-gray-900">{formatRwf(product.price)}</span>
+          <span className="text-xl font-bold text-gray-900 dark:text-white">{formatRwf(product.price)}</span>
           <Link
             to={`/product/${product._id}`}
-            className="text-violet-600 hover:text-violet-700 text-sm font-medium"
+            className="text-violet-600 dark:text-violet-400 hover:text-violet-700 dark:hover:text-violet-300 text-sm font-medium"
           >
             View →
           </Link>
@@ -239,16 +238,16 @@ export default function Home() {
   }, []);
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50 dark:bg-slate-950 transition-colors duration-300">
       <Header />
 
       <main>
         {/* Hero Section - Gradient Split Design */}
         <section className="relative overflow-hidden">
-          <div className="absolute inset-0 bg-gradient-to-br from-slate-900 via-violet-900 to-slate-900"></div>
+          <div className="absolute inset-0 bg-gradient-to-br from-slate-950 via-violet-950 to-slate-950 dark:from-black dark:via-violet-950 dark:to-black"></div>
           <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1557821552-17105176677c?w=1920')] bg-cover bg-center opacity-10"></div>
 
-          <div className="relative container mx-auto px-4 py-20 md:py-32">
+          <div className="relative mx-auto max-w-7xl px-4 py-20 md:py-32">
             <div className="max-w-3xl">
               <span className="inline-block bg-violet-500/20 text-violet-300 px-4 py-2 rounded-full text-sm font-medium mb-6 backdrop-blur-sm border border-violet-500/30">
                 ✨ Welcome to the future of shopping
@@ -256,7 +255,7 @@ export default function Home() {
               <h1 className="text-4xl md:text-6xl lg:text-7xl font-bold text-white mb-6 leading-tight">
                 Discover <span className="text-transparent bg-clip-text bg-gradient-to-r from-violet-400 to-fuchsia-400">Premium</span> Products
               </h1>
-              <p className="text-xl text-gray-300 mb-10 max-w-xl">
+              <p className="text-xl text-gray-300 dark:text-gray-400 mb-10 max-w-xl">
                 Curated collections, exclusive deals, and a seamless shopping experience. Find everything you need in one place.
               </p>
               <div className="flex flex-wrap gap-4">
@@ -277,13 +276,13 @@ export default function Home() {
 
         {/* Categories Section */}
         <section className="py-16">
-          <div className="container mx-auto px-4">
+          <div className="mx-auto max-w-7xl px-4">
             <div className="flex items-end justify-between mb-10">
               <div>
-                <h2 className="text-3xl font-bold text-gray-900 mb-2">Shop by Category</h2>
-                <p className="text-gray-500">Browse our curated collections</p>
+                <h2 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">Shop by Category</h2>
+                <p className="text-gray-500 dark:text-gray-400">Browse our curated collections</p>
               </div>
-              <Link to="/shop" className="text-violet-600 hover:text-violet-700 font-semibold flex items-center gap-1">
+              <Link to="/shop" className="text-violet-600 dark:text-violet-400 hover:text-violet-700 dark:hover:text-violet-300 font-semibold flex items-center gap-1">
                 View All <FaArrowRight className="text-sm" />
               </Link>
             </div>
@@ -305,7 +304,7 @@ export default function Home() {
                 ))}
               </div>
             ) : (
-              <div className="text-center py-12 text-gray-400">
+              <div className="text-center py-12 text-gray-400 dark:text-gray-600">
                 <p>No categories available yet. Check back soon!</p>
               </div>
             )}
@@ -315,7 +314,7 @@ export default function Home() {
         {/* Promotional Banner - Dynamic from Admin */}
         {promoBanner && (
           <section className="py-8">
-            <div className="container mx-auto px-4">
+            <div className="mx-auto max-w-7xl px-4">
               <div
                 className="relative rounded-2xl overflow-hidden min-h-[200px] flex items-center"
                 style={{
@@ -359,7 +358,7 @@ export default function Home() {
 
         {/* Flash Sale with Countdown */}
         <section className="py-8">
-          <div className="container mx-auto px-4">
+          <div className="mx-auto max-w-7xl px-4">
             <div className={`bg-gradient-to-r ${activeFlashSale?.bannerColor || 'from-red-500 to-orange-500'} rounded-2xl p-6 md:p-8 flex flex-col md:flex-row items-center justify-between gap-6`}>
               <div className="text-center md:text-left">
                 <span className="inline-block bg-white/20 text-white px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider mb-2">
@@ -390,14 +389,14 @@ export default function Home() {
         </section>
 
         {/* Featured Products */}
-        <section className="py-16 bg-white">
-          <div className="container mx-auto px-4">
+        <section className="py-16 bg-white dark:bg-slate-900 border-y border-gray-100 dark:border-slate-800">
+          <div className="mx-auto max-w-7xl px-4">
             <div className="flex items-end justify-between mb-10">
               <div>
-                <h2 className="text-3xl font-bold text-gray-900 mb-2">Featured Products</h2>
-                <p className="text-gray-500">Handpicked just for you</p>
+                <h2 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">Featured Products</h2>
+                <p className="text-gray-500 dark:text-gray-400">Handpicked just for you</p>
               </div>
-              <Link to="/shop?sort=featured" className="text-violet-600 hover:text-violet-700 font-semibold flex items-center gap-1">
+              <Link to="/shop?sort=featured" className="text-violet-600 dark:text-violet-400 hover:text-violet-700 dark:hover:text-violet-300 font-semibold flex items-center gap-1">
                 See All <FaArrowRight className="text-sm" />
               </Link>
             </div>
@@ -418,7 +417,7 @@ export default function Home() {
 
         {/* Banner Section */}
         <section className="py-16">
-          <div className="container mx-auto px-4">
+          <div className="mx-auto max-w-7xl px-4">
             <div className="relative rounded-3xl overflow-hidden bg-gradient-to-r from-violet-600 to-fuchsia-600">
               <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1607082349566-187342175e2f?w=1920')] bg-cover bg-center opacity-20"></div>
               <div className="relative px-8 md:px-16 py-16 md:py-24 flex flex-col md:flex-row items-center justify-between gap-8">
@@ -449,14 +448,14 @@ export default function Home() {
         </section>
 
         {/* Trending Products */}
-        <section className="py-16 bg-white">
-          <div className="container mx-auto px-4">
+        <section className="py-16 bg-white dark:bg-slate-900 border-y border-gray-100 dark:border-slate-800">
+          <div className="mx-auto max-w-7xl px-4">
             <div className="flex items-end justify-between mb-10">
               <div>
-                <h2 className="text-3xl font-bold text-gray-900 mb-2">Trending Now</h2>
-                <p className="text-gray-500">What everyone's buying</p>
+                <h2 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">Trending Now</h2>
+                <p className="text-gray-500 dark:text-gray-400">What everyone's buying</p>
               </div>
-              <Link to="/shop?sort=trending" className="text-violet-600 hover:text-violet-700 font-semibold flex items-center gap-1">
+              <Link to="/shop?sort=trending" className="text-violet-600 dark:text-violet-400 hover:text-violet-700 dark:hover:text-violet-300 font-semibold flex items-center gap-1">
                 See All <FaArrowRight className="text-sm" />
               </Link>
             </div>
@@ -476,11 +475,11 @@ export default function Home() {
         </section>
 
         {/* Testimonials */}
-        <section className="py-20 bg-gray-50">
-          <div className="container mx-auto px-4">
+        <section className="py-20 bg-gray-50 dark:bg-slate-950">
+          <div className="mx-auto max-w-7xl px-4">
             <div className="text-center mb-12">
-              <h2 className="text-3xl font-bold text-gray-900 mb-2">What Our Customers Say</h2>
-              <p className="text-gray-500">Real reviews from real shoppers</p>
+              <h2 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">What Our Customers Say</h2>
+              <p className="text-gray-500 dark:text-gray-400">Real reviews from real shoppers</p>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
@@ -507,13 +506,13 @@ export default function Home() {
                   content: "I was hesitant to order online, but Impressa made it so easy. The product was exactly as described."
                 }
               ]).slice(0, 6).map((testimonial, idx) => (
-                <div key={testimonial._id || idx} className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
+                <div key={testimonial._id || idx} className="bg-white dark:bg-slate-800 rounded-2xl p-6 shadow-sm border border-gray-100 dark:border-slate-700">
                   <div className="flex items-center gap-1 mb-4">
                     {[...Array(testimonial.rating || 5)].map((_, i) => (
                       <FaStar key={i} className="text-amber-400" />
                     ))}
                   </div>
-                  <p className="text-gray-600 mb-6 leading-relaxed">"{testimonial.content || testimonial.text}"</p>
+                  <p className="text-gray-600 dark:text-gray-300 mb-6 leading-relaxed">"{testimonial.content || testimonial.text}"</p>
                   <div className="flex items-center gap-3">
                     {testimonial.avatar ? (
                       <img src={testimonial.avatar} alt={testimonial.name} className="w-12 h-12 rounded-full object-cover" />
@@ -523,8 +522,8 @@ export default function Home() {
                       </div>
                     )}
                     <div>
-                      <h4 className="font-semibold text-gray-800">{testimonial.name}</h4>
-                      <p className="text-sm text-gray-500">{testimonial.role}</p>
+                      <h4 className="font-semibold text-gray-800 dark:text-slate-100">{testimonial.name}</h4>
+                      <p className="text-sm text-gray-500 dark:text-gray-400">{testimonial.role}</p>
                     </div>
                   </div>
                 </div>
@@ -534,10 +533,10 @@ export default function Home() {
         </section>
 
         {/* Brand Logos / Trusted By */}
-        <section className="py-12 bg-white border-y border-gray-100">
-          <div className="container mx-auto px-4">
+        <section className="py-12 bg-white dark:bg-slate-900 border-y border-gray-100 dark:border-slate-800">
+          <div className="mx-auto max-w-7xl px-4">
             <p className="text-center text-gray-400 text-sm uppercase tracking-wider mb-8">Trusted by leading brands</p>
-            <div className="flex flex-wrap justify-center items-center gap-8 md:gap-16 opacity-60 grayscale hover:grayscale-0 transition-all duration-500">
+            <div className="flex flex-wrap justify-center items-center gap-8 md:gap-16 opacity-60 dark:opacity-40 grayscale hover:grayscale-0 transition-all duration-500">
               {(brandPartners.length > 0 ? brandPartners : [
                 { name: 'TechCorp' },
                 { name: 'StyleHub' },
@@ -562,7 +561,7 @@ export default function Home() {
                 ) : (
                   <div
                     key={partner._id || idx}
-                    className="text-2xl font-bold text-gray-400 hover:text-violet-600 transition-colors cursor-pointer"
+                    className="text-2xl font-bold text-gray-400 dark:text-gray-500 hover:text-violet-600 dark:hover:text-violet-400 transition-colors cursor-pointer"
                   >
                     {partner.name}
                   </div>
@@ -573,8 +572,8 @@ export default function Home() {
         </section>
 
         {/* Trust Badges */}
-        <section className="bg-white border-b border-gray-100">
-          <div className="container mx-auto px-4 py-10">
+        <section className="bg-white dark:bg-slate-900 border-b border-gray-100 dark:border-slate-800">
+          <div className="mx-auto max-w-7xl px-4 py-10">
             <div className="grid grid-cols-2 md:grid-cols-4 gap-8">
               {(trustBadges.length > 0 ? trustBadges : [
                 { icon: 'truck', title: 'Free Shipping', description: 'On orders over 50,000 Rwf' },
@@ -594,12 +593,12 @@ export default function Home() {
                 };
                 return (
                   <div key={badge._id || idx} className="flex items-center gap-4">
-                    <div className="w-12 h-12 bg-violet-50 rounded-xl flex items-center justify-center text-violet-600">
+                    <div className="w-12 h-12 bg-violet-50 dark:bg-slate-800 rounded-xl flex items-center justify-center text-violet-600 dark:text-violet-400">
                       {iconMap[badge.icon] || <FaShieldAlt className="text-2xl" />}
                     </div>
                     <div>
-                      <h4 className="font-semibold text-gray-800">{badge.title}</h4>
-                      <p className="text-sm text-gray-500">{badge.description}</p>
+                      <h4 className="font-semibold text-gray-800 dark:text-slate-100">{badge.title}</h4>
+                      <p className="text-sm text-gray-500 dark:text-gray-400">{badge.description}</p>
                     </div>
                   </div>
                 );
@@ -609,8 +608,8 @@ export default function Home() {
         </section>
 
         {/* Newsletter */}
-        <section className="py-20 bg-slate-900">
-          <div className="container mx-auto px-4 text-center">
+        <section className="py-20 bg-slate-900 dark:bg-black">
+          <div className="mx-auto max-w-7xl px-4 text-center">
             <h2 className="text-3xl md:text-4xl font-bold text-white mb-4">
               Join Our Community
             </h2>
@@ -649,7 +648,7 @@ export default function Home() {
                 placeholder="Enter your email"
                 value={newsletterEmail}
                 onChange={(e) => setNewsletterEmail(e.target.value)}
-                className="flex-1 bg-slate-800 border border-slate-700 rounded-full px-6 py-3 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-violet-500"
+                className="flex-1 bg-slate-800 dark:bg-slate-900 border border-slate-700 rounded-full px-6 py-3 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-violet-500"
                 disabled={newsletterStatus.loading}
               />
               <button
