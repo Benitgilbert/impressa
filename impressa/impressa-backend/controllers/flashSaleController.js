@@ -1,5 +1,6 @@
 import FlashSale from "../models/FlashSale.js";
 import Product from "../models/Product.js";
+import { notifyFlashSaleCreated } from "./notificationController.js";
 
 /**
  * Get all flash sales
@@ -159,6 +160,16 @@ export const createFlashSale = async (req, res, next) => {
             bannerColor,
             isActive: isActive !== false
         });
+
+        // 🔔 Notify Admin
+        try {
+            notifyFlashSaleCreated({
+                name: flashSale.name,
+                status: 'Created',
+                recipientId: req.user._id // Although internal, good for logging? Or notify OTHER admins? 
+                // Wait, notifyAdmins ignores recipientId and broadcasts.
+            });
+        } catch (e) { }
 
         res.status(201).json({
             success: true,

@@ -1,4 +1,6 @@
 import Subscriber from "../models/Subscriber.js";
+import User from "../models/User.js";
+import { notifyNewSubscriber } from "./notificationController.js";
 
 /**
  * Subscribe to newsletter (public)
@@ -42,6 +44,11 @@ export const subscribe = async (req, res, next) => {
             email: email.toLowerCase(),
             source: source || 'homepage'
         });
+
+        // 🔔 Notify Admin
+        try {
+            notifyNewSubscriber(email);
+        } catch (e) { }
 
         res.status(201).json({
             success: true,
@@ -168,6 +175,89 @@ export const exportSubscribers = async (req, res, next) => {
         res.setHeader('Content-Type', 'text/csv');
         res.setHeader('Content-Disposition', 'attachment; filename=subscribers.csv');
         res.send(csvHeader + csvRows);
+    } catch (error) {
+        next(error);
+    }
+};
+
+/**
+ * Send newsletter to subscribers (admin)
+ */
+export const sendNewsletter = async (req, res, next) => {
+    try {
+        const { subject, message, recipientType = 'subscribers', recipientId } = req.body;
+
+        if (!subject || !message) {
+            return res.status(400).json({
+                success: false,
+                message: "Subject and message are required"
+            });
+        }
+
+        let recipients = [];
+
+        // Determine recipients based on type
+        switch (recipientType) {
+            case 'sellers':
+                recipients = await User.find({ role: 'seller' }).select('email');
+                break;
+            case 'customers':
+                recipients = await User.find({ role: 'customer' }).select('email');
+                break;
+            case 'specific':
+                if (!recipientId) {
+                    return res.status(400).json({
+                        success: false,
+                        message: "Recipient ID is required for specific targeting"
+                    });
+                }
+                const specificUser = await User.findById(recipientId).select('email');
+                if (specificUser) recipients = [specificUser];
+                break;
+            case 'subscribers':
+            default:
+                recipients = await Subscriber.find({ isActive: true }).select('email');
+                break;
+        }
+
+        if (!recipients || recipients.length === 0) {
+            return res.status(404).json({
+                success: false,
+                message: `No active recipients found for type: ${recipientType}`
+            });
+        }
+
+        // Send emails
+        let successCount = 0;
+        let failCount = 0;
+
+        const { sendReportEmail } = await import("../utils/sendReportEmail.js");
+
+        for (const recipient of recipients) {
+            if (!recipient.email) continue;
+
+            try {
+                await sendReportEmail({
+                    to: recipient.email,
+                    subject: subject,
+                    html: message
+                });
+                successCount++;
+            } catch (err) {
+                console.error(`Failed to send newsletter to ${recipient.email}:`, err);
+                failCount++;
+            }
+        }
+
+        res.json({
+            success: true,
+            message: `Newsletter sent to ${successCount} recipients (${recipientType}). Failed: ${failCount}`,
+            stats: {
+                total: recipients.length,
+                sent: successCount,
+                failed: failCount
+            }
+        });
     } catch (error) {
         next(error);
     }

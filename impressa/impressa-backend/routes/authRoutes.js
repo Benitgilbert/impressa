@@ -75,7 +75,15 @@ router.put("/users/:id", verifyToken, verifyAdmin, validateUpdateUser, authContr
 
 // User Profile Routes
 router.get("/me", verifyToken, authController.getProfile);
-router.put("/me", verifyToken, uploadProfileImage.single("profileImage"), authController.updateProfile);
+router.put(
+  "/me",
+  verifyToken,
+  uploadProfileImage.fields([
+    { name: "profileImage", maxCount: 1 },
+    { name: "storeLogo", maxCount: 1 },
+  ]),
+  authController.updateProfile
+);
 
 router.get("/admin/dashboard", authMiddleware(["admin"]), (req, res) => {
   res.json({ message: `Welcome, ${req.user.role} user` });

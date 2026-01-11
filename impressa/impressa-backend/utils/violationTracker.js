@@ -1,6 +1,7 @@
 import SellerViolation from "../models/SellerViolation.js";
 import User from "../models/User.js";
 import Order from "../models/Order.js";
+import { notifyViolation } from "../controllers/notificationController.js";
 
 /**
  * Violation Tracker - Auto-detects seller violations based on metrics
@@ -169,6 +170,11 @@ export const processViolations = async (sellerId) => {
 
             await newViolation.save();
             createdViolations.push(newViolation);
+
+            // 🔔 Notify Admin
+            try {
+                notifyViolation(newViolation.type, seller.storeName || seller.name);
+            } catch (e) { }
         }
 
         // Check total penalty points for auto-suspension

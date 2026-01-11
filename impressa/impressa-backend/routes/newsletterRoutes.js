@@ -4,7 +4,8 @@ import {
     unsubscribe,
     getAllSubscribers,
     deleteSubscriber,
-    exportSubscribers
+    exportSubscribers,
+    sendNewsletter
 } from "../controllers/newsletterController.js";
 import { verifyAdmin } from "../middleware/authMiddleware.js";
 
@@ -18,5 +19,6 @@ router.get("/unsubscribe/:email", unsubscribe);
 router.get("/subscribers", verifyAdmin, getAllSubscribers);
 router.delete("/subscribers/:id", verifyAdmin, deleteSubscriber);
 router.get("/export", verifyAdmin, exportSubscribers);
+router.post("/send", verifyAdmin, sendNewsletter);
 
 export default router;

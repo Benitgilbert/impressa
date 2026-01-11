@@ -1,4 +1,6 @@
 import Product from "../models/Product.js";
+import Fuse from "fuse.js";
+import { notifyProductAdded } from "./notificationController.js";
 
 // Create product (seller only)
 export const createProduct = async (req, res) => {
@@ -44,9 +46,32 @@ export const createProduct = async (req, res) => {
 
     const product = new Product(body);
     await product.save();
+
+    // 🔔 Notify Admin
+    try {
+      if (req.user.role === 'seller') {
+        notifyProductAdded(req.user.name, product.name);
+      }
+    } catch (e) { console.error("Notification failed", e); }
+
     res.status(201).json(product);
   } catch (err) {
     res.status(400).json({ message: err.message });
+  }
+};
+
+// Get seller's own products
+export const getSellerProducts = async (req, res) => {
+  try {
+    // Only fetch products belonging to the logged-in seller
+    const products = await Product.find({ seller: req.user.id })
+      .populate("seller", "name storeName")
+      .sort({ createdAt: -1 });
+
+    // Using a common response structure
+    res.json({ success: true, data: products });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
   }
 };
 
@@ -58,14 +83,6 @@ export const getAllProducts = async (req, res) => {
     if (req.query.tags) q.tags = { $in: req.query.tags.split(',') };
     // Filter by seller (optional)
     if (req.query.seller) q.seller = req.query.seller;
-
-    // Search
-    if (req.query.search) {
-      q.$or = [
-        { name: { $regex: req.query.search, $options: 'i' } },
-        { description: { $regex: req.query.search, $options: 'i' } }
-      ];
-    }
 
     // Category
     if (req.query.category) {
@@ -79,15 +96,61 @@ export const getAllProducts = async (req, res) => {
       if (req.query.maxPrice) q.price.$lte = Number(req.query.maxPrice);
     }
 
+    let products = await Product.find(q).populate("seller", "name storeName");
+
+    // Fuzzy Search with Fuse.js if search query is present
+    if (req.query.search) {
+      const fuse = new Fuse(products, {
+        keys: ["name", "description", "tags"],
+        threshold: 0.4, // Adjust for fuzziness (0.0 exact, 1.0 matches anything)
+        includeScore: true
+      });
+      const results = fuse.search(req.query.search);
+      products = results.map(r => r.item);
+    }
+
     const limit = Math.min(parseInt(req.query.limit) || 0, 100) || undefined;
     const sort = req.query.sort || undefined;
 
-    let cursor = Product.find(q).populate("seller", "name storeName");
-    if (sort) cursor = cursor.sort(sort);
-    if (limit) cursor = cursor.limit(limit);
+    // Apply sorting
+    if (sort && !req.query.search) {
+      // If we have a search, Fuse.js already sorted by relevance. 
+      // Only sort if no search OR if explicit sort is requested (user preference over relevance)
+      // For now, let's allow explicit sort to override relevance if requested.
+      if (sort === "price-asc") products.sort((a, b) => a.price - b.price);
+      else if (sort === "price-desc") products.sort((a, b) => b.price - a.price);
+      else if (sort === "newest") products.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+    }
 
-    const products = await cursor;
+    if (limit) products = products.slice(0, limit);
+
     res.json(products);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
+// Search suggestions (fuzzy)
+export const getSuggestions = async (req, res) => {
+  try {
+    const { q } = req.query;
+    if (!q) return res.json([]);
+
+    // Get only approved/active products for suggestions
+    const products = await Product.find({ visibility: 'public' })
+      .select("name price image _id")
+      .limit(100); // Fetch a reasonable amount for fuse to search locally
+
+    const fuse = new Fuse(products, {
+      keys: ["name"],
+      threshold: 0.4,
+      includeScore: true
+    });
+
+    const results = fuse.search(q);
+    const suggestions = results.slice(0, 8).map(r => r.item);
+
+    res.json(suggestions);
   } catch (err) {
     res.status(500).json({ message: err.message });
   }

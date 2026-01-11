@@ -4,6 +4,7 @@ import jwt from "jsonwebtoken";
 import { sendReportEmail } from "../utils/sendReportEmail.js";
 import { renderTemplate } from "../utils/emailTemplate.js";
 import { processSellerAutoApproval } from "../utils/autoApproval.js";
+import { notifyUserRegistered } from "./notificationController.js";
 
 // Generate tokens
 const generateTokens = (user) => {
@@ -57,6 +58,11 @@ export const register = async (req, res) => {
     if (role === 'seller') {
       approvalResult = await processSellerAutoApproval(user._id);
     }
+
+    // 🔔 Notify Admin
+    try {
+      notifyUserRegistered(user.name, user.role);
+    } catch (e) { }
 
     res.status(201).json({
       message: "User registered successfully",

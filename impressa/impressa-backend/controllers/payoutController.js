@@ -3,6 +3,7 @@ import SellerEarning from "../models/SellerEarning.js";
 import CommissionSettings from "../models/CommissionSettings.js";
 import { recordTransaction } from "./financeController.js";
 import Account from "../models/Account.js";
+import { notifyPayoutRequest, notifyPayoutProcessed } from "./notificationController.js";
 
 /**
  * Request a payout (seller)
@@ -59,6 +60,11 @@ export const requestPayout = async (req, res, next) => {
             { _id: { $in: availableEarnings.map(e => e._id) } },
             { payout: payout._id }
         );
+
+        // 🔔 Notify Admin
+        try {
+            notifyPayoutRequest(req.user.name, payout.amount);
+        } catch (e) { }
 
         res.status(201).json({
             success: true,
@@ -225,6 +231,13 @@ export const processPayout = async (req, res, next) => {
         }
 
         await payout.save();
+
+        // 🔔 Notify Seller
+        try {
+            if (action === "approve" || action === "complete" || action === "reject") {
+                notifyPayoutProcessed(payout.seller?._id, payout.amount, action === "reject" ? "rejected" : "completed");
+            }
+        } catch (e) { }
 
         res.json({
             success: true,

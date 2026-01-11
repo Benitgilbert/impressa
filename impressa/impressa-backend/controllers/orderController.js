@@ -15,6 +15,7 @@ import convertLogsToCSV from "../utils/logCsvExporter.js";
 import generateAISummary from "../utils/aiSummary.js";
 import sendReportEmail from "../utils/sendReportEmail.js";
 import { sendStatusUpdate } from "../services/emailService.js";
+import { notifyAdminNewOrder, notifyOrderPlaced } from "./notificationController.js";
 
 // 📦 Place an order (customer only) - Legacy/Single Item
 export const placeOrder = async (req, res) => {
@@ -169,6 +170,24 @@ export const createOrder = async (req, res) => {
       }
     } catch (earnErr) {
       console.error("Failed to create seller earnings:", earnErr);
+    }
+
+    // 🔔 Send Notifications
+    try {
+      // 1. Notify Customer (if registered)
+      if (req.user?.id) {
+        notifyOrderPlaced(req.user.id, order._id, order.totals.grandTotal);
+      }
+
+      // 2. Notify Admin
+      notifyAdminNewOrder(
+        order._id,
+        order.publicId,
+        order.totals.grandTotal,
+        req.user?.name || (order.guestInfo?.email ? `Guest (${order.guestInfo.email})` : 'Guest')
+      );
+    } catch (notifErr) {
+      console.error("Notification Error:", notifErr);
     }
 
     res.status(201).json(order);

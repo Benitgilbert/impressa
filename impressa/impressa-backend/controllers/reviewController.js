@@ -1,5 +1,6 @@
 import Review from "../models/Review.js";
 import Product from "../models/Product.js";
+import { notifyReviewCreated } from "./notificationController.js";
 
 // Add a review
 export const addReview = async (req, res) => {
@@ -30,6 +31,12 @@ export const addReview = async (req, res) => {
         });
 
         await review.save();
+
+        // 🔔 Notify Admin
+        try {
+            notifyReviewCreated(product.name, rating);
+        } catch (e) { }
+
         res.status(201).json(review);
     } catch (err) {
         res.status(400).json({ message: err.message });
