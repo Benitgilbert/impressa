@@ -5,6 +5,13 @@ import logger from "../config/logger.js";
 const router = express.Router();
 
 /**
+ * Root endpoint for basic connectivity check (Render default health check)
+ */
+router.get("/", (req, res) => {
+  res.status(200).send("Impressa Backend is running");
+});
+
+/**
  * Basic health check endpoint
  * Returns 200 if server is running
  */
@@ -35,7 +42,7 @@ router.get("/ready", async (req, res) => {
   try {
     if (mongoose.connection.readyState === 1) {
       checks.database = "ok";
-      
+
       // Ping database to ensure it's responsive
       await mongoose.connection.db.admin().ping();
     } else {

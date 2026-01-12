@@ -1,78 +1,45 @@
-# Deployment Readiness Checklist
+# Deploying Impressa to Vercel
 
-Use this checklist to take Impressa from dev to a production-ready, secure deployment.
+Since your backend is already on **Render**, here is how to deploy the Frontend to **Vercel** and connect them.
 
-## 1) Security and Validation
-- [ ] Add request validation (zod/express-validator) for all endpoints (auth, products, orders, reports)
-- [ ] Sanitize and normalize inputs; escape/strip HTML where appropriate
-- [ ] File upload hardening: set multer limits (e.g., 10MB, 1 file), MIME sniff (file-type), allow only image/PDF
-- [ ] Add helmet for security headers; review CORS to restrict origins and methods
-- [ ] Enforce rate limiting on public endpoints (/orders/public, /orders/track/:id)
-- [ ] Secrets management: never commit .env; document environment variables; validate with envalid/zod
+## Prerequisites
+1.  **Vercel Account**: Sign up at [vercel.com](https://vercel.com).
+2.  **GitHub Repo**: Ensure your code is pushed to GitHub (I just did this for you).
 
-## 2) Auth and Sessions
-- [ ] Standardize token naming (e.g., accessToken) and storage on frontend
-- [ ] Implement customer login/register UI; ensure axios uses the same token key
-- [ ] Add refresh token rotation and secure storage rules (httpOnly cookies if migrating from localStorage)
-- [ ] Protect admin-only routes; verify RBAC consistently
+## Step 1: Import Project to Vercel
+1.  Go to your **Vercel Dashboard**.
+2.  Click **"Add New..."** -> **"Project"**.
+3.  Select **"Continue with GitHub"**.
+4.  Find your repository (`impressa`) and click **"Import"**.
 
-## 3) API Quality and Error Handling
-- [ ] Centralize error handler middleware with consistent JSON: { message, code?, details? }
-- [ ] Avoid generic 500; attach safe error codes
-- [ ] Add pagination, filtering, and sorting to list endpoints
-- [ ] Document and enforce response schemas
+## Step 2: Configure Project settings
+In the "Configure Project" screen:
+1.  **Framework Preset**: It should auto-detect **Create React App**. If not, select it.
+2.  **Root Directory**: Click "Edit" and select `impressa-frontend`. (This is crucial because your repo has both backend and frontend folders).
+3.  **Build Command**: Leave as `npm run build`.
+4.  **Output Directory**: Leave as `build`.
 
-## 4) Orders and Guest Checkout
-- [ ] Ensure Order.publicId uniqueness with retry on duplicate key
-- [ ] Email receipt to guests with tracking link to /track?query={publicId}
-- [ ] Add order confirmation page in frontend with tracking ID display and “copy” button
+## Step 3: Add Environment Variables
+Expand the **"Environment Variables"** section. You need to tell the frontend where your backend lives.
 
-## 5) Reporting and PDFs
-- [ ] Add timeout and retry for chart image generation; skip gracefully with a note
-- [ ] Cache charts by (report-type, month, year) for 15 min
-- [ ] Confirm logo asset paths in all environments; add fallback text
-- [ ] Add e2e test to render a monthly PDF successfully
+| Key | Value | Example |
+| :--- | :--- | :--- |
+| `REACT_APP_API_URL` | **Your Render Backend URL** | `https://impressa-api.onrender.com/api` |
 
-## 6) Frontend Standards & UX
-- [ ] Use env-based API base URL (REACT_APP_API_BASE_URL) and document
-- [ ] Adopt React Query/SWR for data fetching states and caching
-- [ ] Improve accessibility: labels, alt text, focus states, semantic headings
-- [ ] Tailwind plugin for line-clamp or replace with CSS clamp utilities
-- [ ] Persist cart customization files if needed (draft uploads or IndexedDB)
+> **Important**: key sure to add `/api` at the end of your Render URL if your backend routes start with `/api`.
 
-## 7) Backend Structure & Logging
-- [ ] Clean up server.js route mounting (no duplicates) and order of middlewares
-- [ ] Replace console logs with pino/winston; add request logging (pino-http/morgan)
-- [ ] Split controllers/services cleanly; keep controllers thin
+## Step 4: Deploy
+1.  Click **"Deploy"**.
+2.  Wait for Vercel to build your site (approx. 1-2 mins).
+3.  Once done, you will get a live URL (e.g., `https://impressa-frontend.vercel.app`).
 
-## 8) Database & Data
-- [ ] Ensure indexes on: Order.publicId (unique), createdAt, frequently filtered fields
-- [ ] Add seed scripts for dev (products, admin user)
-- [ ] Create backup/restore procedures for MongoDB
+## Step 5: Update Backend CORS (Crucial!)
+Your Backend on Render might be blocking the new Vercel domain. You need to update your Backend config:
+1.  Go to your **Render Dashboard**.
+2.  Open your Backend service settings.
+3.  Update the `CORS_ORIGIN` or `ALLOWED_ORIGINS` environment variable to include your new Vercel URL (with no trailing slash).
+    *   Example: `http://localhost:3000,https://impressa-frontend.vercel.app`
 
-## 9) Testing
-- [ ] Backend unit tests (services) and integration tests (routes) with Jest + Supertest
-- [ ] Frontend unit tests (React Testing Library) for cart, checkout, tracking
-- [ ] E2E tests with Playwright/Cypress covering: browse, add-to-cart, guest checkout, tracking, admin report
-
-## 10) Observability and Ops
-- [ ] /health and /ready endpoints for monitoring
-- [ ] Structured logging; log correlation IDs
-- [ ] Error tracking (Sentry/Bugsnag) in both client and server
-
-## 11) CI/CD & Deployment
-- [ ] GitHub Actions: lint, test, build for frontend and backend
-- [ ] Build artifacts and deploy to staging; manual approval to production
-- [ ] Ensure node-cron runs in only one instance (dedicated worker or distributed lock)
-- [ ] Containerization (Docker) with production Dockerfiles and compose/k8s manifests
-
-## 12) Performance
-- [ ] Verify Mongo query plans; add indexes where needed
-- [ ] Enable gzip/br compression; cache static assets
-- [ ] Use CDN for images if applicable
-
-## 13) Documentation & Legal
-- [ ] OpenAPI/Swagger for public endpoints (products, order creation/tracking)
-- [ ] Update READMEs (env setup, base URLs, scripts, report endpoints)
-- [ ] Operational runbook (rotation of keys, backups, recovery)
-- [ ] Privacy policy and Terms (for guest/customer data)
+## Troubleshooting
+*   **404 on Refresh**: I already added `vercel.json` to fix this.
+*   **Network Error / CORS Error**: Check Step 5.
