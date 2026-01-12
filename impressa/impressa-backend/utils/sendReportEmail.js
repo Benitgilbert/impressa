@@ -17,7 +17,7 @@ export const sendReportEmail = async ({ to, subject, text, html, attachmentPath 
     }
 
     const emailData = {
-      from: 'Impressa <noreply@impressa.rw>',
+      from: 'Impressa <onboarding@resend.dev>',
       to,
       subject,
       html: html || `<p>${text}</p>`, // Use HTML if provided, otherwise wrap text in <p>

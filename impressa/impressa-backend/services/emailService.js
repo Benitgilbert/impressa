@@ -17,7 +17,7 @@ export const sendOrderConfirmation = async (order) => {
         }
 
         const { data, error } = await resend.emails.send({
-            from: 'Impressa <noreply@impressa.rw>',
+            from: 'Impressa <onboarding@resend.dev>',
             to: order.guestInfo?.email || order.customer?.email,
             subject: `Order Confirmation #${order.publicId}`,
             html: `
@@ -48,7 +48,7 @@ export const sendStatusUpdate = async (order) => {
         }
 
         const { data, error } = await resend.emails.send({
-            from: 'Impressa <noreply@impressa.rw>',
+            from: 'Impressa <onboarding@resend.dev>',
             to: order.guestInfo?.email || order.customer?.email,
             subject: `Order Update #${order.publicId}`,
             html: `
