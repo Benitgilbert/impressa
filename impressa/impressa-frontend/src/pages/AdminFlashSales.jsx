@@ -89,6 +89,13 @@ export default function AdminFlashSales() {
         return { label: 'Active', classes: 'bg-sage-100 text-sage-700 dark:bg-sage-900/20 dark:text-sage-400' };
     };
 
+    const toLocalISOString = (date) => {
+        if (!date) return '';
+        const d = new Date(date);
+        const offset = d.getTimezoneOffset() * 60000;
+        return new Date(d.getTime() - offset).toISOString().slice(0, 16);
+    };
+
     const handleSubmit = async (e) => {
         e.preventDefault();
         setError('');
@@ -100,13 +107,19 @@ export default function AdminFlashSales() {
                 ? `${API_URL}/flash-sales/${editingSale._id}`
                 : `${API_URL}/flash-sales`;
 
+            const payload = {
+                ...form,
+                startDate: new Date(form.startDate).toISOString(),
+                endDate: new Date(form.endDate).toISOString()
+            };
+
             const res = await fetch(url, {
                 method: editingSale ? 'PUT' : 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                     Authorization: `Bearer ${token}`
                 },
-                body: JSON.stringify(form)
+                body: JSON.stringify(payload)
             });
 
             const data = await res.json();
@@ -209,8 +222,8 @@ export default function AdminFlashSales() {
             setForm({
                 name: sale.name || '',
                 description: sale.description || '',
-                startDate: sale.startDate ? new Date(sale.startDate).toISOString().slice(0, 16) : '',
-                endDate: sale.endDate ? new Date(sale.endDate).toISOString().slice(0, 16) : '',
+                startDate: toLocalISOString(sale.startDate),
+                endDate: toLocalISOString(sale.endDate),
                 bannerColor: sale.bannerColor || 'from-terracotta-500 to-sand-400',
                 isActive: sale.isActive !== false,
             });
@@ -221,8 +234,8 @@ export default function AdminFlashSales() {
             setForm({
                 name: '',
                 description: '',
-                startDate: now.toISOString().slice(0, 16),
-                endDate: tomorrow.toISOString().slice(0, 16),
+                startDate: toLocalISOString(now),
+                endDate: toLocalISOString(tomorrow),
                 bannerColor: 'from-terracotta-500 to-sand-400',
                 isActive: true,
             });

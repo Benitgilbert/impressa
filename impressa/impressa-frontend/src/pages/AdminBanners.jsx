@@ -54,6 +54,13 @@ export default function AdminBanners() {
         return { label: 'Active', classes: 'bg-sage-100 text-sage-700 dark:bg-sage-900/20 dark:text-sage-400' };
     };
 
+    const toLocalISOString = (date) => {
+        if (!date) return '';
+        const d = new Date(date);
+        const offset = d.getTimezoneOffset() * 60000;
+        return new Date(d.getTime() - offset).toISOString().slice(0, 16);
+    };
+
     const handleImageUpload = async (e) => {
         const file = e.target.files[0];
         if (!file) return;
@@ -75,10 +82,15 @@ export default function AdminBanners() {
         try {
             const token = localStorage.getItem('authToken');
             const url = editingBanner ? `${API_URL}/banners/${editingBanner._id}` : `${API_URL}/banners`;
+            const payload = {
+                ...form,
+                startDate: form.startDate ? new Date(form.startDate).toISOString() : null,
+                endDate: form.endDate ? new Date(form.endDate).toISOString() : null
+            };
             const res = await fetch(url, {
                 method: editingBanner ? 'PUT' : 'POST',
                 headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-                body: JSON.stringify({ ...form, startDate: form.startDate || null, endDate: form.endDate || null })
+                body: JSON.stringify(payload)
             });
             const data = await res.json();
             if (data.success) { setSuccess(editingBanner ? 'Banner updated!' : 'Banner created!'); fetchBanners(); closeModal(); }
@@ -112,8 +124,8 @@ export default function AdminBanners() {
                 title: banner.title || '', subtitle: banner.subtitle || '', badge: banner.badge || 'Limited Time Offer',
                 buttonText: banner.buttonText || 'Shop Now', buttonLink: banner.buttonLink || '/shop', backgroundImage: banner.backgroundImage || '',
                 gradientFrom: banner.gradientFrom || '#8b5cf6', gradientTo: banner.gradientTo || '#d946ef',
-                startDate: banner.startDate ? new Date(banner.startDate).toISOString().slice(0, 16) : '',
-                endDate: banner.endDate ? new Date(banner.endDate).toISOString().slice(0, 16) : '',
+                startDate: toLocalISOString(banner.startDate),
+                endDate: toLocalISOString(banner.endDate),
                 position: banner.position || 'hero', isActive: banner.isActive !== false
             });
         } else {
