@@ -4,6 +4,7 @@ import {
   FaFacebookF, FaTwitter, FaInstagram, FaLinkedinIn,
   FaEnvelope, FaPhone, FaMapMarkerAlt
 } from "react-icons/fa";
+import api from "../utils/axiosInstance";
 
 export default function LandingFooter() {
   const [footerData, setFooterData] = useState({
@@ -17,8 +18,8 @@ export default function LandingFooter() {
   useEffect(() => {
     const fetchFooterSettings = async () => {
       try {
-        const res = await fetch('http://localhost:5000/api/site-settings/public');
-        const data = await res.json();
+        const res = await api.get('/site-settings/public');
+        const data = res.data; // Axios puts the response body in .data
         if (data.success && data.data) {
           setFooterData({
             footerTagline: data.data.footerTagline || footerData.footerTagline,

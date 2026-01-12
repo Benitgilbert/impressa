@@ -49,9 +49,9 @@ export default function Header() {
   useEffect(() => {
     const fetchCategories = async () => {
       try {
-        const res = await fetch('http://localhost:5000/api/categories');
-        const data = await res.json();
-        if (data.success && Array.isArray(data.data)) {
+        const res = await api.get('/categories');
+        const data = res.data;
+        if (data.success) {
           setCategories(data.data);
         }
       } catch (error) {

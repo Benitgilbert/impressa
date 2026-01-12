@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import api from "../utils/axiosInstance";
+import assetUrl from "../utils/assetUrl";
 import { FaStar, FaArrowRight } from "react-icons/fa";
 
 function TrendingProductsSidebar() {
@@ -47,7 +48,7 @@ function TrendingProductsSidebar() {
             {/* Background Image Layer */}
             <div className="absolute inset-0 z-0">
                 <img
-                    src={`http://localhost:5000${currentProduct.images?.[0] || currentProduct.image}`}
+                    src={assetUrl(currentProduct.images?.[0] || currentProduct.image)}
                     alt="Background"
                     className="w-full h-full object-cover opacity-30 blur-2xl scale-110 transition-all duration-1000 ease-in-out"
                 />
@@ -70,7 +71,7 @@ function TrendingProductsSidebar() {
                     <div className="relative w-80 h-80 mb-12 group cursor-pointer">
                         <div className="absolute inset-0 bg-violet-600 rounded-full blur-3xl opacity-20 group-hover:opacity-40 transition-opacity duration-500"></div>
                         <img
-                            src={`http://localhost:5000${currentProduct.images?.[0] || currentProduct.image}`}
+                            src={assetUrl(currentProduct.images?.[0] || currentProduct.image)}
                             alt={currentProduct.name}
                             className="relative w-full h-full object-contain drop-shadow-[0_35px_35px_rgba(0,0,0,0.5)] transform group-hover:scale-110 transition-transform duration-700 ease-out"
                         />
