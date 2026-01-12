@@ -144,27 +144,28 @@ export const refreshToken = async (req, res) => {
 
 
 export const adminLoginStep1 = async (req, res) => {
-  const { email, password } = req.body;
-  const user = await User.findOne({ email, role: "admin" });
-  if (!user) return res.status(404).json({ message: "Admin not found" });
+  try {
+    const { email, password } = req.body;
+    const user = await User.findOne({ email, role: "admin" });
+    if (!user) return res.status(404).json({ message: "Admin not found" });
 
-  const isMatch = await bcrypt.compare(password, user.password);
-  if (!isMatch) return res.status(401).json({ message: "Invalid credentials" });
+    const isMatch = await bcrypt.compare(password, user.password);
+    if (!isMatch) return res.status(401).json({ message: "Invalid credentials" });
 
-  const otp = Math.floor(100000 + Math.random() * 900000).toString();
-  user.otp = otp;
-  user.otpExpires = Date.now() + 5 * 60 * 1000;
-  await user.save();
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    user.otp = otp;
+    user.otpExpires = Date.now() + 5 * 60 * 1000;
+    await user.save();
 
-  const htmlContent = renderTemplate("otp-template", {
-    otp: otp.split("").join(" "),
-    email: user.email,
-  });
+    const htmlContent = renderTemplate("otp-template", {
+      otp: otp.split("").join(" "),
+      email: user.email,
+    });
 
-  await sendReportEmail({
-    to: user.email,
-    subject: "🔐 impressa Admin Login OTP",
-    text: `Hello ${user.name},
+    await sendReportEmail({
+      to: user.email,
+      subject: "🔐 impressa Admin Login OTP",
+      text: `Hello ${user.name},
 
 Your impressa admin login code is: ${otp}
 
@@ -173,10 +174,14 @@ This code will expire in 5 minutes. Please do not share it with anyone.
 If you did not request this login, you can safely ignore this message.
 
 — impressa Security Team`,
-    html: htmlContent
-  });
+      html: htmlContent
+    });
 
-  res.json({ message: "OTP sent to admin email" });
+    res.json({ message: "OTP sent to admin email" });
+  } catch (error) {
+    console.error("Admin login OTP error:", error);
+    res.status(500).json({ message: "Failed to send OTP. Please try again." });
+  }
 };
 
 // Admin login step 2: verify OTP
