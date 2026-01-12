@@ -1,3 +1,4 @@
+import { useState, useEffect } from "react";
 import Header from "../components/Header";
 import LandingFooter from "../components/LandingFooter";
 import { FaPhoneAlt, FaEnvelope, FaMapMarkerAlt } from "react-icons/fa";
@@ -6,6 +7,25 @@ import { useCart } from "../context/CartContext";
 
 export default function Contact() {
   const { items = [] } = useCart();
+  const [settings, setSettings] = useState(null);
+
+  useEffect(() => {
+    const fetchSettings = async () => {
+      try {
+        const API_URL = process.env.REACT_APP_API_URL || "http://localhost:5000/api";
+        const res = await fetch(`${API_URL}/site-settings/public`);
+        const data = await res.json();
+        if (data.success) setSettings(data.data);
+      } catch (err) {
+        console.error("Failed to fetch site settings:", err);
+      }
+    };
+    fetchSettings();
+  }, []);
+
+  const mapSource = settings?.googleMapsQuery
+    ? `https://maps.google.com/maps?q=${encodeURIComponent(settings.googleMapsQuery)}&t=&z=15&ie=UTF8&iwloc=&output=embed`
+    : "https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3987.523336224859!2d30.06034561475492!3d-1.94399399859239!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x19dca4247de48c37%3A0x6d3b3a4a9f7d6d3c!2sKigali%2C%20Rwanda!5e0!3m2!1sen!2sus!4v1620052300000!5m2!1sen!2sus";
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-slate-950 transition-colors duration-300">
@@ -24,7 +44,7 @@ export default function Contact() {
               Get in <span className="text-violet-600 dark:text-violet-400">Touch</span>
             </h1>
             <p className="text-xl md:text-2xl text-gray-600 dark:text-gray-400 max-w-3xl mx-auto leading-relaxed">
-              We are here to help. Send us a message and we will get back to you as soon as possible.
+              {settings?.tagline || "We are here to help. Send us a message and we will get back to you as soon as possible."}
             </p>
           </div>
         </section>
@@ -100,7 +120,7 @@ export default function Contact() {
                       </div>
                       <div className="flex-1">
                         <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-1 uppercase tracking-widest text-sm opacity-50">Address</h3>
-                        <p className="text-gray-600 dark:text-gray-400 font-medium leading-relaxed">123 Impressa Lane, Kigali, Rwanda</p>
+                        <p className="text-gray-600 dark:text-gray-400 font-medium leading-relaxed">{settings?.contactAddress || "123 Impressa Lane, Kigali, Rwanda"}</p>
                       </div>
                     </div>
                     <div className="flex gap-6 group">
@@ -109,7 +129,7 @@ export default function Contact() {
                       </div>
                       <div className="flex-1">
                         <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-1 uppercase tracking-widest text-sm opacity-50">Phone</h3>
-                        <p className="text-gray-600 dark:text-gray-400 font-medium leading-relaxed">(+250) 788 123 456</p>
+                        <p className="text-gray-600 dark:text-gray-400 font-medium leading-relaxed">{settings?.contactPhone || "(+250) 788 123 456"}</p>
                       </div>
                     </div>
                     <div className="flex gap-6 group">
@@ -119,7 +139,7 @@ export default function Contact() {
                       <div className="flex-1">
                         <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-1 uppercase tracking-widest text-sm opacity-50">Email</h3>
                         <p className="text-gray-600 dark:text-gray-400 font-medium leading-relaxed">
-                          <a href="mailto:contact@impressa.com" className="hover:text-violet-600 dark:hover:text-violet-400 transition-colors">contact@impressa.com</a>
+                          <a href={`mailto:${settings?.contactEmail || "contact@impressa.com"}`} className="hover:text-violet-600 dark:hover:text-violet-400 transition-colors">{settings?.contactEmail || "contact@impressa.com"}</a>
                         </p>
                       </div>
                     </div>
@@ -133,7 +153,7 @@ export default function Contact() {
         {/* Map Section */}
         <section className="h-[500px] w-full bg-gray-100 dark:bg-slate-800 grayscale dark:grayscale-0 hover:grayscale-0 transition-all duration-700">
           <iframe
-            src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3987.523336224859!2d30.06034561475492!3d-1.94399399859239!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x19dca4247de48c37%3A0x6d3b3a4a9f7d6d3c!2sKigali%2C%20Rwanda!5e0!3m2!1sen!2sus!4v1620052300000!5m2!1sen!2sus"
+            src={mapSource}
             width="100%"
             height="100%"
             style={{ border: 0 }}

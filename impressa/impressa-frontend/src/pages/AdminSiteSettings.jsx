@@ -33,6 +33,7 @@ export default function AdminSiteSettings() {
     const [badgeForm, setBadgeForm] = useState({ icon: 'truck', title: '', description: '', isActive: true });
     const [footerForm, setFooterForm] = useState({
         footerTagline: '', contactEmail: '', contactPhone: '', contactAddress: '',
+        googleMapsQuery: '',
         socialLinks: { facebook: '', twitter: '', instagram: '', linkedin: '' }
     });
 
@@ -45,6 +46,7 @@ export default function AdminSiteSettings() {
             setFooterForm({
                 footerTagline: settings.footerTagline || '', contactEmail: settings.contactEmail || '',
                 contactPhone: settings.contactPhone || '', contactAddress: settings.contactAddress || '',
+                googleMapsQuery: settings.googleMapsQuery || '',
                 socialLinks: settings.socialLinks || { facebook: '', twitter: '', instagram: '', linkedin: '' }
             });
         }
@@ -233,6 +235,13 @@ export default function AdminSiteSettings() {
                                     <label className="block text-sm font-medium text-charcoal-700 dark:text-charcoal-300 mb-2"><FaMapMarkerAlt className="inline mr-2 text-terracotta-500" /> Address</label>
                                     <input type="text" value={footerForm.contactAddress} onChange={(e) => setFooterForm({ ...footerForm, contactAddress: e.target.value })} placeholder="123 Commerce St, Kigali, Rwanda"
                                         className="w-full px-4 py-2.5 bg-cream-50 dark:bg-charcoal-700 border border-cream-200 dark:border-charcoal-600 rounded-xl text-charcoal-800 dark:text-white outline-none focus:border-terracotta-500" />
+                                </div>
+
+                                <div className="form-group">
+                                    <label className="block text-sm font-medium text-charcoal-700 dark:text-charcoal-300 mb-2"><FaMapMarkerAlt className="inline mr-2 text-terracotta-500" /> Google Maps Query / Coordinates</label>
+                                    <input type="text" value={footerForm.googleMapsQuery} onChange={(e) => setFooterForm({ ...footerForm, googleMapsQuery: e.target.value })} placeholder="e.g. 1°34'49.5&quot;S 30°04'07.7&quot;E"
+                                        className="w-full px-4 py-2.5 bg-cream-50 dark:bg-charcoal-700 border border-cream-200 dark:border-charcoal-600 rounded-xl text-charcoal-800 dark:text-white outline-none focus:border-terracotta-500" />
+                                    <p className="text-[10px] text-charcoal-400 mt-1 italic">You can enter an address or coordinates (Latitude, Longitude)</p>
                                 </div>
 
                                 <div className="form-group">

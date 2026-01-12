@@ -23,6 +23,7 @@ export const getPublicSettings = async (req, res, next) => {
                 contactEmail: settings.contactEmail,
                 contactPhone: settings.contactPhone,
                 contactAddress: settings.contactAddress,
+                googleMapsQuery: settings.googleMapsQuery,
                 socialLinks: settings.socialLinks || {}
             }
         });
@@ -105,7 +106,7 @@ export const updateGeneralSettings = async (req, res, next) => {
  */
 export const updateFooterSettings = async (req, res, next) => {
     try {
-        const { footerTagline, contactEmail, contactPhone, contactAddress, socialLinks } = req.body;
+        const { footerTagline, contactEmail, contactPhone, contactAddress, googleMapsQuery, socialLinks } = req.body;
 
         const settings = await SiteSettings.getSettings();
 
@@ -113,6 +114,7 @@ export const updateFooterSettings = async (req, res, next) => {
         if (contactEmail !== undefined) settings.contactEmail = contactEmail;
         if (contactPhone !== undefined) settings.contactPhone = contactPhone;
         if (contactAddress !== undefined) settings.contactAddress = contactAddress;
+        if (googleMapsQuery !== undefined) settings.googleMapsQuery = googleMapsQuery;
         if (socialLinks !== undefined) {
             settings.socialLinks = {
                 facebook: socialLinks.facebook || '',
@@ -132,6 +134,7 @@ export const updateFooterSettings = async (req, res, next) => {
                 contactEmail: settings.contactEmail,
                 contactPhone: settings.contactPhone,
                 contactAddress: settings.contactAddress,
+                googleMapsQuery: settings.googleMapsQuery,
                 socialLinks: settings.socialLinks
             }
         });

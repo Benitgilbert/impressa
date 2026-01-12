@@ -67,6 +67,10 @@ const siteSettingsSchema = new mongoose.Schema(
             type: String,
             default: '123 Commerce Street, Design City, DC 12345'
         },
+        googleMapsQuery: {
+            type: String,
+            default: '1°34\'49.5"S 30°04\'07.7"E'
+        },
 
         // Social Media Links
         socialLinks: {
