@@ -7,8 +7,8 @@ export const uploadImage = (req, res) => {
     }
 
     // Return the URL path
-    // Assuming the server is serving 'uploads' static folder at root /uploads
-    const fileUrl = `/uploads/${req.file.filename}`;
+    // Multer Cloudinary Storage provides the full URL in req.file.path
+    const fileUrl = req.file.path;
 
     res.json({
         success: true,

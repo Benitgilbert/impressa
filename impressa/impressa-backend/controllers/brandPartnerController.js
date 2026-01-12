@@ -66,7 +66,7 @@ export const createBrandPartner = async (req, res, next) => {
 
         let logo = logoUrl;
         if (req.file) {
-            logo = `/uploads/${req.file.filename}`;
+            logo = req.file.path;
         }
 
         const partner = await BrandPartner.create({
@@ -96,7 +96,7 @@ export const updateBrandPartner = async (req, res, next) => {
         const updates = { ...req.body };
 
         if (req.file) {
-            updates.logo = `/uploads/${req.file.filename}`;
+            updates.logo = req.file.path;
         }
 
         // Handle boolean conversion from FormData

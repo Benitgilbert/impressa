@@ -326,9 +326,9 @@ export const updateProfile = async (req, res) => {
     if (req.files && req.files.length > 0) {
       req.files.forEach(file => {
         if (file.fieldname === 'profileImage') {
-          user.profileImage = `/uploads/${file.filename}`;
+          user.profileImage = file.path;
         } else if (file.fieldname === 'storeLogo') {
-          user.storeLogo = `/uploads/${file.filename}`;
+          user.storeLogo = file.path;
         }
       });
     }

@@ -68,9 +68,9 @@ export const submitSellerApplication = async (req, res) => {
         if (req.files) {
             req.files.forEach(file => {
                 if (file.fieldname === 'rdbCertificate') {
-                    rdbCertificatePath = `/uploads/${file.filename}`;
+                    rdbCertificatePath = file.path;
                 } else if (file.fieldname === 'nationalId') {
-                    nationalIdPath = `/uploads/${file.filename}`;
+                    nationalIdPath = file.path;
                 }
             });
         }

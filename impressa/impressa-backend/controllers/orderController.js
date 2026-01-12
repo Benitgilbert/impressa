@@ -21,7 +21,7 @@ import { sendOrderConfirmation } from "../services/emailService.js";
 // 📦 Place an order (customer only) - Legacy/Single Item
 export const placeOrder = async (req, res) => {
   try {
-    const customFilePath = req.file ? `/uploads/${req.file.filename}` : (req.body.customFile || null);
+    const customFilePath = req.file ? req.file.path : (req.body.customFile || null);
     const order = new Order({
       product: req.body.product,
       customer: req.user?.id || null,

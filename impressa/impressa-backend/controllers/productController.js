@@ -34,11 +34,11 @@ export const createProduct = async (req, res) => {
     if (req.files && req.files.length > 0) {
       req.files.forEach(file => {
         if (file.fieldname === "image") {
-          body.image = `/uploads/${file.filename}`;
+          body.image = file.path;
         } else if (file.fieldname.startsWith("variation_image_")) {
           const index = parseInt(file.fieldname.split("_")[2]);
           if (body.variations && body.variations[index]) {
-            body.variations[index].image = `/uploads/${file.filename}`;
+            body.variations[index].image = file.path;
           }
         }
       });
@@ -265,11 +265,11 @@ export const updateProduct = async (req, res) => {
     if (req.files && req.files.length > 0) {
       req.files.forEach(file => {
         if (file.fieldname === "image") {
-          body.image = `/uploads/${file.filename}`;
+          body.image = file.path;
         } else if (file.fieldname.startsWith("variation_image_")) {
           const index = parseInt(file.fieldname.split("_")[2]);
           if (body.variations && body.variations[index]) {
-            body.variations[index].image = `/uploads/${file.filename}`;
+            body.variations[index].image = file.path;
           }
         }
       });
