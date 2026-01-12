@@ -243,16 +243,14 @@ export const clearCart = async (req, res, next) => {
   try {
     const sessionToken = req.cookies?.cartSession || req.headers["x-cart-session"];
     if (!sessionToken) {
-      const error = new Error("Cart session not found");
-      error.statusCode = 404;
-      return next(error);
+      // No session = already cleared
+      return res.json({ success: true, message: "Cart cleared (no session)" });
     }
 
     const cart = await Cart.findOne({ sessionToken });
     if (!cart) {
-      const error = new Error("Cart not found");
-      error.statusCode = 404;
-      return next(error);
+      // No cart = already cleared
+      return res.json({ success: true, message: "Cart cleared (no cart found)" });
     }
 
     await cart.clearCart();
