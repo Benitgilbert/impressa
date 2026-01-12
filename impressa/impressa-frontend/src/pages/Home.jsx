@@ -5,14 +5,16 @@ import {
   FaArrowRight, FaHeart, FaRegHeart, FaStar, FaShieldAlt, FaTruck, FaUndo, FaHeadset
 } from "react-icons/fa";
 import { formatRwf } from "../utils/currency";
+import api from "../utils/axiosInstance";
 import LandingFooter from "../components/LandingFooter";
 import Header from "../components/Header";
 import { useWishlist } from "../context/WishlistContext";
 
 const getImageUrl = (path) => {
   if (!path) return '';
+  if (!path) return '';
   if (path.startsWith('http')) return path;
-  if (path.startsWith('/uploads/')) return `http://localhost:5000${path}`;
+  if (path.startsWith('/uploads/')) return `${process.env.REACT_APP_API_URL?.replace('/api', '') || 'http://localhost:5000'}${path}`;
   return process.env.PUBLIC_URL + path;
 };
 
@@ -162,24 +164,24 @@ export default function Home() {
     const fetchData = async () => {
       try {
         const [featuredRes, trendingRes, categoriesRes, flashSaleRes, bannersRes, testimonialsRes, brandPartnersRes, siteSettingsRes] = await Promise.all([
-          fetch('http://localhost:5000/api/products/featured/list'),
-          fetch('http://localhost:5000/api/products/trending'),
-          fetch('http://localhost:5000/api/categories'),
-          fetch('http://localhost:5000/api/flash-sales/active'),
-          fetch('http://localhost:5000/api/banners/active?position=hero'),
-          fetch('http://localhost:5000/api/testimonials/active?limit=6'),
-          fetch('http://localhost:5000/api/brand-partners/active'),
-          fetch('http://localhost:5000/api/site-settings/public')
+          api.get('/products/featured/list'),
+          api.get('/products/trending'),
+          api.get('/categories'),
+          api.get('/flash-sales/active'),
+          api.get('/banners/active?position=hero'),
+          api.get('/testimonials/active?limit=6'),
+          api.get('/brand-partners/active'),
+          api.get('/site-settings/public')
         ]);
 
-        const featuredData = await featuredRes.json();
-        const trendingData = await trendingRes.json();
-        const categoriesData = await categoriesRes.json();
-        const flashSaleData = await flashSaleRes.json();
-        const bannersData = await bannersRes.json();
-        const testimonialsData = await testimonialsRes.json();
-        const brandPartnersData = await brandPartnersRes.json();
-        const siteSettingsData = await siteSettingsRes.json();
+        const featuredData = featuredRes.data;
+        const trendingData = trendingRes.data;
+        const categoriesData = categoriesRes.data;
+        const flashSaleData = flashSaleRes.data;
+        const bannersData = bannersRes.data;
+        const testimonialsData = testimonialsRes.data;
+        const brandPartnersData = brandPartnersRes.data;
+        const siteSettingsData = siteSettingsRes.data;
 
         if (Array.isArray(featuredData)) {
           setFeatured(featuredData.filter(item => item && item._id));
@@ -626,12 +628,10 @@ export default function Home() {
                 }
                 setNewsletterStatus({ loading: true, message: '', type: '' });
                 try {
-                  const res = await fetch('http://localhost:5000/api/newsletter/subscribe', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ email: newsletterEmail, source: 'homepage' })
+                  const { data } = await api.post('/newsletter/subscribe', {
+                    email: newsletterEmail,
+                    source: 'homepage'
                   });
-                  const data = await res.json();
                   if (data.success) {
                     setNewsletterStatus({ loading: false, message: data.message, type: 'success' });
                     setNewsletterEmail('');
