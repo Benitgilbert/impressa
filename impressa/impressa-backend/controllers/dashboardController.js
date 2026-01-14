@@ -46,7 +46,10 @@ export const getDashboardAnalytics = async (req, res) => {
       Order.countDocuments({ status: "in-production" }),
       Order.countDocuments({ status: "cancelled" }),
       Product.countDocuments(),
-      Product.aggregate([{ $group: { _id: null, total: { $sum: "$stock" } } }]).then(res => res[0]?.total || 0),
+      Product.aggregate([
+        { $match: { isDigital: { $ne: true } } },
+        { $group: { _id: null, total: { $sum: "$stock" } } }
+      ]).then(res => res[0]?.total || 0),
       User.countDocuments(),
       Order.find().sort({ createdAt: -1 }).limit(10).populate("items.product customer"),
       Order.aggregate([
