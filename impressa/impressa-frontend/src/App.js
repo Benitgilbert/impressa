@@ -78,6 +78,8 @@ import { AuthProvider } from "./context/AuthContext";
 import ProtectedRoute from "./components/ProtectedRoute";
 import InstallApp from "./components/InstallApp";
 
+import { Toaster } from "react-hot-toast";
+
 function App() {
   return (
     <ThemeProvider>
@@ -86,6 +88,7 @@ function App() {
           <CartProvider>
             <WishlistProvider>
               <Router>
+                <Toaster position="top-center" toastOptions={{ duration: 4000 }} />
                 <InstallApp />
                 <Routes>
                   <Route path="/" element={<Home />} />

@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { FaArrowLeft, FaSave, FaImage } from "react-icons/fa";
+import toast from "react-hot-toast";
 import api from "../../utils/axiosInstance";
 import Sidebar from "../../components/Sidebar";
 import Topbar from "../../components/Topbar";
@@ -40,8 +41,7 @@ export default function AdminBlogEditor() {
                 setImagePreview(assetUrl(data.image));
             }
         } catch (err) {
-            console.error("Failed to fetch blog", err);
-            alert("Failed to load blog post");
+            toast.error("Failed to load blog post");
             navigate("/admin/blogs");
         } finally {
             setFetchLoading(false);
@@ -93,8 +93,8 @@ export default function AdminBlogEditor() {
 
             navigate("/admin/blogs");
         } catch (err) {
-            console.error("Failed to save blog", err);
-            alert("Failed to save blog post. Please try again.");
+            // Error handled by UI, no console log needed in production
+            toast.error("Failed to save blog post. Please try again.");
         } finally {
             setLoading(false);
         }

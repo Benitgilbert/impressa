@@ -3,6 +3,7 @@ import api from "../utils/axiosInstance";
 import Sidebar from "../components/Sidebar";
 import Topbar from "../components/Topbar";
 import { FaRobot, FaUser, FaSearch, FaTrash } from "react-icons/fa";
+import toast from "react-hot-toast";
 
 export default function AdminCustomerQueries() {
     const [logs, setLogs] = useState([]);
@@ -20,7 +21,7 @@ export default function AdminCustomerQueries() {
             const { data } = await api.get("/chatbot/logs");
             setLogs(data);
         } catch (err) {
-            console.error("Failed to fetch logs", err);
+            // Silently fail or minimal logging in production
         } finally {
             setLoading(false);
         }
@@ -57,10 +58,9 @@ export default function AdminCustomerQueries() {
             // Update UI
             setLogs(logs.filter(log => !selectedLogs.includes(log._id)));
             setSelectedLogs([]);
-            alert("Queries deleted successfully");
+            toast.success("Query deleted successfully");
         } catch (err) {
-            console.error("Failed to delete logs", err);
-            alert("Failed to delete logs");
+            toast.error("Failed to delete logs");
         }
     };
 
