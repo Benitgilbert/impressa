@@ -39,7 +39,7 @@ export const AuthProvider = ({ children }) => {
 
     useEffect(() => {
         checkAuth();
-    }, []);
+    }, [checkAuth]);
 
     const login = (token, refreshToken, userData) => {
         localStorage.setItem('authToken', token);

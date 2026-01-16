@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState } from "react";
+import { createContext, useContext, useEffect, useState, useCallback } from "react";
 import * as api from "../services/api";
 import { useToast } from "./ToastContext";
 
@@ -12,20 +12,15 @@ export function CartProvider({ children }) {
   // Local-only mapping of files per cart line item index
   const [files, setFiles] = useState([]);
 
-  // Fetch cart on mount
-  useEffect(() => {
-    fetchCart();
-  }, [fetchCart]);
-
-  const syncFilesWithCart = (nextCart) => {
+  const syncFilesWithCart = useCallback((nextCart) => {
     const length = nextCart?.items?.length || 0;
     setFiles((prev) => prev.slice(0, length));
-  };
+  }, []);
 
-  const setCartSafe = (nextCart) => {
+  const setCartSafe = useCallback((nextCart) => {
     setCart(nextCart);
     syncFilesWithCart(nextCart);
-  };
+  }, [syncFilesWithCart]);
 
   const fetchCart = useCallback(async () => {
     try {
@@ -39,7 +34,12 @@ export function CartProvider({ children }) {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [setCartSafe]);
+
+  // Fetch cart on mount
+  useEffect(() => {
+    fetchCart();
+  }, [fetchCart]);
 
   /**
    * Add item to cart.

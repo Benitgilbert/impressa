@@ -165,7 +165,7 @@ export default function ProductDetail() {
 
   // Determine display price and stock
   const displayPrice = currentVariation ? currentVariation.price : product?.price;
-  const displayPrice = currentVariation ? currentVariation.price : product?.price;
+
   // const displayStock = currentVariation ? currentVariation.stock : product?.stock; // REMOVED unused
 
   return (

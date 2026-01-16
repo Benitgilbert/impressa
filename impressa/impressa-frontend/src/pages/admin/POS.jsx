@@ -16,6 +16,24 @@ const POS = () => {
     const [phoneNumber, setPhoneNumber] = useState("");
     const [pendingOrder, setPendingOrder] = useState(null);
 
+    const fetchProducts = useCallback(async () => {
+        setLoading(true);
+        try {
+            // Fetch only Impressa's own products (admin-owned)
+            const res = await axios.get("/orders/admin/pos-products");
+            if (res.data.success) {
+                setProducts(res.data.data);
+            } else {
+                setProducts([]);
+            }
+        } catch (err) {
+            console.error("Failed to fetch products");
+            setProducts([]);
+        } finally {
+            setLoading(false);
+        }
+    }, []);
+
     useEffect(() => {
         fetchProducts();
     }, [fetchProducts]);
@@ -60,23 +78,7 @@ const POS = () => {
         setTimeout(() => successMsg.remove(), 3000);
     };
 
-    const fetchProducts = useCallback(async () => {
-        setLoading(true);
-        try {
-            // Fetch only Impressa's own products (admin-owned)
-            const res = await axios.get("/orders/admin/pos-products");
-            if (res.data.success) {
-                setProducts(res.data.data);
-            } else {
-                setProducts([]);
-            }
-        } catch (err) {
-            console.error("Failed to fetch products");
-            setProducts([]);
-        } finally {
-            setLoading(false);
-        }
-    }, []);
+
 
     const addToCart = (product) => {
         if (product.stock <= 0) return;
