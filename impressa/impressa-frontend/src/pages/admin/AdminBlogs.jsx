@@ -106,7 +106,7 @@ export default function AdminBlogs() {
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-cream-100 dark:divide-charcoal-700">
-                                        {filteredLogs.map((blog) => (
+                                        {filteredBlogs.map((blog) => (
                                             <tr key={blog._id} className="hover:bg-cream-50 dark:hover:bg-charcoal-700/50 transition-colors">
                                                 <td className="px-6 py-4">
                                                     <div className="w-16 h-10 rounded-lg overflow-hidden bg-cream-100 dark:bg-charcoal-700">
