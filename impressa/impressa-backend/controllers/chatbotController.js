@@ -160,3 +160,19 @@ export const getChatLogs = async (req, res) => {
         res.status(500).json({ message: "Failed to fetch logs" });
     }
 };
+
+// Bulk Delete Chat Logs
+export const deleteChatLogs = async (req, res) => {
+    try {
+        const { ids } = req.body;
+        if (!ids || !Array.isArray(ids) || ids.length === 0) {
+            return res.status(400).json({ message: "No IDs provided" });
+        }
+
+        await ChatLog.deleteMany({ _id: { $in: ids } });
+        res.json({ message: "Chat logs deleted successfully" });
+    } catch (err) {
+        console.error("Failed to delete chat logs:", err);
+        res.status(500).json({ message: "Failed to delete chat logs" });
+    }
+};
