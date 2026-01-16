@@ -6,8 +6,9 @@ import {
     FaArrowDown, FaEye, FaMoneyBillWave
 } from 'react-icons/fa';
 import api from '../utils/axiosInstance';
-import Header from '../components/Header';
+import Topbar from '../components/Topbar';
 import SellerSidebar from '../components/SellerSidebar';
+import AdminChatBot from '../components/AdminChatBot';
 
 import {
     Chart as ChartJS,
@@ -35,6 +36,7 @@ ChartJS.register(
 );
 
 export default function SellerDashboard() {
+    const [sidebarOpen, setSidebarOpen] = useState(false);
     const [user, setUser] = useState(null);
     const [stats, setStats] = useState({
         totalProducts: 0,
@@ -174,10 +176,10 @@ export default function SellerDashboard() {
 
     if (loading) {
         return (
-            <div className="flex h-screen bg-gray-50 dark:bg-gray-900 overflow-hidden">
-                <SellerSidebar />
+            <div className="flex h-screen bg-gray-50 dark:bg-gray-900 transition-colors duration-200">
+                <SellerSidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
                 <div className="flex-1 flex flex-col min-w-0 h-full overflow-hidden">
-                    <Header />
+                    <Topbar onMenuClick={() => setSidebarOpen(true)} title="Dashboard" />
                     <main className="flex-1 p-8 flex items-center justify-center">
                         <div className="flex flex-col items-center">
                             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600 mb-2"></div>
@@ -190,11 +192,11 @@ export default function SellerDashboard() {
     }
 
     return (
-        <div className="flex h-screen bg-gray-50 dark:bg-gray-900 transition-colors duration-200 overflow-hidden">
-            <SellerSidebar />
+        <div className="flex h-screen bg-gray-50 dark:bg-gray-900 transition-colors duration-200">
+            <SellerSidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
             <div className="flex-1 flex flex-col min-w-0 h-full overflow-hidden">
-                <Header />
-                <main className="flex-1 overflow-y-auto p-8">
+                <Topbar onMenuClick={() => setSidebarOpen(true)} title="Dashboard" />
+                <main className="flex-1 overflow-y-auto p-4 md:p-8">
                     <div className="max-w-7xl mx-auto">
                         {/* Welcome Header */}
                         <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
@@ -348,6 +350,7 @@ export default function SellerDashboard() {
                         </div>
                     </div>
                 </main>
+                <AdminChatBot storageKey="sellerChatMessages" title="Seller Assistant" />
             </div>
         </div>
     );

@@ -496,29 +496,38 @@ export const getForecast = async (req, res) => {
 
 export const getProductRecommendations = async (req, res) => {
   try {
-    // Step 1: Get all delivered orders with product IDs
-    const orders = await Order.find({ status: "delivered" }).select("items.product customer");
+    const { productId } = req.query;
+    const userId = req.user?.id; // Optional if logged in
 
-    // Step 2: Build a map of customer → products
-    const customerProductMap = {};
-    orders.forEach((order) => {
-      const customerId = order.customer.toString();
-      if (!customerProductMap[customerId]) customerProductMap[customerId] = new Set();
+    // Step 0: Determine Base Product (Context)
+    let baseProductIds = [];
+    if (productId) {
+      baseProductIds = [productId];
+    } else if (userId) {
+      // Find last product bought by user
+      const lastOrder = await Order.findOne({ customer: userId }).sort({ createdAt: -1 });
+      if (lastOrder && lastOrder.items.length > 0) {
+        baseProductIds = lastOrder.items.map(i => i.product.toString());
+      }
+    }
 
-      order.items.forEach(item => {
-        customerProductMap[customerId].add(item.product.toString());
-      });
-    });
+    // Optimization: Limit to last 5000 orders for performance
+    const orders = await Order.find({ status: "delivered" })
+      .sort({ createdAt: -1 })
+      .limit(5000)
+      .select("items.product customer");
 
-    // Step 3: Count co-occurrences of product pairs
+    // Step 2: Build Co-occurrence Matrix
     const pairCounts = {};
     const productCounts = {};
 
-    Object.values(customerProductMap).forEach((productSet) => {
-      const products = Array.from(productSet);
-      products.forEach((p1) => {
+    orders.forEach((order) => {
+      const uniqueItems = [...new Set(order.items.map(i => i.product.toString()))];
+
+      uniqueItems.forEach(p1 => {
         productCounts[p1] = (productCounts[p1] || 0) + 1;
-        products.forEach((p2) => {
+
+        uniqueItems.forEach(p2 => {
           if (p1 !== p2) {
             const key = `${p1}_${p2}`;
             pairCounts[key] = (pairCounts[key] || 0) + 1;
@@ -527,36 +536,41 @@ export const getProductRecommendations = async (req, res) => {
       });
     });
 
-    // Step 4: Calculate confidence scores
-    const recommendations = [];
+    // Step 3: Generate Rules
+    let recommendations = [];
     for (const key in pairCounts) {
       const [baseId, recId] = key.split("_");
-      const confidence = pairCounts[key] / productCounts[baseId];
 
-      recommendations.push({ baseId, recId, confidence });
+      // Filter if we are looking for specific context
+      if (baseProductIds.length > 0 && !baseProductIds.includes(baseId)) continue;
+
+      const confidence = pairCounts[key] / productCounts[baseId];
+      // Threshold: 20% confidence or at least 2 co-occurrences
+      if (confidence > 0.2 || pairCounts[key] > 2) {
+        recommendations.push({ baseId, recId, confidence, count: pairCounts[key] });
+      }
     }
 
-    // Step 5: Populate product names
-    const productIds = [
-      ...new Set(recommendations.flatMap((r) => [r.baseId, r.recId]))
-    ];
-    const products = await Product.find({ _id: { $in: productIds } });
-    const productMap = {};
-    products.forEach((p) => {
-      productMap[p._id.toString()] = p.name;
-    });
+    // Step 4: Sort by confidence
+    recommendations.sort((a, b) => b.confidence - a.confidence);
 
-    const finalRecommendations = recommendations
-      .filter((r) => r.confidence >= 0.5)
-      .map((r) => ({
-        base: productMap[r.baseId],
-        recommended: productMap[r.recId],
-        confidence: parseFloat(r.confidence.toFixed(2))
-      }));
+    // Step 5: Populate
+    const recIds = recommendations.slice(0, 10).map(r => r.recId);
+    const products = await Product.find({ _id: { $in: recIds } }).select("name price image slug averageRating price");
 
-    res.json(finalRecommendations);
+    const finalResults = products.map(p => {
+      const match = recommendations.find(r => r.recId === p._id.toString());
+      return {
+        ...p.toObject(),
+        confidence: match?.confidence,
+        matchCount: match?.count
+      };
+    }).sort((a, b) => b.confidence - a.confidence);
+
+    res.json(finalResults);
+
   } catch (err) {
-    console.error("Product recommendation failed:", err);
+    console.error("Recommendation engine failed:", err);
     res.status(500).json({ message: "Failed to generate recommendations." });
   }
 };
@@ -638,45 +652,169 @@ export const getAnomalies = async (req, res) => {
 export const handleChatbotQueryLLM = async (req, res) => {
   try {
     const { question, messages = [] } = req.body;
+    const userRole = req.user.role;
+    const userId = req.user.id;
 
-    // Step 1: Gather analytics data
-    const analytics = await getDashboardAnalyticsData();
-    const forecast = await getForecastData();
-    const anomalies = await getAnomalyAlerts();
+    let systemContext = "";
+    let systemPrompt = "";
 
-    // Step 2: Build the prompt with minimal chat history context
+    // ---------------------------------------------------------
+    // 🛍️ SELLER CONTEXT
+    // ---------------------------------------------------------
+    if (userRole === "seller") {
+      const SellerEarning = (await import("../models/SellerEarning.js")).default;
+      const Product = (await import("../models/Product.js")).default;
+
+      // 1. Earnings (Net Amount)
+      const earningsAgg = await SellerEarning.aggregate([
+        { $match: { seller: new mongoose.Types.ObjectId(userId), status: { $in: ["confirmed", "paid"] } } },
+        { $group: { _id: null, total: { $sum: "$netAmount" } } }
+      ]);
+      const totalEarnings = earningsAgg[0]?.total || 0;
+
+      const pendingAgg = await SellerEarning.aggregate([
+        { $match: { seller: new mongoose.Types.ObjectId(userId), status: "pending" } },
+        { $group: { _id: null, total: { $sum: "$netAmount" } } }
+      ]);
+      const pendingEarnings = pendingAgg[0]?.total || 0;
+
+      // 2. Product Stats
+      const products = await Product.find({ seller: userId }).select("name stock salesCount").sort({ salesCount: -1 });
+      const totalProducts = products.length;
+      const lowStock = products.filter(p => p.stock <= 5).slice(0, 5);
+      const topProducts = products.slice(0, 3);
+
+      // 3. Recent Sale Items (from SellerEarnings)
+      const recentSales = await SellerEarning.find({ seller: userId })
+        .sort({ createdAt: -1 })
+        .limit(5)
+        .select("orderPublicId productName netAmount status createdAt");
+
+      systemContext = `
+SELLER DATA:
+- **Financials**:
+  - Total Earnings (Confirmed/Paid): ${totalEarnings.toLocaleString()} RWF
+  - Pending Earnings (In Progress): ${pendingEarnings.toLocaleString()} RWF
+
+- **Products**:
+  - Total Active Products: ${totalProducts}
+  - Top Sellers: ${topProducts.map(p => `${p.name} (${p.salesCount} sold)`).join(", ")}
+  - ⚠️ Low Stock Alerts: ${lowStock.length > 0 ? lowStock.map(p => `${p.name} (${p.stock})`).join(", ") : "None"}
+
+- **Recent Sales**:
+${recentSales.map(s => `  - Order #${s.orderPublicId} | ${s.productName} | ${s.netAmount} RWF | ${s.status}`).join("\n")}
+`;
+
+      systemPrompt = `
+You are the AI Assistant for a Seller on Impressa.
+Access their specific SELLER DATA above to answer their question.
+
+RULES:
+1. **Role**: You are assisting a Business Owner. Be professional and encouraging.
+2. **Scope**: Only discuss THEIR data (shown above). Do not hallucinate global system stats.
+3. **Conciseness**: Answer DIRECTLY. No specific pleasantries unless asked.
+   - Example: "You have 50,000 RWF in pending earnings."
+4. **Recommendation**: You MAY add one short tip if relevant (e.g. "Restock [Item] soon").
+
+Conversation History:
+`;
+
+    }
+    // ---------------------------------------------------------
+    // 🔐 ADMIN CONTEXT
+    // ---------------------------------------------------------
+    else {
+      // Step 1: Gather comprehensive system data
+      // A. Basic Analytics
+      const analytics = await getDashboardAnalyticsData();
+      const forecast = await getForecastData();
+      const anomalies = await getAnomalyAlerts();
+
+      // B. Recent Orders
+      const recentOrders = await Order.find()
+        .sort({ createdAt: -1 })
+        .limit(5)
+        .populate("customer", "name email")
+        .select("publicId status totals.grandTotal createdAt payment.status");
+
+      // C. Low Stock
+      const lowStock = await Product.find({ stock: { $lte: 10 }, visibility: 'public' })
+        .select("name stock")
+        .limit(5);
+
+      // D. Top Sellers
+      const topSellers = await Order.aggregate([
+        { $match: { status: 'delivered', createdAt: { $gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000) } } },
+        { $unwind: '$items' },
+        { $lookup: { from: 'products', localField: 'items.product', foreignField: '_id', as: 'p' } },
+        { $unwind: '$p' },
+        { $group: { _id: '$p.seller', revenue: { $sum: { $multiply: ['$items.price', '$items.quantity'] } } } },
+        { $sort: { revenue: -1 } },
+        { $limit: 3 },
+        { $lookup: { from: 'users', localField: '_id', foreignField: '_id', as: 'u' } },
+        { $unwind: '$u' },
+        { $project: { name: '$u.name', store: '$u.storeName', revenue: 1 } }
+      ]);
+
+      // E. Pending Approvals
+      const pendingSellers = await User.countDocuments({ role: 'seller', sellerStatus: 'pending' });
+
+      systemContext = `
+SYSTEM DATA (ADMIN):
+- **General Stats**:
+  - Orders: ${analytics.totalOrders} (Delivered: ${analytics.deliveredOrders}, Pending: ${analytics.pendingOrders}, Cancelled: ${analytics.cancelledOrders})
+  - Revenue (Month): ${analytics.revenueThisMonth.toLocaleString()} RWF
+  - Forecast: ${forecast.projectedRevenue.toLocaleString()} RWF (Next Month)
+  - Custom Orders: ${analytics.customOrders}
+  - Pending Seller Approvals: ${pendingSellers}
+
+- **Recent Orders**:
+${recentOrders.map(o => `  - #${o.publicId} | ${o.customer?.name || 'Guest'} | ${o.status} | ${o.totals?.grandTotal} RWF`).join("\n")}
+
+- **Inventory Alerts**:
+${lowStock.length > 0 ? lowStock.map(p => `  - ${p.name}: ${p.stock} left`).join("\n") : "  - No low stock items."}
+
+- **Top Sellers**:
+${topSellers.map(s => `  - ${s.store || s.name}: ${s.revenue.toLocaleString()} RWF`).join("\n")}
+
+- **Anomalies**:
+${anomalies.length > 0 ? anomalies.map(a => `  - [ALERT] ${a.type}: ${a.spike}`).join("\n") : "  - None detected."}
+`;
+
+      systemPrompt = `
+You are the AI Admin Assistant for the Impressa E-commerce Platform.
+Access the SYSTEM DATA above to answer the Admin's question.
+
+RULES:
+1. **Scope**: You have access to "the whole system".
+2. **Conciseness**: Answer DIRECTLY. No fluff.
+3. **Recommendation**: Optional one-sentence suggestion.
+
+Conversation History:
+`;
+    }
+
+    // ---------------------------------------------------------
+    // 🧠 COMMON LLM EXECUTION
+    // ---------------------------------------------------------
+
     const lastTurns = Array.isArray(messages) ? messages.slice(-6) : [];
     const historyText = lastTurns
       .map((m) => `${m.role === "user" ? "User" : "Assistant"}: ${m.text}`)
       .join("\n");
 
-    const prompt = `
-impressa Admin Dashboard Analytics:
+    const fullPrompt = `
+${systemContext}
 
-- Total Orders: ${analytics.totalOrders}
-- Delivered Orders: ${analytics.deliveredOrders}
-- Cancelled Orders: ${analytics.cancelledOrders}
-- Pending Orders: ${analytics.pendingOrders} 
-- Revenue This Month: ${analytics.revenueThisMonth.toLocaleString()} RWF
-- Top Product: ${Array.isArray(analytics.topProducts) && analytics.topProducts.length > 0
-        ? `${analytics.topProducts[0].productName} (${analytics.topProducts[0].count} orders)`
-        : "N/A (0 orders)"
-      }
-- Custom Orders: ${analytics.customOrders}
-- Forecasted Revenue: ${forecast.projectedRevenue.toLocaleString()} RWF
-- Forecasted Orders: ${forecast.projectedOrders}
-- Anomalies:
-${anomalies.map(a => `• ${a.type}: ${a.spike} — ${a.message}`).join("\n")}
-
-Conversation (latest first):
+${systemPrompt}
 ${historyText}
 
-Admin Question: ${question}
+Question: ${question}
 
-Respond with a helpful, natural-language answer based on the data above.
+Response:
 `;
 
-    // Step 3: Call Cohere API (or compatible provider)
+    // Step 3: Call LLM API
     const response = await fetch("https://api.cohere.ai/v1/chat", {
       method: "POST",
       headers: {
@@ -685,30 +823,24 @@ Respond with a helpful, natural-language answer based on the data above.
       },
       body: JSON.stringify({
         model: "command-r-08-2024",
-        message: prompt,
-        temperature: 0.3
+        message: fullPrompt,
+        temperature: 0.2
       })
     });
 
     const result = await response.json();
 
-    // ✅ Add safety checks
     if (!response.ok) {
       console.error("Cohere API error:", result);
-      throw new Error(result.message || "Cohere API request failed");
+      throw new Error(result.message || "AI service unavailable");
     }
 
-    const answer = result.text || "Sorry, I couldn't generate a response.";
+    const answer = result.text || "I couldn't find an answer to that.";
 
-    // Step 4: Return the answer
     res.json({ answer });
 
   } catch (err) {
     console.error("LLM chatbot failed:", err);
-    const fallback =
-      err?.response?.data?.error?.message ||
-      err?.message ||
-      "Chatbot failed due to an unknown error.";
-    res.status(500).json({ message: fallback });
+    res.status(500).json({ message: "I'm having trouble accessing the system right now." });
   }
 };

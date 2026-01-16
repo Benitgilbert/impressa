@@ -1,6 +1,6 @@
 {
   "short_name": "Impressa",
-  "name": "Impressa Admin",
+  "name": "Impressa Premium Market",
   "icons": [
     {
       "src": "logo192.png",
@@ -15,6 +15,7 @@
   ],
   "start_url": ".",
   "display": "standalone",
-  "theme_color": "#000000",
-  "background_color": "#ffffff"
+  "theme_color": "#7c3aed",
+  "background_color": "#f8fafc",
+  "description": "Experience the premium marketplace on your phone."
 }

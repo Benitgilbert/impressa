@@ -19,6 +19,7 @@ export default function ProductDetail() {
   const nav = useNavigate();
   const [product, setProduct] = useState(null);
   const [relatedProducts, setRelatedProducts] = useState([]);
+  const [recommendations, setRecommendations] = useState([]);
   const [quantity, setQuantity] = useState(1);
   const [customText, setCustomText] = useState("");
   const [cloudLink, setCloudLink] = useState("");
@@ -64,6 +65,15 @@ export default function ProductDetail() {
           setRelatedProducts(relatedRes.data);
         } catch (err) {
           console.error("Failed to fetch related products", err);
+        }
+
+        // Fetch Recommendations (Smart Picks)
+        try {
+          const recRes = await api.get(`/products/recommendations?productId=${id}`);
+          setRecommendations(recRes.data);
+        } catch (err) {
+          // Silently fail if no recommendations
+          setRecommendations([]);
         }
 
         // Initialize attributes if variable
@@ -406,6 +416,48 @@ export default function ProductDetail() {
                     </div>
                   ))
                 )}
+              </div>
+            </div>
+          )}
+
+
+          {/* RECOMMENDATIONS (FREQUENTLY BOUGHT TOGETHER) */}
+          {recommendations.length > 0 && (
+            <div className="mt-20">
+              <div className="flex items-center gap-2 mb-8">
+                <span className="bg-gradient-to-r from-amber-500 to-orange-500 text-white px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider shadow-sm animate-pulse">
+                  Smart Pick
+                </span>
+                <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Frequently Bought Together</h2>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {recommendations.slice(0, 3).map(rec => (
+                  <Link key={rec._id} to={`/product/${rec.slug || rec._id}`} className="flex bg-white dark:bg-slate-900 rounded-2xl overflow-hidden shadow-sm hover:shadow-lg transition-all border border-amber-100 dark:border-slate-800 group">
+                    <div className="w-1/3 bg-gray-50 dark:bg-slate-950 relative overflow-hidden">
+                      {rec.image ? (
+                        <img src={assetUrl(rec.image)} alt={rec.name} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center text-gray-300">
+                          <FaStar className="text-2xl" />
+                        </div>
+                      )}
+
+                      <div className="absolute top-2 left-2 bg-white/90 dark:bg-black/70 backdrop-blur-sm px-2 py-0.5 rounded text-[10px] font-bold text-gray-800 dark:text-white flex items-center gap-1">
+                        <FaHeart className="text-red-500" /> {Math.round(rec.recommendationScore * 100)}% Match
+                      </div>
+                    </div>
+                    <div className="w-2/3 p-4 flex flex-col justify-center">
+                      <h3 className="font-bold text-gray-800 dark:text-white leading-tight mb-2 line-clamp-2">{rec.name}</h3>
+                      <div className="flex items-center justify-between mt-auto">
+                        <span className="text-violet-600 dark:text-violet-400 font-bold">{formatRwf(rec.price)}</span>
+                        <span className="text-xs text-gray-400">
+                          {rec.boughtTogetherCount > 5 ? `${rec.boughtTogetherCount} sold together` : 'Popular Combo'}
+                        </span>
+                      </div>
+                    </div>
+                  </Link>
+                ))}
               </div>
             </div>
           )}

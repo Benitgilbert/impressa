@@ -15,6 +15,6 @@ router.get("/forecast", authMiddleware(["admin"]), getForecast);
 router.get("/recommendations", authMiddleware(["admin"]), getProductRecommendations);
 router.get("/anomalies", authMiddleware(["admin"]), getAnomalies);
 
-router.post("/chatbot", authMiddleware(["admin"]), handleChatbotQueryLLM); // ✅ single chatbot route
+router.post("/chatbot", authMiddleware(["admin", "seller"]), handleChatbotQueryLLM); // ✅ single chatbot route
 
 export default router;

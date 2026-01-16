@@ -179,6 +179,8 @@ const startServer = async () => {
     app.use("/api/upload", uploadRoutes);
     const violationRoutes = (await import("./routes/violationRoutes.js")).default;
     app.use("/api/violations", violationRoutes);
+    const chatbotRoutes = (await import("./routes/chatbotRoutes.js")).default;
+    app.use("/api/chatbot", chatbotRoutes);
 
 
     app.get("/api", (req, res) => {

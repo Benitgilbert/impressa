@@ -9,9 +9,9 @@ import api from "../utils/axiosInstance";
 export default function LandingFooter() {
   const [footerData, setFooterData] = useState({
     footerTagline: 'Your premium destination for quality products. Curated collections, exclusive deals, and exceptional service.',
-    contactEmail: 'support@impressa.com',
-    contactPhone: '1-800-IMPRESSA',
-    contactAddress: '123 Commerce Street, Design City, DC 12345',
+    contactEmail: 'ishfabzele2@gmail.com',
+    contactPhone: '+250 789 079 978',
+    contactAddress: 'Eudiose Building near Gicumbi District Office',
     socialLinks: { facebook: '', twitter: '', instagram: '', linkedin: '' }
   });
 

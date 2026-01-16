@@ -1,3 +1,4 @@
+import Order from "../models/Order.js";
 import Product from "../models/Product.js";
 import FlashSale from "../models/FlashSale.js";
 import Category from "../models/Category.js";
@@ -5,6 +6,159 @@ import mongoose from "mongoose";
 import Fuse from "fuse.js";
 import { notifyProductAdded, notifyProductDeleted } from "./notificationController.js";
 import User from "../models/User.js";
+
+// ... existing code ...
+
+// Get related products (same category or seller)
+export const getRelatedProducts = async (req, res) => {
+  try {
+    const product = await Product.findById(req.params.id);
+    if (!product) return res.status(404).json({ message: "Product not found" });
+
+    const related = await Product.find({
+      $and: [
+        { _id: { $ne: product._id } },
+        { visibility: "public" },
+        { approvalStatus: "approved" },
+        {
+          $or: [
+            { category: product.category },
+            { seller: product.seller }
+          ]
+        }
+      ]
+    })
+      .limit(4)
+      .populate("seller", "name storeName");
+
+    res.json(related);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
+/**
+ * Smart Recommendation Engine
+ * Uses Collaborative Filtering (Co-occurrence) to recommend products.
+ * Context: 'productId' (Item-based) or 'userId' (User-based)
+ */
+export const getProductRecommendations = async (req, res) => {
+  try {
+    const { productId } = req.query;
+    const userId = req.user?.id;
+
+    // 1. Determine Base Context
+    let baseProductIds = [];
+    if (productId) {
+      baseProductIds = [productId];
+    } else if (userId) {
+      // User-based: Find last purchased items
+      const lastOrder = await Order.findOne({ customer: userId }).sort({ createdAt: -1 });
+      if (lastOrder && lastOrder.items) {
+        baseProductIds = lastOrder.items.map(i => i.product.toString());
+      }
+    }
+
+    // 2. Fetch Orders for Co-occurrence Analysis
+    // Optimization: Analyze last 1000 delivered orders to find patterns
+    // (In production, this should be pre-calculated via cron job)
+    const orders = await Order.find({ status: "delivered" })
+      .sort({ createdAt: -1 })
+      .limit(1000)
+      .select("items.product");
+
+    if (orders.length === 0) return res.json([]);
+
+    // 3. Build Matrices
+    const pairCounts = {};   // { "ProdA_ProdB": 5 }
+    const itemCounts = {};   // { "ProdA": 20 }
+
+    orders.forEach(order => {
+      // Unique products in this order
+      const productsInOrder = [...new Set(order.items.map(i => i.product.toString()))];
+
+      productsInOrder.forEach(p1 => {
+        itemCounts[p1] = (itemCounts[p1] || 0) + 1;
+
+        productsInOrder.forEach(p2 => {
+          if (p1 !== p2) {
+            // Sort to ensure "A_B" is same as "B_A" if undirected, 
+            // BUT for recommendations "Bought A -> Buy B", direction matters if we want "Next Best Action".
+            // Here we assume symmetric relation "Frequently Bought Together".
+            const key = `${p1}_${p2}`;
+            pairCounts[key] = (pairCounts[key] || 0) + 1;
+          }
+        });
+      });
+    });
+
+    // 4. Score Candidates
+    let candidates = [];
+
+    // Iterate all pairs
+    for (const key in pairCounts) {
+      const [pA, pB] = key.split("_");
+
+      // Filter: We only care if pA is in our baseProductIds
+      if (baseProductIds.length > 0 && !baseProductIds.includes(pA)) continue;
+
+      // Confidence = P(B|A) = Count(A & B) / Count(A)
+      const confidence = pairCounts[key] / (itemCounts[pA] || 1);
+
+      // Thresholds to reduce noise
+      if (confidence > 0.15 && pairCounts[key] >= 2) {
+        candidates.push({
+          recommendedId: pB,
+          confidence,
+          support: pairCounts[key]
+        });
+      }
+    }
+
+    // Deduplicate candidates (pick max confidence if same product recommended by multiple base items)
+    const uniqueCandidates = {};
+    candidates.forEach(c => {
+      if (!uniqueCandidates[c.recommendedId] || c.confidence > uniqueCandidates[c.recommendedId].confidence) {
+        uniqueCandidates[c.recommendedId] = c;
+      }
+    });
+
+    // Sort by Confidence
+    const sortedRecs = Object.values(uniqueCandidates)
+      .sort((a, b) => b.confidence - a.confidence)
+      .slice(0, 8); // Top 8
+
+    if (sortedRecs.length === 0) {
+      // Fallback: Trending Products
+      // Logic handled by frontend calling /trending endpoint or we return empty
+      return res.json([]);
+    }
+
+    // 5. Hydrate Products
+    const recommendedIds = sortedRecs.map(r => r.recommendedId);
+    const products = await Product.find({
+      _id: { $in: recommendedIds },
+      visibility: "public",
+      approvalStatus: "approved"
+    }).select("name price image slug averageRating seller").populate("seller", "storeName");
+
+    // Merge score
+    const result = products.map(p => {
+      const score = uniqueCandidates[p._id.toString()];
+      return {
+        ...p.toObject(),
+        recommendationScore: score.confidence,
+        boughtTogetherCount: score.support
+      };
+    }).sort((a, b) => b.recommendationScore - a.recommendationScore);
+
+    res.json(result);
+
+  } catch (err) {
+    console.error("Recommendation Error:", err);
+    res.status(500).json({ message: "Failed to generate recommendations" });
+  }
+};
 
 // Helper to attach flash sale info to products
 const attachFlashSaleInfo = async (products) => {

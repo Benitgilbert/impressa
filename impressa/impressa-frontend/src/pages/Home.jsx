@@ -8,7 +8,10 @@ import { formatRwf } from "../utils/currency";
 import api from "../utils/axiosInstance";
 import LandingFooter from "../components/LandingFooter";
 import Header from "../components/Header";
+import LandingFooter from "../components/LandingFooter";
+import Header from "../components/Header";
 import { useWishlist } from "../context/WishlistContext";
+import AIChatWidget from "../components/AdminChatBot"; // Using the generic Chatbot
 
 import assetUrl from "../utils/assetUrl";
 
@@ -510,101 +513,77 @@ export default function Home() {
         </section>
 
         {/* Testimonials */}
-        <section className="py-20 bg-cream-100 dark:bg-charcoal-900">
-          <div className="mx-auto max-w-7xl px-4">
-            <div className="text-center mb-12">
-              <h2 className="text-3xl font-bold text-charcoal-800 dark:text-white mb-2">What Our Customers Say</h2>
-              <p className="text-charcoal-500 dark:text-charcoal-400">Real reviews from real shoppers</p>
-            </div>
+        {testimonials.length > 0 && (
+          <section className="py-20 bg-cream-100 dark:bg-charcoal-900">
+            <div className="mx-auto max-w-7xl px-4">
+              <div className="text-center mb-12">
+                <h2 className="text-3xl font-bold text-charcoal-800 dark:text-white mb-2">What Our Customers Say</h2>
+                <p className="text-charcoal-500 dark:text-charcoal-400">Real reviews from real shoppers</p>
+              </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-              {(testimonials.length > 0 ? testimonials : [
-                {
-                  name: 'Sarah M.',
-                  role: 'Verified Buyer',
-                  avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=100&h=100&fit=crop',
-                  rating: 5,
-                  content: "Absolutely love this store! The quality of products exceeded my expectations. Fast shipping and excellent customer service."
-                },
-                {
-                  name: 'James K.',
-                  role: 'Verified Buyer',
-                  avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&h=100&fit=crop',
-                  rating: 5,
-                  content: "Best online shopping experience I've had in years. The website is easy to navigate and prices are competitive."
-                },
-                {
-                  name: 'Emily R.',
-                  role: 'Verified Buyer',
-                  avatar: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=100&h=100&fit=crop',
-                  rating: 5,
-                  content: "I was hesitant to order online, but Impressa made it so easy. The product was exactly as described."
-                }
-              ]).slice(0, 6).map((testimonial, idx) => (
-                <div key={testimonial._id || idx} className="bg-white dark:bg-charcoal-800 rounded-2xl p-6 shadow-sm border border-cream-200 dark:border-charcoal-700">
-                  <div className="flex items-center gap-1 mb-4">
-                    {[...Array(testimonial.rating || 5)].map((_, i) => (
-                      <FaStar key={i} className="text-sand-400" />
-                    ))}
-                  </div>
-                  <p className="text-charcoal-600 dark:text-cream-300 mb-6 leading-relaxed">"{testimonial.content || testimonial.text}"</p>
-                  <div className="flex items-center gap-3">
-                    {testimonial.avatar ? (
-                      <img src={testimonial.avatar} alt={testimonial.name} className="w-12 h-12 rounded-full object-cover" />
-                    ) : (
-                      <div className="w-12 h-12 rounded-full bg-gradient-to-br from-terracotta-400 to-terracotta-500 flex items-center justify-center text-white font-bold text-lg">
-                        {testimonial.name?.charAt(0) || '?'}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+                {testimonials.slice(0, 6).map((testimonial, idx) => (
+                  <div key={testimonial._id || idx} className="bg-white dark:bg-charcoal-800 rounded-2xl p-6 shadow-sm border border-cream-200 dark:border-charcoal-700">
+                    <div className="flex items-center gap-1 mb-4">
+                      {[...Array(testimonial.rating || 5)].map((_, i) => (
+                        <FaStar key={i} className="text-sand-400" />
+                      ))}
+                    </div>
+                    <p className="text-charcoal-600 dark:text-cream-300 mb-6 leading-relaxed">"{testimonial.content || testimonial.text}"</p>
+                    <div className="flex items-center gap-3">
+                      {testimonial.avatar ? (
+                        <img src={testimonial.avatar} alt={testimonial.name} className="w-12 h-12 rounded-full object-cover" />
+                      ) : (
+                        <div className="w-12 h-12 rounded-full bg-gradient-to-br from-terracotta-400 to-terracotta-500 flex items-center justify-center text-white font-bold text-lg">
+                          {testimonial.name?.charAt(0) || '?'}
+                        </div>
+                      )}
+                      <div>
+                        <h4 className="font-semibold text-charcoal-800 dark:text-cream-100">{testimonial.name}</h4>
+                        <p className="text-sm text-charcoal-500 dark:text-charcoal-400">{testimonial.role}</p>
                       </div>
-                    )}
-                    <div>
-                      <h4 className="font-semibold text-charcoal-800 dark:text-cream-100">{testimonial.name}</h4>
-                      <p className="text-sm text-charcoal-500 dark:text-charcoal-400">{testimonial.role}</p>
                     </div>
                   </div>
-                </div>
-              ))}
+                ))}
+              </div>
             </div>
-          </div>
-        </section>
+          </section>
+        )}
 
         {/* Brand Logos / Trusted By */}
-        <section className="py-12 bg-white dark:bg-charcoal-800 border-y border-cream-200 dark:border-charcoal-700">
-          <div className="mx-auto max-w-7xl px-4">
-            <p className="text-center text-charcoal-400 text-sm uppercase tracking-wider mb-8">Trusted by leading brands</p>
-            <div className="flex flex-wrap justify-center items-center gap-8 md:gap-16 opacity-60 dark:opacity-40 grayscale hover:grayscale-0 transition-all duration-500">
-              {(brandPartners.length > 0 ? brandPartners : [
-                { name: 'TechCorp' },
-                { name: 'StyleHub' },
-                { name: 'HomeMax' },
-                { name: 'SportZone' },
-                { name: 'BeautyPro' }
-              ]).map((partner, idx) => (
-                partner.logo ? (
-                  <a
-                    key={partner._id || idx}
-                    href={partner.websiteUrl || '#'}
-                    target={partner.websiteUrl ? '_blank' : '_self'}
-                    rel="noopener noreferrer"
-                    className="hover:opacity-100 transition-opacity"
-                  >
-                    <img
-                      src={partner.logo}
-                      alt={partner.name}
-                      className="h-10 md:h-12 w-auto object-contain"
-                    />
-                  </a>
-                ) : (
-                  <div
-                    key={partner._id || idx}
-                    className="text-2xl font-bold text-charcoal-400 dark:text-charcoal-500 hover:text-terracotta-500 dark:hover:text-terracotta-400 transition-colors cursor-pointer"
-                  >
-                    {partner.name}
-                  </div>
-                )
-              ))}
+        {brandPartners.length > 0 && (
+          <section className="py-12 bg-white dark:bg-charcoal-800 border-y border-cream-200 dark:border-charcoal-700">
+            <div className="mx-auto max-w-7xl px-4">
+              <p className="text-center text-charcoal-400 text-sm uppercase tracking-wider mb-8">Trusted by leading brands</p>
+              <div className="flex flex-wrap justify-center items-center gap-8 md:gap-16 opacity-60 dark:opacity-40 grayscale hover:grayscale-0 transition-all duration-500">
+                {brandPartners.map((partner, idx) => (
+                  partner.logo ? (
+                    <a
+                      key={partner._id || idx}
+                      href={partner.websiteUrl || '#'}
+                      target={partner.websiteUrl ? '_blank' : '_self'}
+                      rel="noopener noreferrer"
+                      className="hover:opacity-100 transition-opacity"
+                    >
+                      <img
+                        src={partner.logo}
+                        alt={partner.name}
+                        className="h-10 md:h-12 w-auto object-contain"
+                      />
+                    </a>
+                  ) : (
+                    <div
+                      key={partner._id || idx}
+                      className="text-2xl font-bold text-charcoal-400 dark:text-charcoal-500 hover:text-terracotta-500 dark:hover:text-terracotta-400 transition-colors cursor-pointer"
+                    >
+                      {partner.name}
+                    </div>
+                  )
+                ))}
+              </div>
             </div>
-          </div>
-        </section>
+          </section>
+        )}
 
         {/* Trust Badges */}
         <section className="bg-white dark:bg-charcoal-800 border-b border-cream-200 dark:border-charcoal-700">
@@ -702,6 +681,7 @@ export default function Home() {
       </main>
 
       <LandingFooter />
+      <AIChatWidget endpoint="/api/chatbot/public" title="Client Support" storageKey="publicChat" />
     </div >
   );
 }

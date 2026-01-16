@@ -58,6 +58,7 @@ import SellerPOS from "./pages/SellerPOS";
 import SellerProducts from "./pages/SellerProducts";
 // SellerAddProduct removed
 
+import AdminCustomerQueries from "./pages/AdminCustomerQueries";
 import SellerOrders from "./pages/SellerOrders";
 import SellerPayouts from "./pages/SellerPayouts";
 import SellerProfile from "./pages/SellerProfile";
@@ -73,6 +74,7 @@ import { ToastProvider } from "./context/ToastContext";
 import { ThemeProvider } from "./context/ThemeContext";
 import { AuthProvider } from "./context/AuthContext";
 import ProtectedRoute from "./components/ProtectedRoute";
+import InstallApp from "./components/InstallApp";
 
 function App() {
   return (
@@ -82,6 +84,7 @@ function App() {
           <CartProvider>
             <WishlistProvider>
               <Router>
+                <InstallApp />
                 <Routes>
                   <Route path="/" element={<Home />} />
                   <Route path="/shop" element={<Shop />} />
@@ -286,6 +289,11 @@ function App() {
                   <Route path="/admin/tickets" element={
                     <ProtectedRoute allowedRoles={['admin']}>
                       <AdminTickets />
+                    </ProtectedRoute>
+                  } />
+                  <Route path="/admin/customer-queries" element={
+                    <ProtectedRoute allowedRoles={['admin']}>
+                      <AdminCustomerQueries />
                     </ProtectedRoute>
                   } />
                   <Route path="/admin/seller-verification" element={

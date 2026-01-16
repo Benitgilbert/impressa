@@ -7,6 +7,7 @@ const router = express.Router();
 
 // Public routes
 router.get("/suggestions", productController.getSuggestions);
+router.get("/recommendations", productController.getProductRecommendations); // New Engine
 router.get("/", productController.getAllProducts);
 router.get("/featured/list", productController.getFeaturedProducts);
 router.get("/trending", productController.getTrendingProducts);
