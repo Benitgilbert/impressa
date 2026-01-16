@@ -2,13 +2,14 @@ import { useState, useEffect } from "react";
 import api from "../utils/axiosInstance";
 import Sidebar from "../components/Sidebar";
 import Topbar from "../components/Topbar";
-import { FaRobot, FaUser, FaSearch } from "react-icons/fa";
+import { FaRobot, FaUser, FaSearch, FaTrash } from "react-icons/fa";
 
 export default function AdminCustomerQueries() {
     const [logs, setLogs] = useState([]);
     const [loading, setLoading] = useState(true);
     const [sidebarOpen, setSidebarOpen] = useState(false);
     const [filter, setFilter] = useState("");
+    const [selectedLogs, setSelectedLogs] = useState([]); // Array of IDs
 
     useEffect(() => {
         fetchLogs();
@@ -30,6 +31,39 @@ export default function AdminCustomerQueries() {
         log.answer.toLowerCase().includes(filter.toLowerCase())
     );
 
+    // Bulk selection handlers
+    const handleSelectAll = (e) => {
+        if (e.target.checked) {
+            setSelectedLogs(filteredLogs.map(log => log._id));
+        } else {
+            setSelectedLogs([]);
+        }
+    };
+
+    const handleSelectOne = (id) => {
+        if (selectedLogs.includes(id)) {
+            setSelectedLogs(selectedLogs.filter(logId => logId !== id));
+        } else {
+            setSelectedLogs([...selectedLogs, id]);
+        }
+    };
+
+    const handleBulkDelete = async () => {
+        if (!window.confirm(`Are you sure you want to delete ${selectedLogs.length} queries?`)) return;
+
+        try {
+            await api.delete("/chatbot/logs", { data: { ids: selectedLogs } });
+
+            // Update UI
+            setLogs(logs.filter(log => !selectedLogs.includes(log._id)));
+            setSelectedLogs([]);
+            alert("Queries deleted successfully");
+        } catch (err) {
+            console.error("Failed to delete logs", err);
+            alert("Failed to delete logs");
+        }
+    };
+
     return (
         <div className="min-h-screen bg-cream-100 dark:bg-charcoal-900 transition-colors duration-300">
             <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
@@ -48,15 +82,25 @@ export default function AdminCustomerQueries() {
                                 See what your customers are asking the AI.
                             </p>
                         </div>
-                        <div className="relative">
-                            <FaSearch className="absolute left-4 top-1/2 -translate-y-1/2 text-charcoal-400" />
-                            <input
-                                type="text"
-                                placeholder="Search queries..."
-                                value={filter}
-                                onChange={(e) => setFilter(e.target.value)}
-                                className="pl-11 pr-4 py-2.5 rounded-xl border border-cream-200 dark:border-charcoal-700 bg-white dark:bg-charcoal-800 text-charcoal-800 dark:text-white focus:border-terracotta-500 outline-none w-64 transition-colors"
-                            />
+                        <div className="flex items-center gap-4">
+                            {selectedLogs.length > 0 && (
+                                <button
+                                    onClick={handleBulkDelete}
+                                    className="flex items-center gap-2 px-4 py-2.5 bg-red-500 hover:bg-red-600 text-white font-bold rounded-xl shadow-lg transition-all animate-fade-in"
+                                >
+                                    <FaTrash /> Delete ({selectedLogs.length})
+                                </button>
+                            )}
+                            <div className="relative">
+                                <FaSearch className="absolute left-4 top-1/2 -translate-y-1/2 text-charcoal-400" />
+                                <input
+                                    type="text"
+                                    placeholder="Search queries..."
+                                    value={filter}
+                                    onChange={(e) => setFilter(e.target.value)}
+                                    className="pl-11 pr-4 py-2.5 rounded-xl border border-cream-200 dark:border-charcoal-700 bg-white dark:bg-charcoal-800 text-charcoal-800 dark:text-white focus:border-terracotta-500 outline-none w-64 transition-colors"
+                                />
+                            </div>
                         </div>
                     </div>
 
@@ -74,6 +118,14 @@ export default function AdminCustomerQueries() {
                                 <table className="w-full text-left text-sm">
                                     <thead className="bg-cream-50 dark:bg-charcoal-900">
                                         <tr>
+                                            <th className="px-6 py-4 w-12 text-center">
+                                                <input
+                                                    type="checkbox"
+                                                    onChange={handleSelectAll}
+                                                    checked={filteredLogs.length > 0 && selectedLogs.length === filteredLogs.length}
+                                                    className="w-4 h-4 rounded border-gray-300 text-terracotta-500 focus:ring-terracotta-500"
+                                                />
+                                            </th>
                                             <th className="px-6 py-4 font-bold text-charcoal-500 dark:text-charcoal-400 uppercase tracking-wider">Customer</th>
                                             <th className="px-6 py-4 font-bold text-charcoal-500 dark:text-charcoal-400 uppercase tracking-wider">Question</th>
                                             <th className="px-6 py-4 font-bold text-charcoal-500 dark:text-charcoal-400 uppercase tracking-wider">AI Answer</th>
@@ -82,7 +134,15 @@ export default function AdminCustomerQueries() {
                                     </thead>
                                     <tbody className="divide-y divide-cream-100 dark:divide-charcoal-700">
                                         {filteredLogs.map((log) => (
-                                            <tr key={log._id} className="hover:bg-cream-50 dark:hover:bg-charcoal-700/50 transition-colors">
+                                            <tr key={log._id} className={`hover:bg-cream-50 dark:hover:bg-charcoal-700/50 transition-colors ${selectedLogs.includes(log._id) ? 'bg-terracotta-50/50 dark:bg-terracotta-900/10' : ''}`}>
+                                                <td className="px-6 py-4 text-center">
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={selectedLogs.includes(log._id)}
+                                                        onChange={() => handleSelectOne(log._id)}
+                                                        className="w-4 h-4 rounded border-gray-300 text-terracotta-500 focus:ring-terracotta-500"
+                                                    />
+                                                </td>
                                                 <td className="px-6 py-4 font-medium">
                                                     <div className="flex items-center gap-2 text-charcoal-800 dark:text-white">
                                                         <div className="w-8 h-8 rounded-full bg-cream-100 dark:bg-charcoal-700 flex items-center justify-center text-charcoal-400">

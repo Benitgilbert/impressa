@@ -1,6 +1,6 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { FaArrowLeft, FaSave, FaImage, FaUpload } from "react-icons/fa";
+import { FaArrowLeft, FaSave, FaImage } from "react-icons/fa";
 import api from "../../utils/axiosInstance";
 import Sidebar from "../../components/Sidebar";
 import Topbar from "../../components/Topbar";
@@ -25,13 +25,7 @@ export default function AdminBlogEditor() {
     const [fetchLoading, setFetchLoading] = useState(isEditMode);
     const [sidebarOpen, setSidebarOpen] = useState(false);
 
-    useEffect(() => {
-        if (isEditMode) {
-            fetchBlog();
-        }
-    }, [id]);
-
-    const fetchBlog = async () => {
+    const fetchBlog = useCallback(async () => {
         try {
             const { data } = await api.get(`/blogs/${id}`);
             setFormData({
@@ -52,7 +46,13 @@ export default function AdminBlogEditor() {
         } finally {
             setFetchLoading(false);
         }
-    };
+    }, [id, navigate]);
+
+    useEffect(() => {
+        if (isEditMode) {
+            fetchBlog();
+        }
+    }, [isEditMode, fetchBlog]);
 
     const handleInputChange = (e) => {
         const { name, value } = e.target;
