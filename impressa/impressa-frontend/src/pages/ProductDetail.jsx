@@ -26,8 +26,6 @@ export default function ProductDetail() {
   const [cloudPassword, setCloudPassword] = useState("");
   const [loading, setLoading] = useState(true);
   const [reviews, setReviews] = useState([]);
-  const [newReviewRating] = useState(5);
-  const [newReviewComment, setNewReviewComment] = useState("");
 
   // Variable product state
   const [selectedAttributes, setSelectedAttributes] = useState({});
@@ -35,7 +33,7 @@ export default function ProductDetail() {
 
   const { addItem } = useCart();
   const { toggle, has } = useWishlist();
-  const { showSuccess, showError } = useToast();
+  const { showError } = useToast();
 
   useEffect(() => {
     window.scrollTo(0, 0);
