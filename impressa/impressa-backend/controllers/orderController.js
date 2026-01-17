@@ -16,7 +16,7 @@ import convertToCSV from "../utils/csvExporter.js";
 import convertLogsToCSV from "../utils/logCsvExporter.js";
 import generateAISummary from "../utils/aiSummary.js";
 import sendReportEmail from "../utils/sendReportEmail.js";
-import { sendOrderConfirmation, sendGiftCardEmail } from "../services/emailService.js";
+import { sendOrderConfirmation, sendGiftCardEmail, sendStatusUpdate } from "../services/emailService.js";
 import { notifyAdminNewOrder, notifyOrderPlaced, notifyOrderStatus } from "./notificationController.js";
 import GiftCard from "../models/GiftCard.js";
 
@@ -113,6 +113,14 @@ export const createOrder = async (req, res) => {
 
     order.publicId = generatePublicId();
     await order.save();
+
+    // 📧 Send Confirmation Email (Populate customer for logged-in users)
+    try {
+      await order.populate('customer', 'name email');
+      await sendOrderConfirmation(order);
+    } catch (emailErr) {
+      console.error("Failed to send order confirmation email:", emailErr);
+    }
 
     // 🎁 Process Gift Card Redemption
     if (giftCard && giftCard.code && giftCard.amountApplied > 0) {
@@ -518,12 +526,18 @@ const ensureAccount = async (name, type, code) => {
 export const updateOrderStatus = async (req, res) => {
   try {
     const { status } = req.body;
-    const order = await Order.findById(req.params.id);
+    const order = await Order.findById(req.params.id).populate('customer', 'name email');
 
     if (!order) return res.status(404).json({ message: "Order not found" });
 
     const oldStatus = order.status;
     order.status = status;
+    await order.save(); // Save status change first
+
+    // 📧 Send Status Update Email
+    if (oldStatus !== status) {
+      sendStatusUpdate(order).catch(err => console.error("Failed to send status email:", err));
+    }
 
     // 🚨 Automatic Violation: Slow Fulfillment (> 72 Hours)
     if (status === "shipped" && oldStatus !== "shipped") {
