@@ -26,9 +26,8 @@ export default function ProductDetail() {
   const [cloudPassword, setCloudPassword] = useState("");
   const [loading, setLoading] = useState(true);
   const [reviews, setReviews] = useState([]);
-  const [newReviewRating, setNewReviewRating] = useState(5);
+  const [newReviewRating] = useState(5);
   const [newReviewComment, setNewReviewComment] = useState("");
-  const [submittingReview, setSubmittingReview] = useState(false);
 
   // Variable product state
   const [selectedAttributes, setSelectedAttributes] = useState({});
@@ -95,22 +94,7 @@ export default function ProductDetail() {
     })();
   }, [id, showError]);
 
-  const handleSubmitReview = async () => {
-    try {
-      setSubmittingReview(true);
-      const res = await api.post(`/reviews/product/${id}`, {
-        rating: newReviewRating,
-        comment: newReviewComment
-      });
-      setReviews(prev => [res.data, ...prev]);
-      setNewReviewComment("");
-      showSuccess("Review submitted successfully!");
-    } catch (err) {
-      showError(err.response?.data?.message || "Failed to submit review. Please login.");
-    } finally {
-      setSubmittingReview(false);
-    }
-  };
+
 
   // Handle variation selection
   useEffect(() => {

@@ -1,11 +1,10 @@
 import { useState, useEffect } from "react";
-import { useSearchParams, useNavigate, Link } from "react-router-dom";
-import { FaHeartBroken, FaCheckCircle, FaExclamationTriangle } from "react-icons/fa";
+import { useSearchParams, Link } from "react-router-dom";
+import { FaHeartBroken, FaCheckCircle } from "react-icons/fa";
 import api from "../utils/axiosInstance";
 
 export default function Unsubscribe() {
     const [searchParams] = useSearchParams();
-    const navigate = useNavigate();
     const email = searchParams.get("email");
 
     const [status, setStatus] = useState("loading"); // loading, success, error
