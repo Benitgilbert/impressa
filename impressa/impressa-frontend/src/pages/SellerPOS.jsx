@@ -53,17 +53,21 @@ export default function SellerPOS() {
     const [completedOrder, setCompletedOrder] = useState(null);
     const [scanError, setScanError] = useState("");
 
-    const addToCart = useCallback((product) => {
+    const addToCart = useCallback((product, isVariation = false) => {
         if (product.stock <= 0) return;
         setCart(prevCart => {
-            const existing = prevCart.find((item) => item._id === product._id);
+            // Unique ID for cart item: ProductID + (VariationID or "")
+            const uniqueId = isVariation ? `${product._id}-${product.variationId}` : product._id;
+
+            const existing = prevCart.find((item) => (item.uniqueId || item._id) === uniqueId);
+
             if (existing) {
                 if (existing.quantity >= product.stock) return prevCart;
                 return prevCart.map((item) =>
-                    item._id === product._id ? { ...item, quantity: item.quantity + 1 } : item
+                    (item.uniqueId || item._id) === uniqueId ? { ...item, quantity: item.quantity + 1 } : item
                 );
             } else {
-                return [...prevCart, { ...product, quantity: 1 }];
+                return [...prevCart, { ...product, quantity: 1, uniqueId, variationId: product.variationId }];
             }
         });
     }, []);
@@ -168,26 +172,60 @@ export default function SellerPOS() {
 
 
 
-    const removeFromCart = (productId) => {
-        setCart(cart.filter((item) => item._id !== productId));
+    // Variation Selection
+    const [selectedProductForVariation, setSelectedProductForVariation] = useState(null);
+
+    const handleProductClick = (product) => {
+        if (product.type === 'variable' && product.variations && product.variations.length > 0) {
+            setSelectedProductForVariation(product);
+        } else {
+            addToCart(product);
+        }
     };
 
-    const updateQuantity = (productId, delta) => {
+    const addVariationToCart = (variation) => {
+        if (variation.stock <= 0) return;
+
+        // Flatten attributes map/object to string for display
+        let attrString = "";
+        if (variation.attributes) {
+            const attrs = typeof variation.attributes === 'object' ? Object.values(variation.attributes) : [];
+            attrString = attrs.join(" / ");
+        }
+
+        const productToAdd = {
+            ...selectedProductForVariation,
+            _id: selectedProductForVariation._id, // Keep parent ID for later reference if needed, or use a composite
+            variationId: variation.sku, // Crucial for backend
+            name: `${selectedProductForVariation.name} - ${attrString}`,
+            price: variation.price,
+            stock: variation.stock,
+            image: variation.image || selectedProductForVariation.image
+        };
+
+        addToCart(productToAdd, true); // Pass true to indicate it's a variation item
+        setSelectedProductForVariation(null);
+    };
+
+    const calculateTotal = () => {
+        return cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
+    };
+
+    const removeFromCart = (uniqueId) => {
+        setCart(cart.filter((item) => (item.uniqueId || item._id) !== uniqueId));
+    };
+
+    const updateQuantity = (uniqueId, delta) => {
         setCart(
             cart.map((item) => {
-                if (item._id === productId) {
-                    const product = products.find(p => p._id === productId);
+                if ((item.uniqueId || item._id) === uniqueId) {
                     const newQty = Math.max(1, item.quantity + delta);
-                    if (newQty > (product?.stock || 0)) return item;
+                    if (newQty > (item.stock || 0)) return item;
                     return { ...item, quantity: newQty };
                 }
                 return item;
             })
         );
-    };
-
-    const calculateTotal = () => {
-        return cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
     };
 
     // Cash payment - show confirmation modal first
@@ -219,6 +257,7 @@ export default function SellerPOS() {
                 items: cart.map((item) => ({
                     product: item._id,
                     quantity: item.quantity,
+                    variationId: item.variationId // Pass variationId
                 })),
                 paymentMethod: method,
                 phone: phone
@@ -311,6 +350,57 @@ export default function SellerPOS() {
                 <Header />
                 <main className="flex-1 p-4 md:p-6 overflow-hidden grid grid-cols-1 md:grid-cols-12 gap-6 relative">
 
+                    {/* Variation Selection Modal */}
+                    {selectedProductForVariation && (
+                        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+                            <div className="bg-white dark:bg-gray-800 p-8 rounded-2xl shadow-2xl max-w-lg w-full animate-in fade-in zoom-in duration-200">
+                                <div className="flex justify-between items-start mb-6">
+                                    <h3 className="text-2xl font-bold text-gray-800 dark:text-white">
+                                        Select Option
+                                    </h3>
+                                    <button onClick={() => setSelectedProductForVariation(null)} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200">
+                                        <FaTimes size={24} />
+                                    </button>
+                                </div>
+                                <p className="text-gray-500 dark:text-gray-400 mb-6">
+                                    Choose a variation for <span className="font-bold text-gray-900 dark:text-white">{selectedProductForVariation.name}</span>
+                                </p>
+
+                                <div className="space-y-3 max-h-96 overflow-y-auto pr-2">
+                                    {selectedProductForVariation.variations.map((v, idx) => {
+                                        // Handle attribute display
+                                        let attrDisplay = "";
+                                        if (v.attributes && typeof v.attributes === 'object') {
+                                            attrDisplay = Object.values(v.attributes).join(" / ");
+                                        }
+
+                                        return (
+                                            <div
+                                                key={idx}
+                                                onClick={() => addVariationToCart(v)}
+                                                className={`p-4 rounded-xl border-2 flex justify-between items-center cursor-pointer transition-all ${v.stock > 0
+                                                    ? 'border-gray-200 dark:border-gray-700 hover:border-indigo-500 hover:bg-indigo-50 dark:hover:bg-indigo-900/20'
+                                                    : 'border-gray-100 dark:border-gray-800 opacity-50 cursor-not-allowed bg-gray-50 dark:bg-gray-900'
+                                                    }`}
+                                            >
+                                                <div>
+                                                    <p className="font-bold text-gray-800 dark:text-white">{attrDisplay || `Option ${idx + 1}`}</p>
+                                                    <p className="text-xs text-gray-500 dark:text-gray-400">SKU: {v.sku}</p>
+                                                </div>
+                                                <div className="text-right">
+                                                    <p className="font-bold text-indigo-600 dark:text-indigo-400">RWF {v.price.toLocaleString()}</p>
+                                                    <p className={`text-xs font-bold ${v.stock > 0 ? 'text-green-600' : 'text-red-500'}`}>
+                                                        {v.stock > 0 ? `${v.stock} in stock` : 'Out of Stock'}
+                                                    </p>
+                                                </div>
+                                            </div>
+                                        )
+                                    })}
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
                     {/* Scan Error Toast */}
                     {scanError && (
                         <div className="absolute top-4 left-1/2 transform -translate-x-1/2 bg-red-600 text-white px-6 py-3 rounded-lg shadow-lg z-50 animate-bounce flex items-center gap-2">
@@ -318,7 +408,7 @@ export default function SellerPOS() {
                         </div>
                     )}
 
-                    {/* Receipt Modal */}
+                    {/* Receipt & Cash Modals (Same as before) ... */}
                     {showReceipt && completedOrder && (
                         <Receipt
                             order={completedOrder}
@@ -327,7 +417,6 @@ export default function SellerPOS() {
                         />
                     )}
 
-                    {/* Cash Confirmation Modal */}
                     {showCashConfirm && (
                         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
                             <div className="bg-white dark:bg-gray-800 p-8 rounded-2xl shadow-2xl max-w-md w-full animate-in fade-in zoom-in duration-200">
@@ -380,7 +469,6 @@ export default function SellerPOS() {
                         </div>
                     )}
 
-                    {/* MoMo Modal */}
                     {showMomoModal && (
                         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
                             <div className="bg-white dark:bg-gray-800 p-8 rounded-2xl shadow-2xl max-w-md w-full animate-in fade-in zoom-in duration-200">
@@ -406,7 +494,6 @@ export default function SellerPOS() {
                         </div>
                     )}
 
-                    {/* Pending Payment Overlay */}
                     {pendingOrder && (
                         <div className="fixed inset-0 z-[60] flex flex-col items-center justify-center bg-black/80 backdrop-blur-sm text-white">
                             <div className="w-16 h-16 border-4 border-yellow-500 border-t-transparent rounded-full animate-spin mb-6"></div>
@@ -415,9 +502,7 @@ export default function SellerPOS() {
                         </div>
                     )}
 
-                    {/* Left Column: Product Grid */}
                     <div className="md:col-span-8 flex flex-col min-w-0 h-full bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 overflow-hidden">
-                        {/* POS Header */}
                         <div className="p-6 border-b border-gray-100 dark:border-gray-700 flex flex-col sm:flex-row justify-between items-center gap-4 bg-white dark:bg-gray-800 z-10">
                             <div>
                                 <h1 className="text-xl font-bold text-gray-800 dark:text-white flex items-center gap-2">
@@ -442,7 +527,6 @@ export default function SellerPOS() {
                             </div>
                         </div>
 
-                        {/* Categories */}
                         <div className="px-6 py-3 border-b border-gray-100 dark:border-gray-700 flex gap-2 overflow-x-auto no-scrollbar bg-gray-50/50 dark:bg-gray-800/50">
                             {categories.map(cat => (
                                 <button
@@ -458,7 +542,6 @@ export default function SellerPOS() {
                             ))}
                         </div>
 
-                        {/* Product Grid - Scrollable */}
                         <div className="flex-1 overflow-y-auto p-6 scrollbar-thin dark:scrollbar-thumb-gray-600">
                             {loading ? (
                                 <div className="flex items-center justify-center h-full text-gray-500 dark:text-gray-400">
@@ -475,8 +558,8 @@ export default function SellerPOS() {
                                     {filteredProducts.map((product) => (
                                         <div
                                             key={product._id}
-                                            onClick={() => addToCart(product)}
-                                            className={`group bg-white dark:bg-gray-700 rounded-xl border border-gray-100 dark:border-gray-600 overflow-hidden cursor-pointer hover:shadow-lg transition-all transform hover:-translate-y-1 relative ${product.stock <= 0 ? 'opacity-60 pointer-events-none grayscale' : ''
+                                            onClick={() => handleProductClick(product)} // Updated handler
+                                            className={`group bg-white dark:bg-gray-700 rounded-xl border border-gray-100 dark:border-gray-600 overflow-hidden cursor-pointer hover:shadow-lg transition-all transform hover:-translate-y-1 relative ${product.stock <= 0 && product.type !== 'variable' ? 'opacity-60 pointer-events-none grayscale' : ''
                                                 }`}
                                         >
                                             <div className="aspect-square bg-gray-100 dark:bg-gray-600 relative overflow-hidden">
@@ -491,9 +574,14 @@ export default function SellerPOS() {
                                                         <FaBoxOpen size={32} />
                                                     </div>
                                                 )}
-                                                {product.stock <= 0 && (
+                                                {product.stock <= 0 && product.type !== 'variable' && (
                                                     <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
                                                         <span className="bg-red-600 text-white text-xs font-bold px-2 py-1 rounded shadow-sm transform -rotate-12">OUT OF STOCK</span>
+                                                    </div>
+                                                )}
+                                                {product.type === 'variable' && (
+                                                    <div className="absolute top-2 right-2 bg-indigo-600 text-white text-[10px] font-bold px-2 py-1 rounded-full shadow-sm">
+                                                        OPTIONS
                                                     </div>
                                                 )}
                                             </div>
@@ -501,7 +589,9 @@ export default function SellerPOS() {
                                                 <h4 className="font-semibold text-gray-800 dark:text-gray-100 text-sm truncate mb-1" title={product.name}>{product.name}</h4>
                                                 <div className="flex justify-between items-center">
                                                     <span className="text-indigo-600 dark:text-indigo-400 font-bold text-sm">RWF {product.price.toLocaleString()}</span>
-                                                    <span className="text-xs text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-gray-600 px-1.5 py-0.5 rounded">{product.stock} left</span>
+                                                    <span className="text-xs text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-gray-600 px-1.5 py-0.5 rounded">
+                                                        {product.type === 'variable' ? 'Var' : `${product.stock} left`}
+                                                    </span>
                                                 </div>
                                                 {product.barcode && (
                                                     <p className="text-[10px] text-gray-400 mt-1 font-mono truncate">{product.barcode}</p>
@@ -514,7 +604,6 @@ export default function SellerPOS() {
                         </div>
                     </div>
 
-                    {/* Right Column: Cart */}
                     <div className="md:col-span-4 flex flex-col h-full bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 overflow-hidden">
                         <div className="p-5 border-b border-gray-100 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-800/80 flex justify-between items-center">
                             <h2 className="font-bold text-gray-800 dark:text-white flex items-center gap-2">
@@ -534,7 +623,7 @@ export default function SellerPOS() {
                                 </div>
                             ) : (
                                 cart.map((item) => (
-                                    <div key={item._id} className="bg-white dark:bg-gray-700 border border-gray-100 dark:border-gray-600 rounded-xl p-3 shadow-sm flex justify-between items-center group">
+                                    <div key={item.uniqueId || item._id} className="bg-white dark:bg-gray-700 border border-gray-100 dark:border-gray-600 rounded-xl p-3 shadow-sm flex justify-between items-center group">
                                         <div className="flex-1 min-w-0 mr-3">
                                             <h5 className="font-bold text-gray-800 dark:text-white text-sm truncate">{item.name}</h5>
                                             <p className="text-indigo-600 dark:text-indigo-400 text-xs font-medium">
@@ -543,21 +632,21 @@ export default function SellerPOS() {
                                         </div>
                                         <div className="flex items-center gap-2 bg-gray-50 dark:bg-gray-800 p-1 rounded-lg border border-gray-200 dark:border-gray-600">
                                             <button
-                                                onClick={() => updateQuantity(item._id, -1)}
+                                                onClick={() => updateQuantity(item.uniqueId || item._id, -1)}
                                                 className="w-7 h-7 flex items-center justify-center rounded bg-white dark:bg-gray-700 text-gray-600 dark:text-gray-300 shadow-sm hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors"
                                             >
                                                 <FaMinus size={10} />
                                             </button>
                                             <span className="w-6 text-center text-sm font-bold text-gray-800 dark:text-white">{item.quantity}</span>
                                             <button
-                                                onClick={() => updateQuantity(item._id, 1)}
+                                                onClick={() => updateQuantity(item.uniqueId || item._id, 1)}
                                                 className="w-7 h-7 flex items-center justify-center rounded bg-white dark:bg-gray-700 text-gray-600 dark:text-gray-300 shadow-sm hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors"
                                             >
                                                 <FaPlus size={10} />
                                             </button>
                                         </div>
                                         <button
-                                            onClick={() => removeFromCart(item._id)}
+                                            onClick={() => removeFromCart(item.uniqueId || item._id)}
                                             className="ml-2 w-7 h-7 flex items-center justify-center text-red-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded transition-colors"
                                         >
                                             <FaTrash size={12} />

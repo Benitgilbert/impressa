@@ -80,7 +80,7 @@ export default function AdminBlogEditor() {
                 const uploadRes = await api.post("/upload", uploadData, {
                     headers: { "Content-Type": "multipart/form-data" }
                 });
-                imageUrl = uploadRes.data.url || uploadRes.data.filePath; // Adjust based on backend response
+                imageUrl = uploadRes.data.data?.url || uploadRes.data.url || uploadRes.data.data?.filename; // Handle nested data structure
             }
 
             const payload = { ...formData, image: imageUrl };
@@ -193,15 +193,21 @@ export default function AdminBlogEditor() {
                                     </div>
                                     <div>
                                         <label className="block text-sm font-bold text-charcoal-700 dark:text-charcoal-300 mb-2">Category</label>
-                                        <input
-                                            type="text"
+                                        <select
                                             name="category"
                                             value={formData.category}
                                             onChange={handleInputChange}
                                             required
-                                            className="w-full px-4 py-2.5 rounded-xl border border-cream-200 dark:border-charcoal-700 bg-cream-50 dark:bg-charcoal-900 text-charcoal-800 dark:text-white focus:border-terracotta-500 outline-none transition-colors"
-                                            placeholder="e.g. Design, Tips, News"
-                                        />
+                                            className="w-full px-4 py-2.5 rounded-xl border border-cream-200 dark:border-charcoal-700 bg-cream-50 dark:bg-charcoal-900 text-charcoal-800 dark:text-white focus:border-terracotta-500 outline-none transition-colors appearance-none cursor-pointer"
+                                        >
+                                            <option value="" disabled>Select a category</option>
+                                            <option value="Seller Guides">Seller Guides</option>
+                                            <option value="E-commerce Trends">E-commerce Trends</option>
+                                            <option value="Platform Updates">Platform Updates</option>
+                                            <option value="Success Stories">Success Stories</option>
+                                            <option value="Marketing 101">Marketing 101</option>
+                                            <option value="Customer Tips">Customer Tips</option>
+                                        </select>
                                     </div>
                                 </div>
 

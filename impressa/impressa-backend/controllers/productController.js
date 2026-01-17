@@ -160,7 +160,8 @@ const attachFlashSaleInfo = async (products) => {
   });
 
   const results = items.map(p => {
-    const plain = p.toObject ? p.toObject() : p;
+    // FIX: flattenMaps ensures attributes Map is converted to Object for JSON
+    const plain = p.toObject ? p.toObject({ flattenMaps: true }) : p;
     const saleInfo = productSaleMap.get(plain._id.toString());
     if (saleInfo) {
       plain.flashSaleInfo = saleInfo;
@@ -449,6 +450,7 @@ export const getProductById = async (req, res) => {
 
     if (!product) return res.status(404).json({ message: "Product not found" });
 
+    // Attach sale info
     const enriched = await attachFlashSaleInfo(product);
     res.json(enriched);
   } catch (err) {
@@ -456,7 +458,6 @@ export const getProductById = async (req, res) => {
   }
 };
 
-// Update product (seller/admin only)
 export const updateProduct = async (req, res) => {
   try {
     const product = await Product.findById(req.params.id);
@@ -501,6 +502,7 @@ export const updateProduct = async (req, res) => {
     await product.save();
     res.json(product);
   } catch (err) {
+    console.error("Update Product Error:", err);
     res.status(400).json({ message: err.message });
   }
 };

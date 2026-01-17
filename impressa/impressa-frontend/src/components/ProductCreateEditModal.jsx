@@ -1,16 +1,34 @@
 import { useEffect, useState } from "react";
 import api from "../utils/axiosInstance";
-// import "../styles/PremiumModal.css"; // Removed for Tailwind styling
 
 function ProductCreateEditModal({ product, onClose, onSaved }) {
   const isEdit = !!product;
   const [activeTab, setActiveTab] = useState("general");
-  // const [globalAttributes, setGlobalAttributes] = useState([]); // REMOVED unused
+  const [globalAttributes, setGlobalAttributes] = useState([]);
   const [allProducts, setAllProducts] = useState([]);
   const [shippingClasses, setShippingClasses] = useState([]);
   const [categories, setCategories] = useState([]);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+
+  // Helper to parse attributes from backend format to frontend format
+  const parseAttributes = (attrs) => {
+    if (!attrs) return [];
+    return attrs.map(a => ({
+      key: a.name,
+      value: Array.isArray(a.values) ? a.values.join(", ") : a.values,
+      isVariation: a.variation || false
+    }));
+  };
+
+  // Helper to parse variations
+  const parseVariations = (vars) => {
+    if (!vars) return [];
+    return vars.map(v => ({
+      ...v,
+      attributes: v.attributes || {}
+    }));
+  };
 
   const [form, setForm] = useState({
     name: product?.name || "",
@@ -28,20 +46,25 @@ function ProductCreateEditModal({ product, onClose, onSaved }) {
     upSells: product?.upSells?.map((p) => (typeof p === "object" ? p._id : p)) || [],
     crossSells: product?.crossSells?.map((p) => (typeof p === "object" ? p._id : p)) || [],
     shippingClass: product?.shippingClass || "",
-    attributes: product?.attributes || [],
-    variations: product?.variations || [],
+    attributes: parseAttributes(product?.attributes),
+    variations: parseVariations(product?.variations),
   });
 
-  // const [variationImages, setVariationImages] = useState({}); // REMOVED unused
-
   useEffect(() => {
-    // fetchGlobalAttributes(); // REMOVED unused
+    fetchGlobalAttributes();
     fetchAllProducts();
     fetchShippingClasses();
     fetchCategories();
   }, []);
 
-  // Removed unused fetchGlobalAttributes
+  const fetchGlobalAttributes = async () => {
+    try {
+      const res = await api.get("/attributes");
+      setGlobalAttributes(res.data || []);
+    } catch (err) {
+      console.error("Failed to fetch global attributes:", err);
+    }
+  };
 
   const fetchAllProducts = async () => {
     try {
@@ -85,17 +108,18 @@ function ProductCreateEditModal({ product, onClose, onSaved }) {
     }
   };
 
+  // Attributes Logic
+  const handleAddAttribute = (key = "", value = "") => {
+    setForm((prev) => ({
+      ...prev,
+      attributes: [...prev.attributes, { key, value, isVariation: false }],
+    }));
+  };
+
   const handleAttributeChange = (index, field, value) => {
     const updated = [...form.attributes];
     updated[index][field] = value;
     setForm((prev) => ({ ...prev, attributes: updated }));
-  };
-
-  const handleAddAttribute = () => {
-    setForm((prev) => ({
-      ...prev,
-      attributes: [...prev.attributes, { key: "", value: "" }],
-    }));
   };
 
   const handleRemoveAttribute = (index) => {
@@ -104,20 +128,76 @@ function ProductCreateEditModal({ product, onClose, onSaved }) {
     setForm((prev) => ({ ...prev, attributes: updated }));
   };
 
+  // Variations Logic
+  const generateVariations = () => {
+    const variationAttributes = form.attributes.filter(a => a.isVariation && a.key && a.value);
+    if (variationAttributes.length === 0) {
+      alert("Please add attributes and mark them as 'Used for variations' first.");
+      return;
+    }
+
+    // Group attributes by name to handle multiple rows with same key (e.g. Size: Small, Size: Large)
+    const groupedAttributes = {};
+    variationAttributes.forEach(a => {
+      const key = a.key.trim();
+      const values = a.value.split(',').map(v => v.trim()).filter(Boolean);
+
+      if (groupedAttributes[key]) {
+        groupedAttributes[key] = [...new Set([...groupedAttributes[key], ...values])];
+      } else {
+        groupedAttributes[key] = values;
+      }
+    });
+
+    // Convert to array format for cartesian product
+    const attrs = Object.entries(groupedAttributes).map(([name, values]) => ({
+      name,
+      values
+    }));
+
+    const combine = (list) => {
+      if (list.length === 0) return [{}];
+      const first = list[0];
+      const rest = combine(list.slice(1));
+      const combinations = [];
+      first.values.forEach(val => {
+        rest.forEach(r => {
+          combinations.push({ [first.name]: val, ...r });
+        });
+      });
+      return combinations;
+    };
+
+    const existingVariations = [...form.variations];
+    const combinations = combine(attrs);
+
+    const newVariations = combinations.map(combo => {
+      // Check if exists
+      const existing = existingVariations.find(v =>
+        JSON.stringify(v.attributes) === JSON.stringify(combo)
+      );
+      if (existing) return existing;
+
+      // Create SKU
+      const skuSuffix = Object.values(combo).join('-').toUpperCase().replace(/[^A-Z0-9-]/g, '');
+      const sku = `${form.name.substring(0, 3).toUpperCase()}-${Date.now().toString().slice(-4)}-${skuSuffix}`;
+
+      return {
+        attributes: combo,
+        price: form.price,
+        stock: form.stock, // Default to main stock
+        sku: sku,
+        image: null
+      };
+    });
+
+    setForm(prev => ({ ...prev, variations: newVariations }));
+  };
+
   const handleVariationChange = (index, field, value) => {
     const updated = [...form.variations];
     updated[index][field] = value;
     setForm((prev) => ({ ...prev, variations: updated }));
-  };
-
-  const handleAddVariation = () => {
-    setForm((prev) => ({
-      ...prev,
-      variations: [
-        ...prev.variations,
-        { name: "", price: form.price, stock: form.stock },
-      ],
-    }));
   };
 
   const handleRemoveVariation = (index) => {
@@ -136,16 +216,79 @@ function ProductCreateEditModal({ product, onClose, onSaved }) {
       fd.append("description", form.description);
       fd.append("type", form.type);
 
-      if (form.price !== "") fd.append("price", String(form.price));
-      if (form.stock !== "") fd.append("stock", String(form.stock));
+      // Handle Price Logic
+      let finalPrice = form.price;
+      // Handle Stock Logic
+      let finalStock = form.stock;
+
+      if (form.type === 'variable' && form.variations.length > 0) {
+        // 1. Calculate Min Price from Variations if base price is missing
+        const variationPrices = form.variations
+          .map(v => Number(v.price))
+          .filter(p => !isNaN(p) && p >= 0);
+
+        if ((!finalPrice || finalPrice === "") && variationPrices.length > 0) {
+          finalPrice = Math.min(...variationPrices);
+        }
+
+        // 2. Calculate Total Stock from Variations
+        const variationStocks = form.variations
+          .map(v => Number(v.stock))
+          .filter(s => !isNaN(s));
+
+        if (variationStocks.length > 0) {
+          finalStock = variationStocks.reduce((a, b) => a + b, 0);
+        }
+      }
+
+      if (finalPrice !== "" && finalPrice !== null && finalPrice !== undefined) {
+        fd.append("price", String(finalPrice));
+      }
+
+      // Use the calculated total stock for variable products
+      if (finalStock !== "" && finalStock !== null && finalStock !== undefined) {
+        fd.append("stock", String(finalStock));
+      }
 
       fd.append("customizable", String(form.customizable));
       fd.append("featured", String(form.featured));
       fd.append("isDigital", String(form.isDigital));
       fd.append("downloadLink", form.downloadLink);
 
-      fd.append("attributes", JSON.stringify(form.attributes));
-      fd.append("variations", JSON.stringify(form.variations));
+      // Transform attributes for backend
+      // Group them first to ensure we send clean data
+      const groupedForBackend = {};
+      form.attributes.forEach(a => {
+        if (!a.key) return;
+        const key = a.key.trim();
+        const vals = a.value.split(',').map(v => v.trim()).filter(Boolean);
+        if (groupedForBackend[key]) {
+          groupedForBackend[key].values = [...new Set([...groupedForBackend[key].values, ...vals])];
+          groupedForBackend[key].variation = groupedForBackend[key].variation || a.isVariation;
+        } else {
+          groupedForBackend[key] = {
+            name: key,
+            values: vals,
+            variation: a.isVariation,
+            visible: true
+          };
+        }
+      });
+
+      const backendAttributes = Object.values(groupedForBackend);
+      fd.append("attributes", JSON.stringify(backendAttributes));
+
+      // Transform variations for backend
+      // Backend expects array of objects with 'attributes' Map
+      const backendVariations = form.variations.map(v => ({
+        attributes: v.attributes,
+        price: Number(v.price),
+        stock: Number(v.stock),
+        sku: v.sku
+        // Handling images would require separate FormData logic or existing logic
+      }));
+      fd.append("variations", JSON.stringify(backendVariations));
+
       fd.append("upSells", JSON.stringify(form.upSells));
       fd.append("crossSells", JSON.stringify(form.crossSells));
 
@@ -362,59 +505,111 @@ function ProductCreateEditModal({ product, onClose, onSaved }) {
 
           {activeTab === "attributes" && (
             <div className="space-y-6">
-              <div className="flex justify-between items-center bg-gray-50 dark:bg-gray-700/50 p-4 rounded-lg border border-gray-100 dark:border-gray-700">
+              <div className="flex flex-col md:flex-row justify-between items-start md:items-center bg-gray-50 dark:bg-gray-700/50 p-4 rounded-lg border border-gray-100 dark:border-gray-700 gap-4">
                 <div>
                   <h4 className="font-semibold text-gray-800 dark:text-white">Product Attributes</h4>
                   <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Define characteristics like color, size, or material.</p>
                 </div>
-                <button
-                  type="button"
-                  onClick={handleAddAttribute}
-                  className="bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 hover:border-indigo-300 hover:text-indigo-600 dark:hover:text-indigo-400 text-gray-600 dark:text-gray-300 text-xs px-3 py-1.5 rounded-md font-medium transition-all shadow-sm"
-                >
-                  + Add Attribute
-                </button>
+                <div className="flex gap-2">
+                  <select
+                    onChange={(e) => {
+                      if (e.target.value) {
+                        handleAddAttribute(e.target.value, "");
+                        e.target.value = ""; // Reset select
+                      }
+                    }}
+                    className="bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 text-gray-700 dark:text-gray-300 text-xs px-3 py-1.5 rounded-md focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                  >
+                    <option value="">+ Add Global Attribute</option>
+                    {globalAttributes.map(attr => (
+                      <option key={attr._id} value={attr.name}>{attr.name}</option>
+                    ))}
+                  </select>
+                  <button
+                    type="button"
+                    onClick={() => handleAddAttribute("", "")}
+                    className="bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 hover:border-indigo-300 hover:text-indigo-600 dark:hover:text-indigo-400 text-gray-600 dark:text-gray-300 text-xs px-3 py-1.5 rounded-md font-medium transition-all shadow-sm"
+                  >
+                    + Add Custom
+                  </button>
+                </div>
               </div>
               {form.attributes.length === 0 && (
                 <div className="text-center py-8 text-gray-400 dark:text-gray-500 text-sm italic">
-                  No attributes added yet.
+                  No attributes added yet. Select a global attribute or add a custom one.
                 </div>
               )}
-              {form.attributes.map((attr, index) => (
-                <div key={index} className="p-4 border border-gray-200 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-800 hover:shadow-sm transition-shadow">
-                  <div className="grid grid-cols-1 md:grid-cols-7 gap-4 items-end">
-                    <div className="md:col-span-3">
-                      <label className="block text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1 uppercase tracking-wide">Key</label>
-                      <input
-                        type="text"
-                        placeholder="e.g. Color"
-                        value={attr.key}
-                        onChange={(e) => handleAttributeChange(index, "key", e.target.value)}
-                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 bg-white dark:bg-gray-700 dark:text-white text-sm"
-                      />
-                    </div>
-                    <div className="md:col-span-3">
-                      <label className="block text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1 uppercase tracking-wide">Value</label>
-                      <input
-                        type="text"
-                        placeholder="e.g. Blue"
-                        value={attr.value}
-                        onChange={(e) => handleAttributeChange(index, "value", e.target.value)}
-                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 bg-white dark:bg-gray-700 dark:text-white text-sm"
-                      />
-                    </div>
-                    <div className="md:col-span-1">
-                      <button
-                        type="button"
-                        onClick={() => handleRemoveAttribute(index)}
-                        className="w-full py-2 text-red-500 hover:text-red-700 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 border border-transparent hover:border-red-100 dark:hover:border-red-800 rounded-md text-sm font-medium transition-colors"
-                      >
-                        Remove
-                      </button>
+              {form.attributes.map((attr, index) => {
+                const globalAttr = globalAttributes.find(ga => ga.name.toLowerCase() === attr.key.toLowerCase());
+                return (
+                  <div key={index} className="p-4 border border-gray-200 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-800 hover:shadow-sm transition-shadow">
+                    <div className="grid grid-cols-1 md:grid-cols-7 gap-4 items-end">
+                      <div className="md:col-span-2">
+                        <label className="block text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1 uppercase tracking-wide">Key</label>
+                        <input
+                          type="text"
+                          placeholder="e.g. Color"
+                          value={attr.key}
+                          onChange={(e) => handleAttributeChange(index, "key", e.target.value)}
+                          list={`global-attributes-${index}`}
+                          className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 bg-white dark:bg-gray-700 dark:text-white text-sm"
+                        />
+                        <datalist id={`global-attributes-${index}`}>
+                          {globalAttributes.map(ga => <option key={ga._id} value={ga.name} />)}
+                        </datalist>
+                      </div>
+                      <div className="md:col-span-3">
+                        <label className="block text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1 uppercase tracking-wide">Value(s) <span className="text-[10px] normal-case font-normal">(comma separated for variations)</span></label>
+                        {globalAttr && globalAttr.values && globalAttr.values.length > 0 ? (
+                          <div className="relative">
+                            <input
+                              type="text"
+                              placeholder={`e.g. Red, Blue, Green`}
+                              value={attr.value}
+                              onChange={(e) => handleAttributeChange(index, "value", e.target.value)}
+                              list={`attr-values-${index}`}
+                              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 bg-white dark:bg-gray-700 dark:text-white text-sm"
+                            />
+                            <datalist id={`attr-values-${index}`}>
+                              {globalAttr.values.map(val => (
+                                <option key={val._id} value={val.name} />
+                              ))}
+                            </datalist>
+                          </div>
+                        ) : (
+                          <input
+                            type="text"
+                            placeholder="e.g. Red, Blue"
+                            value={attr.value}
+                            onChange={(e) => handleAttributeChange(index, "value", e.target.value)}
+                            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 bg-white dark:bg-gray-700 dark:text-white text-sm"
+                          />
+                        )}
+                      </div>
+                      <div className="md:col-span-1 flex items-center h-[42px]">
+                        <label className="flex items-center space-x-2 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={attr.isVariation}
+                            onChange={(e) => handleAttributeChange(index, "isVariation", e.target.checked)}
+                            className="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
+                          />
+                          <span className="text-xs text-gray-600 dark:text-gray-300">Variation?</span>
+                        </label>
+                      </div>
+                      <div className="md:col-span-1">
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveAttribute(index)}
+                          className="w-full py-2 text-red-500 hover:text-red-700 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 border border-transparent hover:border-red-100 dark:hover:border-red-800 rounded-md text-sm font-medium transition-colors"
+                        >
+                          Remove
+                        </button>
+                      </div>
                     </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
 
@@ -427,27 +622,40 @@ function ProductCreateEditModal({ product, onClose, onSaved }) {
                 </div>
                 <button
                   type="button"
-                  onClick={handleAddVariation}
+                  onClick={generateVariations}
                   className="bg-indigo-600 hover:bg-indigo-700 text-white text-xs px-3 py-1.5 rounded-md font-medium transition-all shadow-sm"
                 >
-                  + Add Variation
+                  Generate Variations
                 </button>
               </div>
+
               {form.variations.length === 0 && (
                 <div className="text-center py-8 text-gray-400 dark:text-gray-500 text-sm italic">
-                  No variations added yet.
+                  No variations added yet. Add attributes and mark them for variation, then click Generate.
                 </div>
               )}
+
               {form.variations.map((v, idx) => (
                 <div key={idx} className="p-4 border border-gray-200 dark:border-gray-700 rounded-xl bg-white dark:bg-gray-800 shadow-sm hover:border-indigo-300 dark:hover:border-indigo-700 transition-colors">
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 items-end">
+                  <div className="mb-3 pb-2 border-b border-gray-100 dark:border-gray-700 flex justify-between items-center">
+                    <h5 className="font-semibold text-sm text-gray-800 dark:text-gray-200">
+                      {Object.entries(v.attributes).map(([key, val]) => `${key}: ${val}`).join(' / ')}
+                    </h5>
+                    <button
+                      type="button"
+                      onClick={() => handleRemoveVariation(idx)}
+                      className="text-red-500 hover:text-red-700 text-xs font-medium"
+                    >
+                      Remove
+                    </button>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div>
-                      <label className="block text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1 uppercase tracking-wide">Variation</label>
+                      <label className="block text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1 uppercase tracking-wide">SKU</label>
                       <input
                         type="text"
-                        placeholder="e.g. XL / Red"
-                        value={v.name}
-                        onChange={(e) => handleVariationChange(idx, "name", e.target.value)}
+                        value={v.sku}
+                        onChange={(e) => handleVariationChange(idx, "sku", e.target.value)}
                         className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-1 focus:ring-indigo-500 bg-white dark:bg-gray-700 dark:text-white text-sm"
                       />
                     </div>
@@ -470,15 +678,6 @@ function ProductCreateEditModal({ product, onClose, onSaved }) {
                         onChange={(e) => handleVariationChange(idx, "stock", e.target.value)}
                         className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-1 focus:ring-indigo-500 bg-white dark:bg-gray-700 dark:text-white text-sm"
                       />
-                    </div>
-                    <div>
-                      <button
-                        type="button"
-                        onClick={() => handleRemoveVariation(idx)}
-                        className="w-full py-2 text-red-500 hover:text-red-700 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 border border-red-100 dark:border-red-900/30 rounded-md text-sm font-medium transition-all"
-                      >
-                        Remove
-                      </button>
                     </div>
                   </div>
                 </div>

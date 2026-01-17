@@ -3,7 +3,7 @@ import { useParams, useNavigate, Link } from "react-router-dom";
 import api from "../utils/axiosInstance";
 import { useCart } from "../context/CartContext";
 import { useWishlist } from "../context/WishlistContext";
-import { useToast } from "../context/ToastContext"; // Added useToast import
+import { useToast } from "../context/ToastContext";
 import { formatRwf } from "../utils/currency";
 import assetUrl from "../utils/assetUrl";
 import LandingFooter from "../components/LandingFooter";
@@ -36,7 +36,7 @@ export default function ProductDetail() {
 
   const { addItem } = useCart();
   const { toggle, has } = useWishlist();
-  const { showSuccess, showError } = useToast(); // Initialized useToast
+  const { showSuccess, showError } = useToast();
 
   useEffect(() => {
     window.scrollTo(0, 0);
@@ -119,9 +119,19 @@ export default function ProductDetail() {
       const allSelected = Object.values(selectedAttributes).every(v => v !== "");
 
       if (allSelected) {
-        const match = product.variations.find(v =>
-          Object.entries(v.attributes).every(([key, val]) => selectedAttributes[key] === val)
-        );
+        // Robust matching: trim and case-insensitive check
+        const match = product.variations.find(v => {
+          if (!v.attributes) return false;
+          const vAttrs = v.attributes;
+
+          return Object.entries(selectedAttributes).every(([selKey, selVal]) => {
+            const varKey = Object.keys(vAttrs).find(k => k.trim().toLowerCase() === selKey.trim().toLowerCase());
+            if (!varKey) return false;
+
+            const varVal = vAttrs[varKey];
+            return String(varVal).trim().toLowerCase() === String(selVal).trim().toLowerCase();
+          });
+        });
         setCurrentVariation(match || null);
       } else {
         setCurrentVariation(null);
@@ -144,11 +154,16 @@ export default function ProductDetail() {
 
       addItem({
         ...product,
-        variationId: currentVariation.sku,
-        price: currentVariation.price,
         name: `${product.name} - ${Object.values(currentVariation.attributes).join(" / ")}`,
         image: currentVariation.image || product.image
-      }, { quantity, customText, cloudLink, cloudPassword });
+      }, {
+        quantity,
+        customText,
+        cloudLink,
+        cloudPassword,
+        variationId: currentVariation.sku,
+        price: currentVariation.price
+      });
     } else {
       addItem(product, { quantity, customText, cloudLink, cloudPassword });
     }
@@ -165,8 +180,6 @@ export default function ProductDetail() {
 
   // Determine display price and stock
   const displayPrice = currentVariation ? currentVariation.price : product?.price;
-
-  // const displayStock = currentVariation ? currentVariation.stock : product?.stock; // REMOVED unused
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-slate-950 transition-colors duration-300">
@@ -355,68 +368,6 @@ export default function ProductDetail() {
                     <FaHeart className={has(product._id) ? "text-red-500" : ""} /> {has(product._id) ? 'Saved' : 'Wishlist'}
                   </button>
                 </div>
-              </div>
-            </div>
-          )}
-
-          {/* REVIEWS SECTION */}
-          {product && (
-            <div className="mt-16 bg-white dark:bg-slate-900 rounded-3xl p-8 shadow-sm border border-gray-100 dark:border-slate-800">
-              <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-8">Customer Reviews</h2>
-
-              {/* Add Review Form */}
-              <div className="bg-gray-50 dark:bg-slate-800/50 rounded-2xl p-6 mb-12 border border-gray-100 dark:border-slate-800">
-                <h3 className="text-lg font-bold text-gray-800 dark:text-slate-200 mb-4">Write a Review</h3>
-                <div className="flex gap-2 mb-4">
-                  {[1, 2, 3, 4, 5].map(star => (
-                    <button key={star} onClick={() => setNewReviewRating(star)} className="p-1 hover:scale-110 transition-transform">
-                      <FaStar className={`text-2xl ${star <= newReviewRating ? "text-amber-400" : "text-gray-300 dark:text-gray-600"}`} />
-                    </button>
-                  ))}
-                </div>
-                <textarea
-                  value={newReviewComment}
-                  onChange={(e) => setNewReviewComment(e.target.value)}
-                  placeholder="Share your thoughts about this product..."
-                  className="w-full bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl p-4 text-sm outline-none focus:ring-2 focus:ring-violet-500 transition-all dark:text-white mb-4"
-                  rows="3"
-                />
-                <button
-                  onClick={handleSubmitReview}
-                  disabled={submittingReview}
-                  className="bg-violet-600 hover:bg-violet-700 text-white px-8 py-3 rounded-xl font-bold transition-all disabled:opacity-50"
-                >
-                  {submittingReview ? "Submitting..." : "Submit Review"}
-                </button>
-              </div>
-
-              {/* Reviews List */}
-              <div className="space-y-8">
-                {reviews.length === 0 ? (
-                  <p className="text-center py-8 text-gray-500 italic">No reviews yet. Be the first to review!</p>
-                ) : (
-                  reviews.map(review => (
-                    <div key={review._id} className="pb-8 border-b border-gray-50 dark:border-slate-800 last:border-0">
-                      <div className="flex justify-between items-start mb-4">
-                        <div className="flex items-center gap-3">
-                          <div className="w-10 h-10 bg-gradient-to-br from-violet-100 to-fuchsia-100 dark:from-violet-900/40 dark:to-fuchsia-900/40 text-violet-600 dark:text-violet-400 rounded-full flex items-center justify-center font-bold">
-                            {review.user?.name?.[0] || 'U'}
-                          </div>
-                          <div>
-                            <h4 className="font-bold text-gray-900 dark:text-white leading-tight">{review.user?.name || "Anonymous"}</h4>
-                            <span className="text-xs text-gray-400">{new Date(review.createdAt).toLocaleDateString()}</span>
-                          </div>
-                        </div>
-                        <div className="flex text-amber-400 text-xs mt-1">
-                          {[...Array(5)].map((_, i) => (
-                            <FaStar key={i} className={i < review.rating ? "text-amber-400" : "text-gray-200 dark:text-gray-700"} />
-                          ))}
-                        </div>
-                      </div>
-                      <p className="text-gray-600 dark:text-gray-400 leading-relaxed italic">"{review.comment}"</p>
-                    </div>
-                  ))
-                )}
               </div>
             </div>
           )}

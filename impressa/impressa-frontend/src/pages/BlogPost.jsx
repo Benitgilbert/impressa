@@ -4,12 +4,16 @@ import { FaUser, FaCalendarAlt } from "react-icons/fa";
 import Header from "../components/Header";
 import LandingFooter from "../components/LandingFooter";
 import api from "../utils/axiosInstance";
+import toast from "react-hot-toast";
+import assetUrl from "../utils/assetUrl";
 
 export default function BlogPost() {
   const { id } = useParams();
   const [post, setPost] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [email, setEmail] = useState("");
+  const [subscribing, setSubscribing] = useState(false);
 
   useEffect(() => {
     const fetchPost = async () => {
@@ -28,6 +32,31 @@ export default function BlogPost() {
       fetchPost();
     }
   }, [id]);
+
+  const handleSubscribe = async () => {
+    if (!email) {
+      toast.error("Please enter your email address.");
+      return;
+    }
+
+    // Basic email validation
+    if (!/\S+@\S+\.\S+/.test(email)) {
+      toast.error("Please enter a valid email address.");
+      return;
+    }
+
+    setSubscribing(true);
+    try {
+      await api.post("/newsletter/subscribe", { email });
+      toast.success("Successfully subscribed to our newsletter!");
+      setEmail("");
+    } catch (err) {
+      console.error("Subscription failed:", err);
+      toast.error(err.response?.data?.message || "Failed to subscribe. Please try again.");
+    } finally {
+      setSubscribing(false);
+    }
+  };
 
   if (loading) {
     return (
@@ -72,7 +101,7 @@ export default function BlogPost() {
             {post.image && (
               <div className="aspect-[21/9] w-full relative">
                 <img
-                  src={post.image.startsWith('http') ? post.image : process.env.PUBLIC_URL + post.image}
+                  src={assetUrl(post.image)}
                   alt={post.title}
                   className="w-full h-full object-cover"
                 />
@@ -122,11 +151,17 @@ export default function BlogPost() {
                 <div className="flex flex-col sm:flex-row gap-4">
                   <input
                     type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
                     placeholder="your@email.com"
                     className="flex-1 bg-white/20 border border-white/30 rounded-2xl py-5 px-6 text-white placeholder:text-violet-200 outline-none focus:bg-white/30 transition-all font-bold"
                   />
-                  <button className="bg-white text-violet-600 px-8 py-5 rounded-2xl font-black hover:bg-gray-100 transition-all active:scale-95 shadow-2xl">
-                    Subscribe
+                  <button
+                    onClick={handleSubscribe}
+                    disabled={subscribing}
+                    className="bg-white text-violet-600 px-8 py-5 rounded-2xl font-black hover:bg-gray-100 transition-all active:scale-95 shadow-2xl disabled:opacity-70 disabled:cursor-not-allowed"
+                  >
+                    {subscribing ? "Subscribing..." : "Subscribe"}
                   </button>
                 </div>
               </div>

@@ -101,7 +101,14 @@ export const addToCart = async (req, res, next) => {
 
       price = variation.price;
       // Append attributes to name
-      const attrString = Object.values(variation.attributes).join(" / ");
+      let attrValues = [];
+      if (variation.attributes instanceof Map) {
+        attrValues = Array.from(variation.attributes.values());
+      } else if (variation.attributes && typeof variation.attributes === 'object') {
+        attrValues = Object.values(variation.attributes);
+      }
+
+      const attrString = attrValues.join(" / ");
       name = `${product.name} - ${attrString}`;
       if (variation.image) image = variation.image;
 

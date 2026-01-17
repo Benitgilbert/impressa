@@ -1,6 +1,7 @@
 import Subscriber from "../models/Subscriber.js";
 import User from "../models/User.js";
 import { notifyNewSubscriber } from "./notificationController.js";
+import { sendWelcomeEmail } from "../utils/emailService.js";
 
 /**
  * Subscribe to newsletter (public)
@@ -32,6 +33,13 @@ export const subscribe = async (req, res, next) => {
                 existing.subscribedAt = new Date();
                 await existing.save();
 
+                // Send welcome email
+                try {
+                    await sendWelcomeEmail(email.toLowerCase());
+                } catch (error) {
+                    console.error("Failed to send welcome email:", error);
+                }
+
                 return res.json({
                     success: true,
                     message: "Welcome back! Your subscription has been reactivated."
@@ -49,6 +57,13 @@ export const subscribe = async (req, res, next) => {
         try {
             notifyNewSubscriber(email);
         } catch (e) { }
+
+        // Send welcome email
+        try {
+            await sendWelcomeEmail(email.toLowerCase());
+        } catch (error) {
+            console.error("Failed to send welcome email:", error);
+        }
 
         res.status(201).json({
             success: true,

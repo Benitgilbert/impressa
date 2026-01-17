@@ -163,6 +163,7 @@ export function CartProvider({ children }) {
     customText: it.customizations?.customText || "",
     cloudLink: it.customizations?.cloudLink || "",
     cloudPassword: it.customizations?.cloudPassword || "",
+    variationId: it.variationId || null,
     _id: it.product?._id || it.product,
   }));
 

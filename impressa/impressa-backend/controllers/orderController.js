@@ -46,12 +46,41 @@ export const createOrder = async (req, res) => {
   try {
     const { items, billingAddress, shippingAddress, totals, shipping, tax, paymentMethod, guestInfo, giftCard } = req.body;
 
+    console.log("DEBUG CREATE ORDER ITEMS:", JSON.stringify(items, null, 2));
+
     if (!items || items.length === 0) {
       return res.status(400).json({ message: "Order must contain items" });
     }
 
     const orderItems = await Promise.all(items.map(async (item) => {
       const product = await Product.findById(item.product._id || item.product);
+      if (!product) throw new Error(`Product not found: ${item.name}`);
+
+      // --- STOCK DEDUCTION LOGIC ---
+      if (item.variationId) {
+        // Variable Product
+        const variation = product.variations.find(v => v.sku === item.variationId);
+        if (!variation) throw new Error(`Variation ${item.variationId} not found`);
+
+        if (variation.stock < item.quantity) {
+          throw new Error(`Insufficient stock for ${product.name} (Variation)`);
+        }
+
+        variation.stock -= item.quantity;
+        // Also deduct from parent total stock
+        product.stock -= item.quantity;
+      } else {
+        // Simple Product
+        if (product.stock < item.quantity) {
+          throw new Error(`Insufficient stock for ${product.name}`);
+        }
+        product.stock -= item.quantity;
+      }
+
+      product.salesCount += item.quantity;
+      await product.save();
+      // -----------------------------
+
       return {
         product: item.product._id || item.product,
         seller: product ? product.seller : (item.product.seller || item.seller),
@@ -703,16 +732,46 @@ export const createPOSOrder = async (req, res) => {
         throw new Error(`You can only sell your own products: ${product.name}`);
       }
 
-      if (product.stock < item.quantity) {
-        throw new Error(`Insufficient stock for ${product.name}. Available: ${product.stock}`);
+      let price = product.price;
+      let productName = product.name;
+
+      // --- VARIATION LOGIC ---
+      if (item.variationId) {
+        const variation = product.variations.find(v => v.sku === item.variationId);
+        if (!variation) throw new Error(`Variation ${item.variationId} not found for ${product.name}`);
+
+        if (variation.stock < item.quantity) {
+          throw new Error(`Insufficient stock for ${product.name} (${item.variationId}). Available: ${variation.stock}`);
+        }
+
+        // Deduct Variation Stock
+        variation.stock -= item.quantity;
+        // Deduct Parent Stock
+        product.stock -= item.quantity;
+
+        // Use Variation details
+        price = variation.price;
+        // Helper to handle Map attributes for name construction
+        let attrValues = [];
+        if (variation.attributes instanceof Map) {
+          attrValues = Array.from(variation.attributes.values());
+        } else if (variation.attributes && typeof variation.attributes === 'object') {
+          attrValues = Object.values(variation.attributes);
+        }
+        productName = `${product.name} - ${attrValues.join(" / ")}`;
+
+      } else {
+        // Simple Product Logic
+        if (product.stock < item.quantity) {
+          throw new Error(`Insufficient stock for ${product.name}. Available: ${product.stock}`);
+        }
+        product.stock -= item.quantity;
       }
 
-      // Deduct Stock
-      product.stock -= item.quantity;
       product.salesCount += item.quantity;
       await product.save();
 
-      const itemSubtotal = product.price * item.quantity;
+      const itemSubtotal = price * item.quantity;
       subtotal += itemSubtotal;
 
       // Track seller for this item
@@ -721,12 +780,13 @@ export const createPOSOrder = async (req, res) => {
       orderItems.push({
         product: product._id,
         seller: sellerId,
-        productName: product.name,
+        productName: productName,
         productImage: product.image,
         quantity: item.quantity,
-        price: product.price,
+        price: price,
         cost: product.costPrice || 0,
-        subtotal: itemSubtotal
+        subtotal: itemSubtotal,
+        variationId: item.variationId || null // Track variation ID in order item if schema allows, or just rely on name
       });
 
       // Accumulate earnings per seller
@@ -897,7 +957,7 @@ export const getSellerPOSProducts = async (req, res) => {
       stock: { $gt: 0 },
       visibility: 'public'
     })
-      .select('name price stock image sku categories')
+      .select('name price stock image sku categories type variations')
       .populate('categories', 'name')
       .sort({ name: 1 });
 
@@ -926,7 +986,7 @@ export const getAdminPOSProducts = async (req, res) => {
       ],
       stock: { $gt: 0 }
     })
-      .select('name price stock image sku categories')
+      .select('name price stock image sku categories type variations')
       .populate('categories', 'name')
       .sort({ name: 1 });
 

@@ -19,19 +19,23 @@ const createTransporter = () => {
     });
 };
 
-/**
- * Send email with error handling
- */
-const sendEmail = async ({ to, subject, text, html }) => {
+const sendEmail = async ({ to, subject, text, html, headers }) => {
     try {
         const transporter = createTransporter();
 
+        // Ensure "Impressa" is always in the From field
+        let from = process.env.SMTP_FROM || "Impressa <noreply@impressa.rw>";
+        if (!from.includes("Impressa") && !from.includes('"')) {
+            from = `"Impressa" <${process.env.SMTP_USER || from}>`;
+        }
+
         const mailOptions = {
-            from: process.env.SMTP_FROM || '"Impressa" <noreply@impressa.rw>',
+            from,
             to,
             subject,
             text,
-            html
+            html,
+            headers // Support for custom headers from arguments
         };
 
         const result = await transporter.sendMail(mailOptions);
@@ -221,6 +225,76 @@ export const sendLowStockEmail = async (seller, products) => {
     });
 };
 
+// Welcome Newsletter Subscriber
+export const sendWelcomeEmail = async (email) => {
+    const unsubscribeUrl = `${process.env.FRONTEND_URL}/unsubscribe?email=${encodeURIComponent(email)}`;
+
+    const headers = {
+        'List-Unsubscribe': `<${unsubscribeUrl}>, <mailto:${process.env.SMTP_USER || 'noreply@impressa.rw'}?subject=unsubscribe>`,
+        'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click'
+    };
+
+    const html = `
+    <div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 6px rgba(0,0,0,0.05); border: 1px solid #e5e7eb;">
+        <!-- Header -->
+        <div style="background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%); padding: 32px 24px; text-align: center;">
+            <h1 style="color: #ffffff; margin: 0; font-size: 28px; font-weight: 800; letter-spacing: -0.5px;">Welcome to Impressa! 🎉</h1>
+        </div>
+
+        <!-- Content -->
+        <div style="padding: 32px 24px;">
+            <p style="color: #374151; font-size: 16px; line-height: 1.6; margin-bottom: 24px;">Hi there,</p>
+            
+            <p style="color: #374151; font-size: 16px; line-height: 1.6; margin-bottom: 24px;">
+                Thank you so much for subscribing to the Impressa newsletter! We're thrilled to have you join our community of creative minds and printing enthusiasts.
+            </p>
+
+            <div style="background-color: #f3f4f6; padding: 24px; border-radius: 12px; margin-bottom: 24px;">
+                <h3 style="color: #111827; margin-top: 0; margin-bottom: 16px; font-size: 18px;">What to expect:</h3>
+                <ul style="color: #4b5563; font-size: 15px; line-height: 1.6; padding-left: 20px; margin: 0;">
+                    <li style="margin-bottom: 8px;">💡 Expert printing tips and design guides</li>
+                    <li style="margin-bottom: 8px;">🚀 Platform updates and new features</li>
+                    <li style="margin-bottom: 8px;">🌟 Seller success stories and spotights</li>
+                    <li style="margin-bottom: 0;">🎁 Exclusive subscriber-only deals</li>
+                </ul>
+            </div>
+
+            <p style="color: #374151; font-size: 16px; line-height: 1.6; margin-bottom: 32px;">
+                Stay tuned for our next update. In the meantime, explore our latest blog posts or browse the marketplace for inspiration!
+            </p>
+
+            <div style="text-align: center;">
+                <a href="${process.env.FRONTEND_URL}/blog" 
+                   style="display: inline-block; background-color: #ef4444; color: #ffffff; font-weight: 700; font-size: 16px; padding: 16px 32px; text-decoration: none; border-radius: 50px; transition: background-color 0.3s ease; box-shadow: 0 4px 6px rgba(239, 68, 68, 0.25);">
+                    Read the Blog
+                </a>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <div style="background-color: #f9fafb; padding: 24px; text-align: center; border-top: 1px solid #e5e7eb;">
+            <p style="color: #9ca3af; font-size: 13px; margin: 0;">
+                © ${new Date().getFullYear()} Impressa. All rights reserved.<br>
+                This email was sent to <a href="mailto:${email}" style="color: #9ca3af; text-decoration: none;">${email}</a>
+            </p>
+            <div style="margin-top: 12px;">
+                <a href="${process.env.FRONTEND_URL}" style="color: #6366f1; text-decoration: none; font-size: 13px; margin: 0 8px;">Website</a>
+                <span style="color: #d1d5db;">|</span>
+                <a href="${process.env.FRONTEND_URL}/contact" style="color: #6366f1; text-decoration: none; font-size: 13px; margin: 0 8px;">Contact Us</a>
+                <span style="color: #d1d5db;">|</span>
+                <a href="${unsubscribeUrl}" style="color: #6366f1; text-decoration: none; font-size: 13px; margin: 0 8px;">Unsubscribe</a>
+            </div>
+        </div>
+    </div>`;
+
+    return sendEmail({
+        to: email,
+        subject: "Welcome to the Impressa Community! 💌",
+        html,
+        headers
+    });
+};
+
 export default {
     sendEmail,
     sendSellerApprovedEmail,
@@ -229,5 +303,6 @@ export default {
     sendNewOrderEmail,
     sendPayoutSentEmail,
     sendWarningEmail,
-    sendLowStockEmail
+    sendLowStockEmail,
+    sendWelcomeEmail
 };

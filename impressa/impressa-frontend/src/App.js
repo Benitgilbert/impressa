@@ -69,6 +69,7 @@ import AdminNotifications from "./pages/AdminNotifications";
 import SellerNotifications from "./pages/SellerNotifications";
 import OrderSuccess from "./pages/OrderSuccess";
 import GiftCards from "./pages/GiftCards";
+import Unsubscribe from "./pages/Unsubscribe";
 
 import { CartProvider } from "./context/CartContext";
 import { WishlistProvider } from "./context/WishlistContext";
@@ -113,6 +114,7 @@ function App() {
                   } />
                   <Route path="/daily-deals" element={<DailyDeals />} />
                   <Route path="/gift-cards" element={<GiftCards />} />
+                  <Route path="/unsubscribe" element={<Unsubscribe />} />
 
                   <Route path="/login" element={<Login />} />
                   <Route path="/register" element={<Register />} />

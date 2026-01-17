@@ -4,11 +4,20 @@ import { FaUser, FaCalendarAlt, FaSearch } from "react-icons/fa";
 import Header from "../components/Header";
 import LandingFooter from "../components/LandingFooter";
 import api from "../utils/axiosInstance";
+import assetUrl from "../utils/assetUrl";
+import toast from "react-hot-toast";
 
 export default function Blog() {
   const [blogPosts, setBlogPosts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+
+  const [searchTerm, setSearchTerm] = useState("");
+  const [selectedCategory, setSelectedCategory] = useState("All");
+  const [email, setEmail] = useState("");
+  const [subscribing, setSubscribing] = useState(false);
+
+  const categories = ["All", "Seller Guides", "E-commerce Trends", "Platform Updates", "Success Stories", "Marketing 101", "Customer Tips"];
 
   useEffect(() => {
     const fetchBlogs = async () => {
@@ -26,7 +35,42 @@ export default function Blog() {
     fetchBlogs();
   }, []);
 
-  const categories = ["Design Tips", "Marketing", "Branding", "Inspiration"];
+  const handleSubscribe = async () => {
+    if (!email) {
+      toast.error("Please enter your email address.");
+      return;
+    }
+
+    // Basic email validation
+    if (!/\S+@\S+\.\S+/.test(email)) {
+      toast.error("Please enter a valid email address.");
+      return;
+    }
+
+    setSubscribing(true);
+    try {
+      await api.post("/newsletter/subscribe", { email });
+      toast.success("Successfully subscribed to our newsletter!");
+      setEmail("");
+    } catch (err) {
+      console.error("Subscription failed:", err);
+      toast.error(err.response?.data?.message || "Failed to subscribe. Please try again.");
+    } finally {
+      setSubscribing(false);
+    }
+  };
+
+  const filteredPosts = blogPosts.filter(post => {
+    const searchLower = searchTerm.toLowerCase();
+    const matchesSearch = (post.title?.toLowerCase() || "").includes(searchLower) ||
+      (post.excerpt?.toLowerCase() || "").includes(searchLower) ||
+      (post.author?.toLowerCase() || "").includes(searchLower);
+
+    const matchesCategory = selectedCategory === "All" ||
+      (post.category?.toLowerCase().trim() === selectedCategory.toLowerCase().trim());
+
+    return matchesSearch && matchesCategory;
+  });
 
   return (
     <div className="min-h-screen bg-cream-100 dark:bg-charcoal-900 transition-colors duration-300">
@@ -67,18 +111,18 @@ export default function Blog() {
                 <div className="p-12 bg-terracotta-50 dark:bg-terracotta-900/10 border-2 border-terracotta-500/20 rounded-[40px] text-center">
                   <p className="text-xl font-bold text-terracotta-600 dark:text-terracotta-400">{error}</p>
                 </div>
-              ) : blogPosts.length === 0 ? (
+              ) : filteredPosts.length === 0 ? (
                 <div className="p-20 bg-white dark:bg-charcoal-800 rounded-[40px] border-2 border-dashed border-cream-300 dark:border-charcoal-700 text-center text-charcoal-400 font-bold text-xl">
-                  No blog posts found.
+                  No blog posts found matching your criteria.
                 </div>
               ) : (
                 <div className="space-y-16">
-                  {blogPosts.map((post) => (
+                  {filteredPosts.map((post) => (
                     <article key={post._id} className="group bg-white dark:bg-charcoal-800 rounded-[40px] shadow-sm hover:shadow-2xl border border-cream-200 dark:border-charcoal-700 transition-all duration-500 overflow-hidden transform hover:-translate-y-2">
                       {post.image && (
                         <div className="aspect-[21/9] overflow-hidden">
                           <img
-                            src={post.image.startsWith('http') ? post.image : process.env.PUBLIC_URL + post.image}
+                            src={assetUrl(post.image)}
                             alt={post.title}
                             className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
                           />
@@ -94,9 +138,12 @@ export default function Blog() {
                             <FaCalendarAlt className="text-terracotta-500 dark:text-terracotta-400" />
                             <span>{new Date(post.createdAt).toLocaleDateString()}</span>
                           </div>
-                          <Link to="#" className="px-4 py-1.5 bg-terracotta-50 dark:bg-terracotta-900/10 text-terracotta-500 dark:text-terracotta-400 rounded-full hover:bg-terracotta-500 hover:text-white transition-all">
+                          <button
+                            onClick={() => setSelectedCategory(post.category)}
+                            className="px-4 py-1.5 bg-terracotta-50 dark:bg-terracotta-900/10 text-terracotta-500 dark:text-terracotta-400 rounded-full hover:bg-terracotta-500 hover:text-white transition-all"
+                          >
                             {post.category}
-                          </Link>
+                          </button>
                         </div>
                         <h2 className="text-3xl md:text-4xl font-black text-charcoal-800 dark:text-white mb-6 leading-tight group-hover:text-terracotta-500 dark:group-hover:text-terracotta-400 transition-colors">
                           <Link to={`/blog/${post._id}`}>{post.title}</Link>
@@ -123,6 +170,8 @@ export default function Blog() {
                 <div className="relative">
                   <input
                     type="text"
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
                     placeholder="Search blogs..."
                     className="w-full bg-cream-100 dark:bg-charcoal-700 border border-transparent focus:border-terracotta-500 rounded-3xl py-4 pl-6 pr-14 text-charcoal-800 dark:text-white outline-none transition-all shadow-inner"
                   />
@@ -136,15 +185,19 @@ export default function Blog() {
                 <ul className="space-y-4">
                   {categories.map((category) => (
                     <li key={category}>
-                      <Link
-                        to="#"
-                        className="flex items-center justify-between group p-4 rounded-2xl hover:bg-cream-100 dark:hover:bg-charcoal-700 transition-all border border-transparent hover:border-cream-200 dark:hover:border-charcoal-600"
+                      <button
+                        onClick={() => setSelectedCategory(category)}
+                        className={`w-full flex items-center justify-between group p-4 rounded-2xl transition-all border ${selectedCategory === category
+                          ? "bg-terracotta-500 text-white border-terracotta-500"
+                          : "hover:bg-cream-100 dark:hover:bg-charcoal-700 border-transparent hover:border-cream-200 dark:hover:border-charcoal-600"
+                          }`}
                       >
-                        <span className="font-bold text-charcoal-600 dark:text-charcoal-400 group-hover:text-terracotta-500 dark:group-hover:text-terracotta-400">{category}</span>
-                        <div className="w-8 h-8 rounded-full bg-cream-200 dark:bg-charcoal-700 flex items-center justify-center text-xs font-bold text-charcoal-400 transition-all group-hover:bg-terracotta-500 group-hover:text-white">
-                          <FaSearch className="text-[10px]" />
-                        </div>
-                      </Link>
+                        <span className={`font-bold ${selectedCategory === category
+                          ? "text-white"
+                          : "text-charcoal-600 dark:text-charcoal-400 group-hover:text-terracotta-500 dark:group-hover:text-terracotta-400"
+                          }`}>{category}</span>
+                        {selectedCategory === category && <div className="w-2 h-2 bg-white rounded-full"></div>}
+                      </button>
                     </li>
                   ))}
                 </ul>
@@ -158,11 +211,17 @@ export default function Blog() {
                 <div className="space-y-4">
                   <input
                     type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
                     placeholder="your@email.com"
-                    className="w-full bg-white/20 border border-white/30 rounded-2xl py-4 px-6 text-white placeholder:text-terracotta-200 outline-none focus:bg-white/30 transition-all"
+                    className="w-full bg-white/20 border border-white/30 rounded-2xl py-4 px-6 text-white placeholder:text-terracotta-200 outline-none focus:bg-white/30 transition-all font-bold"
                   />
-                  <button className="w-full bg-white text-terracotta-500 py-4 rounded-2xl font-black hover:bg-cream-100 transition-all active:scale-95 shadow-2xl">
-                    Subscribe
+                  <button
+                    onClick={handleSubscribe}
+                    disabled={subscribing}
+                    className="w-full bg-white text-terracotta-500 py-4 rounded-2xl font-black hover:bg-cream-100 transition-all active:scale-95 shadow-2xl disabled:opacity-70 disabled:cursor-not-allowed"
+                  >
+                    {subscribing ? "Subscribing..." : "Subscribe"}
                   </button>
                 </div>
               </div>
