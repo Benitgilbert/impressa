@@ -75,7 +75,11 @@ function SellerSidebar({ isOpen, onClose }) {
                             <FaList className="text-lg opacity-70 group-hover:opacity-100" />
                             <span>My Orders</span>
                         </Link>
-                        <Link to="/seller/abonnes" className="flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-gray-100 dark:hover:bg-charcoal-700 transition-colors"><span className="w-5"><FaUserFriends /></span><span>Client Abonnés</span></Link>\n            <Link to="/seller/payouts" className={getLinkClass('/seller/payouts')} onClick={onClose}>
+                        <Link to="/seller/abonnes" className={getLinkClass('/seller/abonnes')} onClick={onClose}>
+                            <FaUserFriends className="text-lg opacity-70 group-hover:opacity-100" />
+                            <span>Client Abonnés</span>
+                        </Link>
+                        <Link to="/seller/payouts" className={getLinkClass('/seller/payouts')} onClick={onClose}>
                             <FaMoneyBillWave className="text-lg opacity-70 group-hover:opacity-100" />
                             <span>Payouts</span>
                         </Link>
