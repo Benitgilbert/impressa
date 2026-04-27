@@ -70,6 +70,9 @@ import SellerNotifications from "./pages/SellerNotifications";
 import OrderSuccess from "./pages/OrderSuccess";
 import GiftCards from "./pages/GiftCards";
 import Unsubscribe from "./pages/Unsubscribe";
+import SellerAbonne from "./pages/SellerAbonne";
+import AdminAbonne from "./pages/admin/AdminAbonne";
+
 
 import { CartProvider } from "./context/CartContext";
 import { WishlistProvider } from "./context/WishlistContext";
@@ -174,6 +177,12 @@ function App() {
                       <SellerProfile />
                     </ProtectedRoute>
                   } />
+                  <Route path="/seller/abonnes" element={
+                    <ProtectedRoute allowedRoles={['seller', 'admin']}>
+                      <SellerAbonne />
+                    </ProtectedRoute>
+                  } />
+
                   <Route path="/become-seller" element={<SellerRegistration />} />
 
                   <Route path="/forgot-password" element={<ForgotPassword />} />
@@ -348,6 +357,12 @@ function App() {
                       <AdminNotifications />
                     </ProtectedRoute>
                   } />
+                  <Route path="/admin/abonnes" element={
+                    <ProtectedRoute allowedRoles={['admin']}>
+                      <AdminAbonne />
+                    </ProtectedRoute>
+                  } />
+
                   <Route path="/seller/notifications" element={
                     <ProtectedRoute allowedRoles={['seller', 'admin']}>
                       <SellerNotifications />
