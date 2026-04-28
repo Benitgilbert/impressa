@@ -1,11 +1,16 @@
-import Testimonial from "../models/Testimonial.js";
+import prisma from "../prisma.js";
 
 /**
- * Get all testimonials (admin)
+ * ✍️ Get all testimonials (admin)
  */
 export const getAllTestimonials = async (req, res, next) => {
     try {
-        const testimonials = await Testimonial.find().sort({ order: 1, createdAt: -1 });
+        const testimonials = await prisma.testimonial.findMany({
+            orderBy: [
+                { order: 'asc' },
+                { createdAt: 'desc' }
+            ]
+        });
 
         res.json({
             success: true,
@@ -18,12 +23,17 @@ export const getAllTestimonials = async (req, res, next) => {
 };
 
 /**
- * Get active testimonials for public display
+ * ✍️ Get active testimonials for public display
  */
 export const getActiveTestimonials = async (req, res, next) => {
     try {
         const limit = parseInt(req.query.limit) || 10;
-        const testimonials = await Testimonial.getActiveTestimonials(limit);
+        
+        const testimonials = await prisma.testimonial.findMany({
+            where: { isActive: true },
+            orderBy: { order: 'asc' },
+            take: limit
+        });
 
         res.json({
             success: true,
@@ -36,12 +46,14 @@ export const getActiveTestimonials = async (req, res, next) => {
 };
 
 /**
- * Get single testimonial
+ * ✍️ Get single testimonial
  */
 export const getTestimonialById = async (req, res, next) => {
     try {
         const { id } = req.params;
-        const testimonial = await Testimonial.findById(id);
+        const testimonial = await prisma.testimonial.findUnique({
+            where: { id }
+        });
 
         if (!testimonial) {
             const error = new Error("Testimonial not found");
@@ -59,21 +71,23 @@ export const getTestimonialById = async (req, res, next) => {
 };
 
 /**
- * Create testimonial
+ * ✍️ Create testimonial
  */
 export const createTestimonial = async (req, res, next) => {
     try {
         const { name, role, content, avatar, rating, isActive, order, featured } = req.body;
 
-        const testimonial = await Testimonial.create({
-            name,
-            role,
-            content,
-            avatar,
-            rating: rating || 5,
-            isActive: isActive !== false,
-            order: order || 0,
-            featured: featured || false
+        const testimonial = await prisma.testimonial.create({
+            data: {
+                name,
+                role,
+                content,
+                avatar,
+                rating: rating ? Number(rating) : 5,
+                isActive: isActive !== false,
+                order: order ? Number(order) : 0,
+                featured: featured || false
+            }
         });
 
         res.status(201).json({
@@ -87,23 +101,17 @@ export const createTestimonial = async (req, res, next) => {
 };
 
 /**
- * Update testimonial
+ * ✍️ Update testimonial
  */
 export const updateTestimonial = async (req, res, next) => {
     try {
         const { id } = req.params;
         const updates = req.body;
 
-        const testimonial = await Testimonial.findByIdAndUpdate(id, updates, {
-            new: true,
-            runValidators: true
+        const testimonial = await prisma.testimonial.update({
+            where: { id },
+            data: updates
         });
-
-        if (!testimonial) {
-            const error = new Error("Testimonial not found");
-            error.statusCode = 404;
-            return next(error);
-        }
 
         res.json({
             success: true,
@@ -111,40 +119,48 @@ export const updateTestimonial = async (req, res, next) => {
             data: testimonial
         });
     } catch (error) {
+        if (error.code === 'P2025') {
+            const err = new Error("Testimonial not found");
+            err.statusCode = 404;
+            return next(err);
+        }
         next(error);
     }
 };
 
 /**
- * Delete testimonial
+ * ✍️ Delete testimonial
  */
 export const deleteTestimonial = async (req, res, next) => {
     try {
         const { id } = req.params;
-        const testimonial = await Testimonial.findByIdAndDelete(id);
-
-        if (!testimonial) {
-            const error = new Error("Testimonial not found");
-            error.statusCode = 404;
-            return next(error);
-        }
+        
+        await prisma.testimonial.delete({
+            where: { id }
+        });
 
         res.json({
             success: true,
             message: "Testimonial deleted successfully"
         });
     } catch (error) {
+        if (error.code === 'P2025') {
+            const err = new Error("Testimonial not found");
+            err.statusCode = 404;
+            return next(err);
+        }
         next(error);
     }
 };
 
 /**
- * Toggle testimonial active status
+ * ✍️ Toggle testimonial active status
  */
 export const toggleTestimonialStatus = async (req, res, next) => {
     try {
         const { id } = req.params;
-        const testimonial = await Testimonial.findById(id);
+        
+        const testimonial = await prisma.testimonial.findUnique({ where: { id } });
 
         if (!testimonial) {
             const error = new Error("Testimonial not found");
@@ -152,13 +168,15 @@ export const toggleTestimonialStatus = async (req, res, next) => {
             return next(error);
         }
 
-        testimonial.isActive = !testimonial.isActive;
-        await testimonial.save();
+        const updatedTestimonial = await prisma.testimonial.update({
+            where: { id },
+            data: { isActive: !testimonial.isActive }
+        });
 
         res.json({
             success: true,
-            message: `Testimonial ${testimonial.isActive ? "activated" : "deactivated"} successfully`,
-            data: testimonial
+            message: `Testimonial ${updatedTestimonial.isActive ? "activated" : "deactivated"} successfully`,
+            data: updatedTestimonial
         });
     } catch (error) {
         next(error);

@@ -1,43 +1,43 @@
-import Payout from "../models/Payout.js";
-import SellerEarning from "../models/SellerEarning.js";
-import CommissionSettings from "../models/CommissionSettings.js";
+import prisma from "../prisma.js";
 import { recordTransaction } from "./financeController.js";
-import Account from "../models/Account.js";
 import { notifyPayoutRequest, notifyPayoutProcessed } from "./notificationController.js";
-import mongoose from "mongoose";
-import User from "../models/User.js";
 
 /**
- * Request a payout (seller)
+ * 💸 Request a payout (seller)
  */
 export const requestPayout = async (req, res, next) => {
     try {
-        const sellerId = new mongoose.Types.ObjectId(req.user.id);
+        const sellerId = req.user.id;
         const { paymentMethod, paymentDetails } = req.body;
 
         // Get commission settings
-        const settings = await CommissionSettings.getSettings();
+        const settings = await prisma.commissionSettings.findFirst() || { defaultRate: 10, minimumPayoutAmount: 10000 };
+        const minPayout = settings.minimumPayoutAmount || 10000;
 
         // Calculate available balance
-        const availableEarnings = await SellerEarning.find({
-            seller: sellerId,
-            status: { $in: ["pending", "confirmed"] },
-            payout: null
+        const availableEarnings = await prisma.sellerEarning.findMany({
+            where: {
+                sellerId: sellerId,
+                status: { in: ["pending", "confirmed"] },
+                payoutId: null
+            }
         });
 
         const availableBalance = availableEarnings.reduce((sum, e) => sum + e.netAmount, 0);
 
-        if (availableBalance < settings.minimumPayoutAmount) {
+        if (availableBalance < minPayout) {
             return res.status(400).json({
                 success: false,
-                message: `Minimum payout amount is RWF ${settings.minimumPayoutAmount.toLocaleString()}. Your balance: RWF ${availableBalance.toLocaleString()}`
+                message: `Minimum payout amount is RWF ${minPayout.toLocaleString()}. Your balance: RWF ${availableBalance.toLocaleString()}`
             });
         }
 
         // Check for existing pending payout
-        const existingPayout = await Payout.findOne({
-            seller: sellerId,
-            status: { $in: ["pending", "processing"] }
+        const existingPayout = await prisma.payout.findFirst({
+            where: {
+                sellerId: sellerId,
+                status: { in: ["pending", "processing"] }
+            }
         });
 
         if (existingPayout) {
@@ -50,25 +50,22 @@ export const requestPayout = async (req, res, next) => {
         // Create payout request
         const payoutId = `PAY-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
 
-        const payout = await Payout.create({
-            payoutId,
-            seller: sellerId,
-            amount: availableBalance,
-            paymentMethod: paymentMethod || "mobile_money",
-            paymentDetails: paymentDetails || {},
-            earnings: availableEarnings.map(e => e._id),
-            earningsCount: availableEarnings.length
+        const payout = await prisma.payout.create({
+            data: {
+                payoutId,
+                sellerId: sellerId,
+                amount: availableBalance,
+                paymentMethod: paymentMethod || "mobile_money",
+                paymentDetails: paymentDetails || {},
+                earnings: {
+                    connect: availableEarnings.map(e => ({ id: e.id }))
+                }
+            }
         });
-
-        // Mark earnings as linked to this payout
-        await SellerEarning.updateMany(
-            { _id: { $in: availableEarnings.map(e => e._id) } },
-            { payout: payout._id }
-        );
 
         // 🔔 Notify Admin
         try {
-            const user = await User.findById(sellerId).select('name');
+            const user = await prisma.user.findUnique({ where: { id: sellerId }, select: { name: true } });
             notifyPayoutRequest(user?.name || "Seller", payout.amount);
         } catch (e) { }
 
@@ -83,31 +80,33 @@ export const requestPayout = async (req, res, next) => {
 };
 
 /**
- * Get seller's payouts (seller)
+ * 💸 Get seller's payouts (seller)
  */
 export const getMyPayouts = async (req, res, next) => {
     try {
-        const sellerId = new mongoose.Types.ObjectId(req.user.id);
+        const sellerId = req.user.id;
         const { status, page = 1, limit = 10 } = req.query;
 
-        const filter = { seller: sellerId };
-        if (status) filter.status = status;
+        const where = { sellerId };
+        if (status) where.status = status;
 
-        const payouts = await Payout.find(filter)
-            .sort({ createdAt: -1 })
-            .skip((page - 1) * limit)
-            .limit(parseInt(limit));
+        const payouts = await prisma.payout.findMany({
+            where,
+            orderBy: { createdAt: 'desc' },
+            skip: (Number(page) - 1) * Number(limit),
+            take: Number(limit)
+        });
 
-        const total = await Payout.countDocuments(filter);
+        const total = await prisma.payout.count({ where });
 
         res.json({
             success: true,
             data: payouts,
             pagination: {
-                page: parseInt(page),
-                limit: parseInt(limit),
+                page: Number(page),
+                limit: Number(limit),
                 total,
-                pages: Math.ceil(total / limit)
+                pages: Math.ceil(total / Number(limit))
             }
         });
     } catch (error) {
@@ -116,44 +115,48 @@ export const getMyPayouts = async (req, res, next) => {
 };
 
 /**
- * Get all payouts (admin)
+ * 💸 Get all payouts (admin)
  */
 export const getAllPayouts = async (req, res, next) => {
     try {
         const { status, sellerId, page = 1, limit = 20 } = req.query;
 
-        const filter = {};
-        if (status) filter.status = status;
-        if (sellerId) filter.seller = sellerId;
+        const where = {};
+        if (status) where.status = status;
+        if (sellerId) where.sellerId = sellerId;
 
-        const payouts = await Payout.find(filter)
-            .populate('seller', 'name email storeName storePhone')
-            .populate('processedBy', 'name')
-            .sort({ createdAt: -1 })
-            .skip((page - 1) * limit)
-            .limit(parseInt(limit));
+        const payouts = await prisma.payout.findMany({
+            where,
+            include: {
+                seller: { select: { name: true, email: true, storeName: true, storePhone: true } },
+                processedBy: { select: { name: true } }
+            },
+            orderBy: { createdAt: 'desc' },
+            skip: (Number(page) - 1) * Number(limit),
+            take: Number(limit)
+        });
 
-        const total = await Payout.countDocuments(filter);
+        const total = await prisma.payout.count({ where });
 
         // Stats
-        const pendingCount = await Payout.countDocuments({ status: "pending" });
-        const pendingAmount = await Payout.aggregate([
-            { $match: { status: "pending" } },
-            { $group: { _id: null, total: { $sum: "$amount" } } }
-        ]);
+        const pendingCount = await prisma.payout.count({ where: { status: "pending" } });
+        const pendingAmountResult = await prisma.payout.aggregate({
+            _sum: { amount: true },
+            where: { status: "pending" }
+        });
 
         res.json({
             success: true,
             data: payouts,
             stats: {
                 pendingCount,
-                pendingAmount: pendingAmount[0]?.total || 0
+                pendingAmount: pendingAmountResult._sum.amount || 0
             },
             pagination: {
-                page: parseInt(page),
-                limit: parseInt(limit),
+                page: Number(page),
+                limit: Number(limit),
                 total,
-                pages: Math.ceil(total / limit)
+                pages: Math.ceil(total / Number(limit))
             }
         });
     } catch (error) {
@@ -162,20 +165,20 @@ export const getAllPayouts = async (req, res, next) => {
 };
 
 /**
- * Process payout (admin) - approve/reject
+ * 💸 Process payout (admin) - approve/reject
  */
 export const processPayout = async (req, res, next) => {
     try {
         const { id } = req.params;
         const { action, transactionId, adminNote, rejectionReason } = req.body;
 
-        const payout = await Payout.findById(id).populate('seller', 'name');
+        const payout = await prisma.payout.findUnique({
+            where: { id },
+            include: { seller: { select: { id: true, name: true } } }
+        });
 
         if (!payout) {
-            return res.status(404).json({
-                success: false,
-                message: "Payout not found"
-            });
+            return res.status(404).json({ success: false, message: "Payout not found" });
         }
 
         if (payout.status !== "pending" && payout.status !== "processing") {
@@ -185,34 +188,36 @@ export const processPayout = async (req, res, next) => {
             });
         }
 
+        let updateData = {};
         if (action === "approve" || action === "complete") {
-            payout.status = "completed";
-            payout.transactionId = transactionId;
-            payout.adminNote = adminNote;
-            payout.processedBy = req.user.id;
-            payout.processedAt = new Date();
-
-            // Mark all linked earnings as paid
-            await SellerEarning.updateMany(
-                { payout: payout._id },
-                { status: "paid", paidAt: new Date() }
-            );
+            updateData = {
+                status: "completed",
+                transactionId,
+                adminNote,
+                processedById: req.user.id,
+                processedAt: new Date(),
+                earnings: {
+                    updateMany: {
+                        where: { payoutId: payout.id },
+                        data: { status: "paid", paidAt: new Date() }
+                    }
+                }
+            };
 
             // 💰 Automate Finance: Record Payout Transaction
             try {
-                const accounts = await Account.find({ code: { $in: ["1001", "2001"] } });
-                const bankAcc = accounts.find(a => a.code === "1001");    // Cash/Bank (Asset)
-                const payableAcc = accounts.find(a => a.code === "2001"); // Seller Payable (Liability)
+                const bankAcc = await prisma.account.findUnique({ where: { code: "1001" } });
+                const payableAcc = await prisma.account.findUnique({ where: { code: "2001" } });
 
                 if (bankAcc && payableAcc) {
                     await recordTransaction({
                         date: new Date(),
                         description: `Payout to ${payout.seller?.name || "Seller"} (Ref: ${transactionId || "N/A"})`,
-                        reference: `Payout #${payout._id.toString().substring(18)}`,
+                        reference: `Payout #${payout.payoutId}`,
                         type: "Payment",
                         entries: [
-                            { account: payableAcc._id, debit: payout.amount }, // Reduce Liability (Debit)
-                            { account: bankAcc._id, credit: payout.amount }    // Reduce Asset (Credit)
+                            { accountId: payableAcc.id, debit: payout.amount }, // Reduce Liability (Debit)
+                            { accountId: bankAcc.id, credit: payout.amount }    // Reduce Asset (Credit)
                         ],
                         createdBy: req.user.id
                     });
@@ -221,34 +226,39 @@ export const processPayout = async (req, res, next) => {
                 console.error("Failed to record payout transaction", finErr);
             }
         } else if (action === "reject") {
-            payout.status = "rejected";
-            payout.rejectionReason = rejectionReason;
-            payout.processedBy = req.user.id;
-            payout.processedAt = new Date();
-
-            // Unlink earnings so seller can request again
-            await SellerEarning.updateMany(
-                { payout: payout._id },
-                { payout: null }
-            );
+            updateData = {
+                status: "rejected",
+                rejectionReason,
+                processedById: req.user.id,
+                processedAt: new Date(),
+                earnings: {
+                    disconnect: true // Unlink all earnings so they can be requested again
+                }
+            };
         } else if (action === "processing") {
-            payout.status = "processing";
-            payout.adminNote = adminNote;
+            updateData = {
+                status: "processing",
+                adminNote
+            };
         }
 
-        await payout.save();
+        const updatedPayout = await prisma.payout.update({
+            where: { id },
+            data: updateData,
+            include: { seller: true }
+        });
 
         // 🔔 Notify Seller
         try {
             if (action === "approve" || action === "complete" || action === "reject") {
-                notifyPayoutProcessed(payout.seller?._id, payout.amount, action === "reject" ? "rejected" : "completed");
+                notifyPayoutProcessed(payout.seller?.id, payout.amount, action === "reject" ? "rejected" : "completed");
             }
         } catch (e) { }
 
         res.json({
             success: true,
             message: `Payout ${action === "approve" || action === "complete" ? "completed" : action === "reject" ? "rejected" : "updated"}`,
-            data: payout
+            data: updatedPayout
         });
     } catch (error) {
         next(error);
@@ -256,41 +266,39 @@ export const processPayout = async (req, res, next) => {
 };
 
 /**
- * Cancel payout (seller - only if pending)
+ * 💸 Cancel payout (seller - only if pending)
  */
 export const cancelPayout = async (req, res, next) => {
     try {
         const { id } = req.params;
         const sellerId = req.user.id;
 
-        const payout = await Payout.findOne({ _id: id, seller: sellerId });
+        const payout = await prisma.payout.findFirst({
+            where: { id, sellerId }
+        });
 
         if (!payout) {
-            return res.status(404).json({
-                success: false,
-                message: "Payout not found"
-            });
+            return res.status(404).json({ success: false, message: "Payout not found" });
         }
 
         if (payout.status !== "pending") {
-            return res.status(400).json({
-                success: false,
-                message: "Can only cancel pending payouts"
-            });
+            return res.status(400).json({ success: false, message: "Can only cancel pending payouts" });
         }
 
-        payout.status = "cancelled";
-        await payout.save();
-
-        // Unlink earnings
-        await SellerEarning.updateMany(
-            { payout: payout._id },
-            { payout: null }
-        );
+        const updatedPayout = await prisma.payout.update({
+            where: { id },
+            data: {
+                status: "cancelled",
+                earnings: {
+                    disconnect: true // Unlink earnings
+                }
+            }
+        });
 
         res.json({
             success: true,
-            message: "Payout cancelled"
+            message: "Payout cancelled",
+            data: updatedPayout
         });
     } catch (error) {
         next(error);

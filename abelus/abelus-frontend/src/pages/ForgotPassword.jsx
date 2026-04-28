@@ -1,12 +1,12 @@
 import { useState } from "react";
-import axios from "axios";
+import { supabase } from "../utils/supabaseClient";
 import { Link, useNavigate } from "react-router-dom";
 import { FaEnvelope, FaLock, FaKey, FaArrowRight, FaArrowLeft, FaSpinner } from "react-icons/fa";
 import TrendingProductsSidebar from "../components/TrendingProductsSidebar";
 
 function ForgotPassword() {
   const [step, setStep] = useState("request");
-  const [form, setForm] = useState({ email: "", token: "", newPassword: "" });
+  const [form, setForm] = useState({ email: "" });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
@@ -16,45 +16,20 @@ function ForgotPassword() {
     setForm({ ...form, [e.target.name]: e.target.value });
   };
 
-  const API_URL = process.env.REACT_APP_API_URL || "http://localhost:5000/api";
-
   const handleRequest = async (e) => {
     e.preventDefault();
     setLoading(true);
     setError("");
     setSuccess("");
     try {
-      await axios.post(`${API_URL}/auth/request-password-reset`, {
-        email: form.email,
+      const { error } = await supabase.auth.resetPasswordForEmail(form.email, {
+        redirectTo: `${window.location.origin}/login`,
       });
-      setStep("confirm");
-      setSuccess("Reset code sent! Please check your email.");
+      if (error) throw error;
+      setSuccess("Reset link sent! Please check your email.");
     } catch (err) {
       console.error("Request failed:", err);
-      setError("Failed to send reset code. Please check your email.");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleConfirm = async (e) => {
-    e.preventDefault();
-    setLoading(true);
-    setError("");
-    setSuccess("");
-    try {
-      await axios.post(`${API_URL}/auth/confirm-password-reset`, {
-        email: form.email,
-        token: form.token,
-        newPassword: form.newPassword,
-      });
-      setSuccess("Password reset successful! Redirecting...");
-      setTimeout(() => {
-        navigate("/login");
-      }, 2000);
-    } catch (err) {
-      console.error("Reset failed:", err);
-      setError("Invalid code or password reset failed.");
+      setError(err.message || "Failed to send reset link.");
     } finally {
       setLoading(false);
     }
@@ -105,99 +80,40 @@ function ForgotPassword() {
             </div>
           )}
 
-          {step === "request" ? (
-            <form className="space-y-6" onSubmit={handleRequest}>
-              <div className="space-y-2">
-                <label className="text-xs font-black text-gray-400 dark:text-gray-500 uppercase tracking-[0.2em] ml-1">Email Address</label>
-                <div className="relative group">
-                  <div className="absolute left-6 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-violet-600 transition-colors">
-                    <FaEnvelope />
-                  </div>
-                  <input
-                    name="email"
-                    type="email"
-                    required
-                    className="block w-full pl-14 pr-6 py-4 bg-gray-50 dark:bg-slate-900 border border-gray-100 dark:border-slate-800 rounded-2xl text-gray-900 dark:text-white placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-violet-600/20 focus:border-violet-600 transition-all font-bold"
-                    placeholder="you@example.com"
-                    value={form.email}
-                    onChange={handleChange}
-                  />
+          <form className="space-y-6" onSubmit={handleRequest}>
+            <div className="space-y-2">
+              <label className="text-xs font-black text-gray-400 dark:text-gray-500 uppercase tracking-[0.2em] ml-1">Email Address</label>
+              <div className="relative group">
+                <div className="absolute left-6 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-violet-600 transition-colors">
+                  <FaEnvelope />
                 </div>
+                <input
+                  name="email"
+                  type="email"
+                  required
+                  className="block w-full pl-14 pr-6 py-4 bg-gray-50 dark:bg-slate-900 border border-gray-100 dark:border-slate-800 rounded-2xl text-gray-900 dark:text-white placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-violet-600/20 focus:border-violet-600 transition-all font-bold"
+                  placeholder="you@example.com"
+                  value={form.email}
+                  onChange={handleChange}
+                />
               </div>
+            </div>
 
-              <button
-                type="submit"
-                disabled={loading}
-                className="w-full flex items-center justify-center gap-3 py-4 px-6 bg-violet-600 text-white rounded-2xl font-black text-lg hover:bg-violet-700 transition-all active:scale-[0.98] shadow-lg shadow-violet-200 dark:shadow-none disabled:opacity-50"
-              >
-                {loading ? <FaSpinner className="animate-spin text-2xl" /> : "Send Reset Code"}
-                {!loading && <FaArrowRight />}
-              </button>
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full flex items-center justify-center gap-3 py-4 px-6 bg-violet-600 text-white rounded-2xl font-black text-lg hover:bg-violet-700 transition-all active:scale-[0.98] shadow-lg shadow-violet-200 dark:shadow-none disabled:opacity-50"
+            >
+              {loading ? <FaSpinner className="animate-spin text-2xl" /> : "Send Reset Link"}
+              {!loading && <FaArrowRight />}
+            </button>
 
-              <div className="text-center mt-8">
-                <Link to="/login" className="text-sm font-black text-violet-600 dark:text-violet-400 hover:text-violet-500 transition-colors flex items-center justify-center gap-2">
-                  <FaArrowLeft className="text-xs" /> Back to Login
-                </Link>
-              </div>
-            </form>
-          ) : (
-            <form className="space-y-6" onSubmit={handleConfirm}>
-              <div className="space-y-2">
-                <label className="text-xs font-black text-gray-400 dark:text-gray-500 uppercase tracking-[0.2em] ml-1">Reset Code</label>
-                <div className="relative group">
-                  <div className="absolute left-6 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-violet-600 transition-colors">
-                    <FaKey />
-                  </div>
-                  <input
-                    name="token"
-                    type="text"
-                    required
-                    className="block w-full pl-14 pr-6 py-4 bg-gray-50 dark:bg-slate-900 border border-gray-100 dark:border-slate-800 rounded-2xl text-gray-900 dark:text-white placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-violet-600/20 focus:border-violet-600 transition-all font-black tracking-widest"
-                    placeholder="Enter code"
-                    value={form.token}
-                    onChange={handleChange}
-                  />
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <label className="text-xs font-black text-gray-400 dark:text-gray-500 uppercase tracking-[0.2em] ml-1">New Password</label>
-                <div className="relative group">
-                  <div className="absolute left-6 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-violet-600 transition-colors">
-                    <FaLock />
-                  </div>
-                  <input
-                    name="newPassword"
-                    type="password"
-                    required
-                    className="block w-full pl-14 pr-6 py-4 bg-gray-50 dark:bg-slate-900 border border-gray-100 dark:border-slate-800 rounded-2xl text-gray-900 dark:text-white placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-violet-600/20 focus:border-violet-600 transition-all font-bold"
-                    placeholder="New password"
-                    value={form.newPassword}
-                    onChange={handleChange}
-                  />
-                </div>
-              </div>
-
-              <button
-                type="submit"
-                disabled={loading}
-                className="w-full flex items-center justify-center gap-3 py-4 px-6 bg-emerald-600 text-white rounded-2xl font-black text-lg hover:bg-emerald-700 transition-all active:scale-[0.98] shadow-lg shadow-emerald-200 dark:shadow-none"
-              >
-                {loading ? <FaSpinner className="animate-spin text-2xl" /> : "Reset Password"}
-                {!loading && <FaArrowRight />}
-              </button>
-
-              <div className="text-center mt-8">
-                <button
-                  type="button"
-                  onClick={() => setStep("request")}
-                  className="text-sm font-black text-violet-600 dark:text-violet-400 hover:text-violet-500 transition-colors"
-                >
-                  Resend Code
-                </button>
-              </div>
-            </form>
-          )}
+            <div className="text-center mt-8">
+              <Link to="/login" className="text-sm font-black text-violet-600 dark:text-violet-400 hover:text-violet-500 transition-colors flex items-center justify-center gap-2">
+                <FaArrowLeft className="text-xs" /> Back to Login
+              </Link>
+            </div>
+          </form>
         </div>
       </div>
     </div>

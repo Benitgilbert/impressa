@@ -9,9 +9,9 @@ import api from "../utils/axiosInstance";
 export default function LandingFooter() {
   const [footerData, setFooterData] = useState({
     footerTagline: 'Your premium destination for quality products. Curated collections, exclusive deals, and exceptional service.',
-    contactEmail: 'ishfabzele2@gmail.com',
-    contactPhone: '+250 789 079 978',
-    contactAddress: 'Eudiose Building near Gicumbi District Office',
+    contactEmail: 'uwanyirigiraeleora@gmail.com',
+    contactPhone: '+25078 881 9878',
+    contactAddress: 'Building near Bank of Kigali Gicumbi Branch',
     socialLinks: { facebook: '', twitter: '', instagram: '', linkedin: '' }
   });
 

@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import axios from "axios";
+import api from "../utils/axiosInstance";
 
 function OrderTable({ readOnly = false }) {
 
@@ -7,14 +7,9 @@ function OrderTable({ readOnly = false }) {
   const [loading, setLoading] = useState(true);
   const [statusUpdate, setStatusUpdate] = useState({});
 
-  const API_URL = process.env.REACT_APP_API_URL || "http://localhost:5000/api";
-
   const fetchOrders = async () => {
     try {
-      const token = localStorage.getItem("authToken");
-      const res = await axios.get(`${API_URL}/orders`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      const res = await api.get("/orders");
       setOrders(res.data);
     } catch (err) {
       console.error("Failed to fetch orders:", err);
@@ -25,11 +20,9 @@ function OrderTable({ readOnly = false }) {
 
   const handleStatusChange = async (orderId, newStatus) => {
     try {
-      const token = localStorage.getItem("authToken");
-      await axios.put(
-        `${API_URL}/orders/${orderId}/status`, // ✅ fixed path
-        { status: newStatus },
-        { headers: { Authorization: `Bearer ${token}` } }
+      await api.put(
+        `/orders/${orderId}/status`, 
+        { status: newStatus }
       );
       fetchOrders(); // Refresh after update
     } catch (err) {

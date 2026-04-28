@@ -1,45 +1,35 @@
-import mongoose from "mongoose";
 import dotenv from "dotenv";
-import User from "../models/User.js";
 import path from "path";
 import { fileURLToPath } from "url";
+import bcrypt from "bcryptjs";
+import prisma from "../prisma.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// Load env vars
 dotenv.config({ path: path.join(__dirname, "../.env") });
 
 const seedAdmin = async () => {
     try {
-        await mongoose.connect(process.env.MONGO_URI);
-        console.log("✅ Connected to MongoDB");
-
         const adminEmail = "byiringirobenitg@gmail.com";
         const adminPassword = "admin123";
+        const hashedPassword = await bcrypt.hash(adminPassword, 10);
 
-        // Check if admin exists
-        let admin = await User.findOne({ email: adminEmail });
-
-        if (admin) {
-            console.log("Admin user found. Updating password...");
-            admin.password = adminPassword; // Pre-save hook will hash this
-            admin.role = "admin"; // Ensure role is admin
-            await admin.save();
-            console.log("✅ Admin password updated successfully.");
-        } else {
-            console.log("Admin user not found. Creating new admin...");
-            admin = new User({
+        const admin = await prisma.user.upsert({
+            where: { email: adminEmail },
+            update: {
+                password: hashedPassword,
+                role: "admin"
+            },
+            create: {
                 name: "Admin User",
                 email: adminEmail,
-                password: adminPassword,
-                role: "admin",
-                isVerified: true
-            });
-            await admin.save();
-            console.log("✅ Admin user created successfully.");
-        }
+                password: hashedPassword,
+                role: "admin"
+            }
+        });
 
+        console.log("✅ Admin user seeded successfully:", admin.email);
         process.exit(0);
     } catch (error) {
         console.error("❌ Error seeding admin:", error);

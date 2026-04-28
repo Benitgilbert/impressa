@@ -1,82 +1,82 @@
-import Product from "../models/Product.js";
-import ChatLog from "../models/ChatLog.js";
+import prisma from "../prisma.js";
 import Fuse from "fuse.js";
-import FlashSale from "../models/FlashSale.js"; // Import FlashSale
 
-// Handle Public Customer Questions
+/**
+ * 🤖 Handle Public Customer Questions
+ */
 export const handlePublicChatbot = async (req, res) => {
     try {
         const { question, messages = [] } = req.body;
-        const userId = req.user?.id || null; // Optional if we attach auth middleware loosely
+        const userId = req.user?.id || null;
 
         // 1. Context Retrieval
         // A. Products
-        const products = await Product.find({ visibility: "public", approvalStatus: "approved" })
-            .select("name price description tags category")
-            .sort({ salesCount: -1 })
-            .limit(50);
+        const products = await prisma.product.findMany({
+            where: { visibility: "public", approvalStatus: "approved" },
+            select: { name: true, price: true, description: true, tags: true },
+            orderBy: { salesCount: 'desc' },
+            take: 50
+        });
 
         // B. Active Deals
         const now = new Date();
-        const activeSales = await FlashSale.find({
-            status: "active",
-            startDate: { $lte: now },
-            endDate: { $gte: now }
-        }).select("name discountPercentage");
+        const activeSales = await prisma.flashSale.findMany({
+            where: {
+                isActive: true,
+                startDate: { lte: now },
+                endDate: { gte: now }
+            },
+            select: { name: true }
+        });
 
         const salesContext = activeSales.length > 0
-            ? activeSales.map(s => `- ${s.name}: ${s.discountPercentage}% OFF`).join("\n")
-            : "No active flash sales or daily deals at the moment.";
+            ? activeSales.map(s => `- ${s.name}: ACTIVE DEALS`).join("\n")
+            : "No active flash sales at the moment.";
 
         const fuse = new Fuse(products, {
-            keys: ["name", "tags", "category", "description"],
+            keys: ["name", "tags", "description"],
             threshold: 0.4
         });
 
         const results = fuse.search(question);
         const topMatches = results.slice(0, 5).map(r => r.item);
-
-        // Fallback: If no matches, maybe show top 3 generic popular products
         const finalContextProducts = topMatches.length > 0 ? topMatches : products.slice(0, 3);
 
         const productContext = finalContextProducts.map(p =>
-            `- ${p.name}: ${p.price} RWF (${p.description.substring(0, 50)}...)`
+            `- ${p.name}: ${p.price} RWF (${(p.description || '').substring(0, 50)}...)`
         ).join("\n");
 
         // 2. Build Prompt
         const history = messages
-            .slice(-6) // Keep last 6 messages for context
+            .slice(-6)
             .map(m => `${m.role === 'user' ? 'Customer' : 'AI'}: ${m.text}`)
             .join("\n");
 
         const prompt = `
-You are the Sales & Support AI Assistant for Abelus (an online marketplace).
+You are the Sales & Support AI Assistant for Abelus Marketplace.
 Use the PRODUCT DATA, ACTIVE DEALS, and CHAT HISTORY to answer the Customer.
 
 PRODUCT DATA:
 ${productContext}
 
-ACTIVE DEALS (Flash Sales / Daily Deals):
+ACTIVE DEALS:
 ${salesContext}
 
 CHAT HISTORY:
 ${history}
 
 RULES:
-1. **Goal**: Help the customer find products or answer basic questions.
-2. **Context**: Use the CHAT HISTORY to understand the conversation flow.
-3. **No Greetings**: Do NOT say "Hello" or "Welcome" if you see it in the history.
-4. **Deals**: ONLY mention deals/discounts if they appear in "ACTIVE DEALS". If none are listed, say "We have everyday low prices" instead of promising specific deals.
-5. **Conciseness**: Keep answers short (2-3 sentences max).
+1. Goal: Help the customer find products or answer basic questions.
+2. Conciseness: Keep answers short (2-3 sentences max).
+3. No greetings if conversation is already in progress.
 
 Customer Question: ${question}
-
 Response:
 `;
 
         let answer = "";
 
-        // 3. Try Calling LLM (if key exists)
+        // 3. Try Calling LLM
         if (process.env.COHERE_API_KEY) {
             try {
                 const response = await fetch("https://api.cohere.ai/v1/chat", {
@@ -96,45 +96,31 @@ Response:
                     answer = result.text;
                 }
             } catch (apiErr) {
-                console.warn("Cohere API failed, falling back to local logic:", apiErr.message);
+                console.warn("Cohere API failed:", apiErr.message);
             }
         }
 
-        // 4. Fallback Logic (if no API key or API failed)
+        // 4. Fallback Logic
         if (!answer) {
             const lowerQ = question.toLowerCase();
-            const hasHistory = messages.length > 1;
-
             if (topMatches.length > 0) {
-                const names = topMatches.map(p => p.name).slice(0, 3).join(", ");
-                answer = `I found these likely matches: ${names}.`;
-                if (lowerQ.includes("price") || lowerQ.includes("cost")) {
-                    answer += ` Prices start around ${topMatches[0].price} RWF.`;
-                }
-            } else if ((lowerQ.includes("hello") || lowerQ.includes("hi")) && !hasHistory) {
-                answer = "Hello! Welcome to Abelus Premium Market. How can I help you find the perfect product today?";
+                answer = `I found these likely matches: ${topMatches.map(p => p.name).slice(0, 3).join(", ")}. Prices start around ${topMatches[0].price} RWF.`;
             } else if (lowerQ.includes("delivery") || lowerQ.includes("shipping")) {
                 answer = "We offer fast shipping across Rwanda! Free delivery for orders over 50,000 RWF.";
-            } else if (lowerQ.includes("return") || lowerQ.includes("refund")) {
-                answer = "You can return items within 30 days if you're not satisfied. Satisfaction guaranteed!";
-            } else if (lowerQ.includes("payment") || lowerQ.includes("pay")) {
-                answer = "We accept MTN Mobile Money, Visa, MasterCard, and Cash on Delivery.";
             } else {
-                if (hasHistory) {
-                    answer = "I'm focusing on products right now. Could you try asking about specific items or categories like 'shoes', 'watches', or 'electronics'?";
-                } else {
-                    answer = "I'm here to help! I'd recommend browsing our 'Trending' section to see what others are loving right now.";
-                }
+                answer = "I'm here to help! I'd recommend browsing our 'Trending' section or searching for specific items.";
             }
         }
 
         // 5. Log the Interaction
         try {
-            await ChatLog.create({
-                user: userId,
-                question,
-                answer,
-                topics: topMatches.map(p => p.name)
+            await prisma.chatLog.create({
+                data: {
+                    userId,
+                    question,
+                    answer,
+                    topics: topMatches.map(p => p.name)
+                }
             });
         } catch (logErr) {
             console.error("Failed to log chat:", logErr);
@@ -144,24 +130,29 @@ Response:
 
     } catch (err) {
         console.error("Public chatbot error:", err);
-        res.json({ answer: "I'm having a brief connection issue, but please browse our amazing collection!" });
+        res.json({ answer: "I'm having a brief connection issue, but please browse our collection!" });
     }
 };
 
-// Get Chat Logs for Admin
+/**
+ * 🤖 Get Chat Logs for Admin
+ */
 export const getChatLogs = async (req, res) => {
     try {
-        const logs = await ChatLog.find()
-            .populate("user", "name email")
-            .sort({ createdAt: -1 })
-            .limit(100);
+        const logs = await prisma.chatLog.findMany({
+            include: { user: { select: { name: true, email: true } } },
+            orderBy: { createdAt: 'desc' },
+            take: 100
+        });
         res.json(logs);
     } catch (err) {
         res.status(500).json({ message: "Failed to fetch logs" });
     }
 };
 
-// Bulk Delete Chat Logs
+/**
+ * 🤖 Bulk Delete Chat Logs
+ */
 export const deleteChatLogs = async (req, res) => {
     try {
         const { ids } = req.body;
@@ -169,7 +160,9 @@ export const deleteChatLogs = async (req, res) => {
             return res.status(400).json({ message: "No IDs provided" });
         }
 
-        await ChatLog.deleteMany({ _id: { $in: ids } });
+        await prisma.chatLog.deleteMany({
+            where: { id: { in: ids } }
+        });
         res.json({ message: "Chat logs deleted successfully" });
     } catch (err) {
         console.error("Failed to delete chat logs:", err);

@@ -1,85 +1,49 @@
-import User from "../models/User.js";
-import bcrypt from "bcryptjs";
-import jwt from "jsonwebtoken";
-import { sendReportEmail } from "../utils/sendReportEmail.js";
-import { renderTemplate } from "../utils/emailTemplate.js";
+import prisma from "../prisma.js";
 import { processSellerAutoApproval } from "../utils/autoApproval.js";
 import { notifyUserRegistered } from "./notificationController.js";
 
-// Generate tokens
-const generateTokens = (user) => {
-  const refreshSecret = process.env.JWT_REFRESH_SECRET || process.env.REFRESH_SECRET;
-
-  if (!process.env.JWT_SECRET || !refreshSecret) {
-    throw new Error("JWT_SECRET or REFRESH_SECRET is not defined in environment variables");
-  }
-  const accessToken = jwt.sign(
-    { id: user._id, role: user.role },
-    process.env.JWT_SECRET,
-    { expiresIn: "15m" }
-  );
-  const refreshToken = jwt.sign(
-    { id: user._id },
-    refreshSecret,
-    { expiresIn: "7d" }
-  );
-  return { accessToken, refreshToken };
-};
-
-export const register = async (req, res) => {
+/**
+ * Handle post-signup registration completion
+ * (Used to add metadata like storeName that isn't in auth.users)
+ */
+export const completeRegistration = async (req, res) => {
   try {
-    const { name, email, password, role, storeName, storeDescription, storePhone } = req.body;
+    const { role, storeName, storeDescription, storePhone } = req.body;
+    const userId = req.user.id;
 
-    // Check if user exists
-    const existingUser = await User.findOne({ email });
-    if (existingUser) return res.status(400).json({ message: "User already exists" });
-
-    // Create user with seller profile if role is seller
-    const userData = {
-      name,
-      email,
-      password,
-      role: role || "customer"
+    const updateData = {
+      role: role || "customer",
+      ...(role === 'seller' && {
+        storeName,
+        storeDescription,
+        storePhone,
+        sellerStatus: 'pending'
+      })
     };
 
-    // Add seller-specific fields if registering as seller
-    if (role === 'seller') {
-      userData.storeName = storeName;
-      userData.storeDescription = storeDescription;
-      userData.storePhone = storePhone;
-      userData.sellerStatus = 'pending';
-    }
-
-    const user = new User(userData);
-    await user.save();
+    const user = await prisma.user.update({
+      where: { id: userId },
+      data: updateData
+    });
 
     // If registering as seller, check for auto-approval
     let approvalResult = null;
     if (role === 'seller') {
-      approvalResult = await processSellerAutoApproval(user._id);
+      try {
+        approvalResult = await processSellerAutoApproval(user.id);
+      } catch (e) {
+        console.error("Auto-approval failed:", e);
+      }
     }
-
-    // Generate tokens for auto-login
-    const { accessToken, refreshToken } = generateTokens(user);
-    user.refreshToken = refreshToken;
-    await user.save();
 
     // 🔔 Notify Admin
     try {
       notifyUserRegistered(user.name, user.role);
     } catch (e) { }
 
-    res.status(201).json({
-      message: "User registered successfully",
-      token: accessToken, // Frontend expects 'token'
-      accessToken,
-      refreshToken,
-      user: {
-        id: user._id,
-        name: user.name,
-        email: user.email,
-        role: user.role
-      },
+    res.json({
+      success: true,
+      user,
       ...(approvalResult && {
         sellerApproval: {
           approved: approvalResult.approved,
@@ -89,288 +53,89 @@ export const register = async (req, res) => {
       })
     });
   } catch (err) {
-    res.status(500).json({ message: "Server error", error: err.message });
+    res.status(500).json({ message: "Failed to complete registration", error: err.message });
   }
 };
 
-export const login = async (req, res) => {
-  try {
-    const { email, password } = req.body;
-
-    // Check user
-    const user = await User.findOne({ email });
-    if (!user) {
-      return res.status(400).json({ message: "Invalid credentials" });
-    }
-
-    // Check password
-    const isMatch = await bcrypt.compare(password, user.password);
-    if (!isMatch) {
-      return res.status(400).json({ message: "Invalid credentials" });
-    }
-
-    // Generate tokens
-    const { accessToken, refreshToken } = generateTokens(user);
-
-    // Save refresh token to DB (optional, for revocation)
-    user.refreshToken = refreshToken;
-    await user.save();
-
-    res.json({
-      accessToken,
-      refreshToken,
-      user: {
-        id: user._id,
-        name: user.name,
-        email: user.email,
-        role: user.role,
-        profileImage: user.profileImage
-      },
-    });
-  } catch (err) {
-    console.error("Login Error Details:", err);
-    res.status(500).json({ message: "Server error", error: err.message });
-  }
-};
-
-export const refreshToken = async (req, res) => {
-  const { token } = req.body;
-  if (!token) return res.status(401).json({ message: "Refresh token required" });
-
-  try {
-    const refreshSecret = process.env.JWT_REFRESH_SECRET || process.env.REFRESH_SECRET;
-    const decoded = jwt.verify(token, refreshSecret);
-    const user = await User.findById(decoded.id);
-
-    if (!user || user.refreshToken !== token) {
-      return res.status(403).json({ message: "Invalid refresh token" });
-    }
-
-    const tokens = generateTokens(user);
-    user.refreshToken = tokens.refreshToken;
-    await user.save();
-
-    res.json(tokens);
-  } catch (err) {
-    res.status(403).json({ message: "Token expired or invalid" });
-  }
-};
-
-
-export const adminLoginStep1 = async (req, res) => {
-  try {
-    const { email, password } = req.body;
-    const user = await User.findOne({ email, role: "admin" });
-    if (!user) return res.status(404).json({ message: "Admin not found" });
-
-    const isMatch = await bcrypt.compare(password, user.password);
-    if (!isMatch) return res.status(401).json({ message: "Invalid credentials" });
-
-    const otp = Math.floor(100000 + Math.random() * 900000).toString();
-    user.otp = otp;
-    user.otpExpires = Date.now() + 5 * 60 * 1000;
-    await user.save();
-
-    const htmlContent = renderTemplate("otp-template", {
-      otp: otp.split("").join(" "),
-      email: user.email,
-    });
-
-    await sendReportEmail({
-      to: user.email,
-      subject: "🔐 abelus Admin Login OTP",
-      text: `Hello ${user.name},
-
-Your abelus admin login code is: ${otp}
-
-This code will expire in 5 minutes. Please do not share it with anyone.
-
-If you did not request this login, you can safely ignore this message.
-
-— abelus Security Team`,
-      html: htmlContent
-    });
-
-    res.json({ message: "OTP sent to admin email" });
-  } catch (error) {
-    console.error("Admin login OTP error:", error);
-    res.status(500).json({ message: "Failed to send OTP. Please try again." });
-  }
-};
-
-// Admin login step 2: verify OTP
-export const adminLoginStep2 = async (req, res) => {
-  const { email, otp } = req.body;
-  const user = await User.findOne({ email, role: "admin" });
-
-  if (!user || user.otp !== otp || Date.now() > user.otpExpires) {
-    return res.status(401).json({ message: "Invalid or expired OTP" });
-  }
-
-  // Clear OTP
-  user.otp = null;
-  user.otpExpires = null;
-
-  // Generate tokens
-  const { accessToken, refreshToken } = generateTokens(user);
-  user.refreshToken = refreshToken;
-  await user.save();
-
-  res.json({
-    token: accessToken,
-    refreshToken,
-    user: {
-      id: user._id,
-      name: user.name,
-      email: user.email,
-      role: user.role
-    }
-  });
-};
-
-// Resend OTP
-export const resendAdminOTP = async (req, res) => {
-  try {
-    const { email } = req.body;
-    const user = await User.findOne({ email, role: "admin" });
-    if (!user) return res.status(404).json({ message: "Admin not found" });
-
-    const otp = Math.floor(100000 + Math.random() * 900000).toString();
-    user.otp = otp;
-    user.otpExpires = Date.now() + 5 * 60 * 1000;
-    await user.save();
-
-    const htmlContent = renderTemplate("otp-template", {
-      otp: otp.split("").join(" "),
-      email: user.email,
-    });
-
-    await sendReportEmail({
-      to: user.email,
-      subject: "🔁 abelus Admin Login OTP (Resent)",
-      html: htmlContent
-    });
-
-    res.json({ message: "OTP resent to admin email" });
-  } catch (error) {
-    console.error("Resend OTP error:", error);
-    res.status(500).json({ message: "Failed to resend OTP" });
-  }
-};
-
-// Request Password Reset
-export const requestPasswordReset = async (req, res) => {
-  try {
-    const { email } = req.body;
-    const user = await User.findOne({ email });
-    if (!user) return res.status(404).json({ message: "User not found" });
-
-    const otp = Math.floor(100000 + Math.random() * 900000).toString();
-    user.otp = otp;
-    user.otpExpires = Date.now() + 10 * 60 * 1000; // 10 minutes
-    await user.save();
-
-    const htmlContent = renderTemplate("otp-template", {
-      otp: otp.split("").join(" "),
-      email: user.email,
-    });
-
-    await sendReportEmail({
-      to: user.email,
-      subject: "🔑 abelus Password Reset Code",
-      html: htmlContent
-    });
-
-    res.json({ message: "Password reset code sent" });
-  } catch (error) {
-    console.error("Password reset request error:", error);
-    res.status(500).json({ message: "Failed to send reset code" });
-  }
-};
-
-// Confirm Password Reset
-export const confirmPasswordReset = async (req, res) => {
-  try {
-    const { email, token, newPassword } = req.body;
-    const user = await User.findOne({ email });
-
-    if (!user || user.otp !== token || Date.now() > user.otpExpires) {
-      return res.status(400).json({ message: "Invalid or expired reset code" });
-    }
-
-    user.password = newPassword; // Will be hashed by pre-save hook
-    user.otp = null;
-    user.otpExpires = null;
-    await user.save();
-
-    res.json({ message: "Password reset successful" });
-  } catch (error) {
-    console.error("Password reset confirm error:", error);
-    res.status(500).json({ message: "Failed to reset password" });
-  }
-};
-
+/**
+ * Get current authenticated user profile
+ */
 export const getMe = async (req, res) => {
   try {
-    const user = await User.findById(req.user.id).select("-password -refreshToken -otp -otpExpires");
+    const user = await prisma.user.findUnique({
+      where: { id: req.user.id },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        role: true,
+        profileImage: true,
+        storeName: true,
+        storeDescription: true,
+        storePhone: true,
+        sellerStatus: true,
+        storeLogo: true,
+        createdAt: true
+      }
+    });
+    
+    if (!user) {
+      return res.status(404).json({ message: "User not found in our database" });
+    }
+    
     res.json(user);
   } catch (error) {
+    console.error("GetMe error:", error);
     res.status(500).json({ message: "Server Error" });
   }
 };
 
-export const getProfile = async (req, res) => {
-  try {
-    const user = await User.findById(req.user.id).select("-password -refreshToken -otp -otpExpires");
-    res.json(user);
-  } catch (error) {
-    res.status(500).json({ message: "Server Error" });
-  }
-};
-
+/**
+ * Update user profile
+ */
 export const updateProfile = async (req, res) => {
   try {
-    const user = await User.findById(req.user.id);
-    if (!user) return res.status(404).json({ message: "User not found" });
+    const userId = req.user.id;
+    const { name, email, storeName, storeDescription, storePhone } = req.body;
 
-    if (req.body.name) user.name = req.body.name;
-    if (req.body.email) user.email = req.body.email;
-    if (req.body.password) user.password = req.body.password; // Will be hashed by pre-save hook
+    const updateData = {};
+    if (name) updateData.name = name;
+    if (email) updateData.email = email;
+    if (storeName) updateData.storeName = storeName;
+    if (storeDescription) updateData.storeDescription = storeDescription;
+    if (storePhone) updateData.storePhone = storePhone;
 
-    // Seller Profile Updates
-    if (req.body.storeName) user.storeName = req.body.storeName;
-    if (req.body.storeDescription) user.storeDescription = req.body.storeDescription;
-    if (req.body.storePhone) user.storePhone = req.body.storePhone;
-
-    if (req.files && req.files.length > 0) {
-      req.files.forEach(file => {
-        if (file.fieldname === 'profileImage') {
-          user.profileImage = file.path;
-        } else if (file.fieldname === 'storeLogo') {
-          user.storeLogo = file.path;
-        }
-      });
+    if (req.files) {
+      if (req.files.profileImage) updateData.profileImage = req.files.profileImage[0].path;
+      if (req.files.storeLogo) updateData.storeLogo = req.files.storeLogo[0].path;
     }
 
-    await user.save();
-
-    res.json({
-      id: user._id,
-      name: user.name,
-      email: user.email,
-      role: user.role,
-      profileImage: user.profileImage
+    const updatedUser = await prisma.user.update({
+      where: { id: userId },
+      data: updateData
     });
+
+    res.json(updatedUser);
   } catch (error) {
     console.error("Update profile error:", error);
-    res.status(500).json({ message: "Update failed" });
+    res.status(500).json({ message: "Update failed", error: error.message });
   }
 };
 
+/**
+ * Get all team members (admins)
+ */
 export const getTeamMembers = async (req, res) => {
   try {
-    // Fetch users with 'admin' role, excluding sensitive data
-    const teamMembers = await User.find({ role: 'admin' }).select('name role profileImage');
+    const teamMembers = await prisma.user.findMany({
+      where: { role: 'admin' },
+      select: {
+        id: true,
+        name: true,
+        role: true,
+        profileImage: true
+      }
+    });
     res.json(teamMembers);
   } catch (error) {
     console.error("Error fetching team members:", error);
@@ -378,9 +143,21 @@ export const getTeamMembers = async (req, res) => {
   }
 };
 
+/**
+ * Admin: Get all users
+ */
 export const getAllUsers = async (req, res) => {
   try {
-    const users = await User.find().select('-password -otp -otpExpires');
+    const users = await prisma.user.findMany({
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        role: true,
+        sellerStatus: true,
+        createdAt: true
+      }
+    });
     res.json(users);
   } catch (error) {
     console.error("Error fetching users:", error);
@@ -388,9 +165,12 @@ export const getAllUsers = async (req, res) => {
   }
 };
 
+/**
+ * Admin: Delete a user
+ */
 export const deleteUser = async (req, res) => {
   try {
-    await User.findByIdAndDelete(req.params.id);
+    await prisma.user.delete({ where: { id: req.params.id } });
     res.json({ message: "User deleted successfully" });
   } catch (error) {
     console.error("Error deleting user:", error);
@@ -398,17 +178,83 @@ export const deleteUser = async (req, res) => {
   }
 };
 
+/**
+ * Admin: Update a user
+ */
 export const updateUser = async (req, res) => {
   try {
     const { name, email, role } = req.body;
-    const user = await User.findByIdAndUpdate(
-      req.params.id,
-      { name, email, role },
-      { new: true }
-    ).select('-password');
+    const user = await prisma.user.update({
+      where: { id: req.params.id },
+      data: { name, email, role },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        role: true
+      }
+    });
     res.json(user);
   } catch (error) {
     console.error("Error updating user:", error);
     res.status(500).json({ message: "Failed to update user" });
   }
+};
+
+// Legacy stubs for routes
+export const login = (req, res) => res.status(410).json({ message: "Ghone: Use Supabase Auth on frontend" });
+export const register = (req, res) => res.status(410).json({ message: "Gone: Use Supabase Auth on frontend" });
+export const refreshToken = (req, res) => res.status(410).json({ message: "Gone: Use Supabase Auth on frontend" });
+export const adminLoginStep1 = (req, res) => res.status(410).json({ message: "Gone: Use Supabase Auth on frontend" });
+export const adminLoginStep2 = (req, res) => res.status(410).json({ message: "Gone: Use Supabase Auth on frontend" });
+
+/**
+ * Admin: Create a new user (staff/seller/customer)
+ */
+export const createUser = async (req, res) => {
+  try {
+    const { name, email, password, role } = req.body;
+
+    // 1. Create user in Supabase Auth using Admin Client
+    const { data: authUser, error: authError } = await supabase.auth.admin.createUser({
+      email,
+      password,
+      email_confirm: true,
+      user_metadata: { name, role }
+    });
+
+    if (authError) throw authError;
+
+    // Note: The database trigger 'on_auth_user_created' will handle 
+    // creating the record in public.User. We just need to ensure 
+    // the role is updated if the trigger didn't catch it correctly 
+    // or if we want to ensure it.
+    
+    // The trigger uses user_metadata.role, so it should be fine.
+    
+    res.status(201).json({
+      success: true,
+      message: "User created successfully",
+      user: authUser.user
+    });
+  } catch (error) {
+    console.error("Admin createUser error:", error);
+    res.status(500).json({ message: "Failed to create user", error: error.message });
+  }
+};
+
+export default {
+  completeRegistration,
+  getMe,
+  updateProfile,
+  getTeamMembers,
+  getAllUsers,
+  deleteUser,
+  updateUser,
+  createUser,
+  login,
+  register,
+  refreshToken,
+  adminLoginStep1,
+  adminLoginStep2
 };

@@ -1,51 +1,45 @@
 import axios from "axios";
+import { supabase } from "./supabaseClient";
 
 const instance = axios.create({
-  baseURL: process.env.REACT_APP_API_URL || "http://localhost:5000/api",
+  baseURL: process.env.REACT_APP_API_URL || "/api",
   withCredentials: true,
 });
 
-instance.interceptors.request.use((config) => {
-  const token = localStorage.getItem("authToken");
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`;
+/**
+ * Request Interceptor: Attach Supabase JWT to every request
+ */
+instance.interceptors.request.use(async (config) => {
+  const { data: { session } } = await supabase.auth.getSession();
+  
+  if (session?.access_token) {
+    config.headers.Authorization = `Bearer ${session.access_token}`;
   }
+  
   return config;
 });
 
+/**
+ * Response Interceptor: Handle Authentication Errors
+ */
 instance.interceptors.response.use(
   (response) => response,
   async (error) => {
-    const originalRequest = error.config;
-
-    // If error is 401 and we haven't tried to refresh yet
-    if (error.response?.status === 401 && !originalRequest._retry) {
-      originalRequest._retry = true;
-
-      try {
-        const refreshToken = localStorage.getItem("refreshToken");
-        if (!refreshToken) {
-          throw new Error("No refresh token");
+    // If we get a 401, it means the session is likely invalid or expired
+    if (error.response?.status === 401) {
+      // We can try to refresh the session manually or just logout
+      const { data: { session }, error: refreshError } = await supabase.auth.refreshSession();
+      
+      if (refreshError || !session) {
+        // Clear everything and redirect to login if session is truly dead
+        await supabase.auth.signOut();
+        if (window.location.pathname !== '/login') {
+          window.location.href = "/login";
         }
-
-        const { data } = await axios.post(`${instance.defaults.baseURL}/auth/refresh`, {
-          token: refreshToken,
-        });
-
-        localStorage.setItem("authToken", data.accessToken);
-        localStorage.setItem("refreshToken", data.refreshToken);
-
-        instance.defaults.headers.common["Authorization"] = `Bearer ${data.accessToken}`;
-        originalRequest.headers["Authorization"] = `Bearer ${data.accessToken}`;
-
-        return instance(originalRequest);
-      } catch (refreshError) {
-        // If refresh fails, logout user
-        localStorage.removeItem("authToken");
-        localStorage.removeItem("refreshToken");
-        localStorage.removeItem("userRole");
-        window.location.href = "/login";
-        return Promise.reject(refreshError);
+      } else {
+        // Retry the original request with the new token
+        error.config.headers.Authorization = `Bearer ${session.access_token}`;
+        return instance(error.config);
       }
     }
 
@@ -53,4 +47,4 @@ instance.interceptors.response.use(
   }
 );
 
-export default instance;
+export default instance;

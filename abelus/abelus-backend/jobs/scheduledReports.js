@@ -2,31 +2,36 @@ import cron from "node-cron";
 import path from "path";
 import fs from "fs";
 
-import User from "../models/User.js";
-import ReportLog from "../models/ReportLog.js";
+import prisma from "../prisma.js";
 import { buildReportData } from "../services/reportBuilders.js";
 import { createabelusPDF } from "../utils/pdfLayout.js";
 import generateAISummary from "../utils/aiSummary.js";
 import sendReportEmail from "../utils/sendReportEmail.js";
 
+/**
+ * 📅 Scheduled Monthly Report Job
+ * Runs on the 1st of each month at 8 AM
+ */
 cron.schedule("0 8 1 * *", async () => {
   try {
     const now = new Date();
     const month = now.getMonth() + 1;
     const year = now.getFullYear();
 
-    const admin = await User.findOne({ role: "admin" });
+    const admin = await prisma.user.findFirst({ where: { role: "admin" } });
     if (!admin) return console.warn("No admin found for scheduled report");
 
     const { orders, summary } = await buildReportData("monthly", { month, year });
     const aiSummary = generateAISummary("monthly", summary);
 
-    await ReportLog.create({
-      type: "monthly",
-      filters: { month, year },
-      generatedBy: admin._id,
-      format: "pdf",
-      aiSummary,
+    await prisma.reportLog.create({
+      data: {
+        type: "monthly",
+        filters: { month, year },
+        generatedById: admin.id,
+        format: "pdf",
+        aiSummary,
+      }
     });
 
     const logoPath = path.join(path.resolve(), "assets/logo.png");
@@ -41,7 +46,7 @@ cron.schedule("0 8 1 * *", async () => {
       logoPath,
       signatory: {
         name: admin.name,
-        title: admin.title || "abelus Administrator",
+        title: admin.title || "Abelus Administrator",
         signatureImage: admin.signatureImage,
         stampImage: admin.stampImage,
       },
@@ -54,7 +59,7 @@ cron.schedule("0 8 1 * *", async () => {
         doc.text(aiSummary);
         doc.moveDown(0.8);
 
-        // Key metrics (2 columns)
+        // Key metrics
         doc.fillColor("#111827").fontSize(11).font("Helvetica-Bold");
         doc.text("Key Metrics", { underline: true });
         doc.font("Helvetica").moveDown(0.3);
@@ -85,16 +90,16 @@ cron.schedule("0 8 1 * *", async () => {
         doc.y = startY + (maxRows * lineHeight);
         doc.moveDown(0.8);
 
-        // Orders table (first 30 rows)
+        // Orders table
         doc.fillColor("#111827").fontSize(11).font("Helvetica-Bold");
         doc.text("Order Details", { underline: true });
         doc.font("Helvetica").moveDown(0.3);
 
         const tableRows = orders.slice(0, 30).map(o => ({
-          id: o._id.toString().slice(-6).toUpperCase(),
-          product: (o.product?.name || "N/A").substring(0, 22),
+          id: o.id.slice(-6).toUpperCase(),
+          product: (o.items[0]?.product?.name || "N/A").substring(0, 22),
           customer: (o.customer?.name || o.customer?.email || "N/A").substring(0, 18),
-          qty: String(o.quantity),
+          qty: String(o.items.reduce((sum, i) => sum + i.quantity, 0)),
           status: o.status.charAt(0).toUpperCase() + o.status.slice(1),
           date: new Date(o.createdAt).toLocaleDateString("en-US", { month: "short", day: "2-digit" })
         }));
@@ -119,16 +124,20 @@ cron.schedule("0 8 1 * *", async () => {
       }
     });
 
-    doc.pipe(fs.createWriteStream(filePath));
+    const stream = fs.createWriteStream(filePath);
+    doc.pipe(stream);
     doc.end();
-    await sendReportEmail({
-      to: admin.email,
-      subject: `📊 Monthly Report - ${month}/${year}`,
-      text: `Your monthly report is ready.\n\nSummary:\n${aiSummary}`,
-      attachmentPath: filePath,
+
+    stream.on('finish', async () => {
+        await sendReportEmail({
+          to: admin.email,
+          subject: `📊 Monthly Report - ${month}/${year}`,
+          text: `Your monthly report is ready.\n\nSummary:\n${aiSummary}`,
+          attachmentPath: filePath,
+        });
+        console.log(`✅ Monthly report generated and sent: ${filePath}`);
     });
 
-    console.log(`✅ Monthly report generated: ${filePath}`);
   } catch (err) {
     console.error("❌ Scheduled report generation failed:", err);
   }

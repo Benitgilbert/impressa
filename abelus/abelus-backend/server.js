@@ -1,5 +1,4 @@
 import express from "express";
-import mongoose from "mongoose";
 import path from "path";
 import passport from "./config/passport.js";
 import cors from "cors";
@@ -7,10 +6,12 @@ import helmet from "helmet";
 import pinoHttp from "pino-http";
 import cookieParser from "cookie-parser";
 import dotenv from "dotenv";
+import prisma from "./prisma.js"; // Replace mongoose with prisma
 //import authRoutes from "./routes/authRoutes.js";
 import dashboardRoutes from "./routes/dashboardRoutes.js";
 import { errorHandler, notFound } from "./middleware/errorHandler.js";
 import logger from "./config/logger.js";
+import { mongoCompat } from "./middleware/mongoCompat.js";
 
 dotenv.config();
 
@@ -55,6 +56,7 @@ app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 app.use(passport.initialize());
 app.use(cookieParser()); // For cart session management
+app.use(mongoCompat); // Ensure frontend compatibility (id -> _id)
 
 // ✅ Request Logging Middleware
 app.use(
@@ -81,21 +83,12 @@ app.use(
 // Static uploads for product images
 app.use("/uploads", express.static("uploads"));
 
-// ✅ Connection events for debugging
-mongoose.connection.on("connected", () => {
-  logger.info("✅ Mongoose connected to MongoDB");
-});
-mongoose.connection.on("error", (err) => {
-  logger.error({ err }, "❌ Mongoose connection error");
-});
-mongoose.connection.on("disconnected", () => {
-  logger.warn("⚠️  Mongoose disconnected from MongoDB");
-});
-
 // ✅ Start server only after DB connects
 const startServer = async () => {
   try {
-    await mongoose.connect(process.env.MONGO_URI);
+    // Connect to Prisma instead of Mongoose
+    await prisma.$connect();
+    logger.info("✅ Prisma connected to Supabase (PostgreSQL)");
 
     // ✅ Import routes only after DB is ready
     const reportRoutes = (await import("./routes/reportRoutes.js")).default;
@@ -190,7 +183,7 @@ const startServer = async () => {
     app.get("/api", (req, res) => {
       res.json({
         success: true,
-        message: "Abelus Backend API is running!",
+        message: "Abelus Backend API is running on Prisma!",
         version: "1.0.0",
         environment: process.env.NODE_ENV || "development",
         docs: "/api-docs (coming in Phase 4)"
@@ -221,9 +214,9 @@ const startServer = async () => {
         logger.info("HTTP server closed");
 
         try {
-          // Close database connections
-          await mongoose.connection.close(false);
-          logger.info("MongoDB connection closed");
+          // Close Prisma connection
+          await prisma.$disconnect();
+          logger.info("Prisma connection closed");
 
           logger.info("Graceful shutdown completed");
           process.exit(0);
@@ -256,7 +249,7 @@ const startServer = async () => {
       gracefulShutdown("UNHANDLED_REJECTION");
     });
   } catch (err) {
-    logger.fatal({ err }, "❌ Failed to connect to MongoDB");
+    logger.fatal({ err }, "❌ Failed to connect to Supabase via Prisma");
     process.exit(1);
   }
 };

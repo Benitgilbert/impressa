@@ -1,9 +1,27 @@
-import Cart from "../models/Cart.js";
-import Order from "../models/Order.js";
-import Coupon from "../models/Coupon.js";
-import Product from "../models/Product.js";
+import prisma from "../prisma.js";
 import crypto from "crypto";
 import logger from "../config/logger.js";
+
+const calculateCartTotals = (cart, discountAmount = 0) => {
+  let subtotal = 0;
+  cart.items.forEach(item => {
+    let price = 0;
+    if (item.product) {
+      price = item.product.price;
+      if (item.variationId && item.product.variations) {
+        const variation = item.product.variations.find(v => v.id === item.variationId || v.sku === item.variationId);
+        if (variation) price = variation.price;
+      }
+    }
+    subtotal += price * item.quantity;
+  });
+  
+  const tax = 0;
+  const shipping = 0;
+  const total = Math.max(0, subtotal - discountAmount + tax + shipping);
+  
+  return { subtotal, discount: discountAmount, tax, shipping, total };
+};
 
 /**
  * Create order from cart (checkout)
@@ -16,24 +34,35 @@ export const createOrderFromCart = async (req, res, next) => {
       sameAsShipping = true,
       paymentMethod = "pending",
       shippingMethod,
+      couponCode // Pass it explicitly since it's not saved to Cart in Postgres anymore
     } = req.body;
 
-    // Validate addresses
     if (!shippingAddress || !shippingAddress.fullName || !shippingAddress.addressLine1) {
       const error = new Error("Shipping address is required");
       error.statusCode = 400;
       return next(error);
     }
 
-    // Get cart
     const sessionToken = req.cookies?.cartSession || req.headers["x-cart-session"];
-    if (!sessionToken) {
-      const error = new Error("Cart session not found");
-      error.statusCode = 404;
-      return next(error);
+    const userId = req.user?.id;
+    
+    let cart = null;
+    if (userId) {
+        cart = await prisma.cart.findUnique({ 
+            where: { userId }, 
+            include: { items: { include: { product: { include: { variations: true } } } } } 
+        });
+    }
+    if (!cart && sessionToken) {
+        const isUUID = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(sessionToken);
+        if (isUUID) {
+            cart = await prisma.cart.findUnique({ 
+                where: { id: sessionToken }, 
+                include: { items: { include: { product: { include: { variations: true } } } } } 
+            });
+        }
     }
 
-    const cart = await Cart.findOne({ sessionToken }).populate("items.product");
     if (!cart || cart.items.length === 0) {
       const error = new Error("Cart is empty");
       error.statusCode = 400;
@@ -42,15 +71,15 @@ export const createOrderFromCart = async (req, res, next) => {
 
     // Validate stock availability
     for (const item of cart.items) {
-      const product = await Product.findById(item.product._id);
+      const product = item.product;
       if (!product) {
-        const error = new Error(`Product ${item.product.name} not found`);
+        const error = new Error(`Product not found`);
         error.statusCode = 404;
         return next(error);
       }
 
       if (product.visibility !== "public") {
-        const error = new Error(`Product ${item.product.name} is not available`);
+        const error = new Error(`Product ${product.name} is not available`);
         error.statusCode = 400;
         return next(error);
       }
@@ -62,95 +91,123 @@ export const createOrderFromCart = async (req, res, next) => {
       }
     }
 
-    // Build order items
-    const orderItems = cart.items.map((item) => ({
-      product: item.product._id,
-      productName: item.product.name,
-      productImage: item.product.image,
-      sku: item.product.sku,
-      quantity: item.quantity,
-      price: item.price,
-      subtotal: item.subtotal,
-      customizations: item.customizations,
-    }));
+    // Validate Coupon
+    let discountAmount = 0;
+    let validCouponCode = null;
+    
+    if (couponCode) {
+        const coupon = await prisma.coupon.findUnique({ where: { code: couponCode } });
+        if (coupon && coupon.isActive && new Date() <= new Date(coupon.expiresAt)) {
+            let tempSubtotal = 0;
+            cart.items.forEach(i => {
+                let price = i.product?.price || 0;
+                tempSubtotal += price * i.quantity;
+            });
+            
+            if (!coupon.minSpend || tempSubtotal >= coupon.minSpend) {
+                if (coupon.type === "fixed") {
+                    discountAmount = coupon.value;
+                } else if (coupon.type === "percentage") {
+                    discountAmount = tempSubtotal * (coupon.value / 100);
+                    if (coupon.maxDiscount && discountAmount > coupon.maxDiscount) discountAmount = coupon.maxDiscount;
+                }
+                validCouponCode = coupon.code;
+            }
+        }
+    }
 
-    // Generate public order ID (8 characters: letters + numbers)
+    const totals = calculateCartTotals(cart, discountAmount);
+
+    const orderItems = cart.items.map((item) => {
+      let price = item.product.price;
+      if (item.variationId && item.product.variations) {
+          const variation = item.product.variations.find(v => v.id === item.variationId || v.sku === item.variationId);
+          if (variation) price = variation.price;
+      }
+      return {
+        productId: item.productId,
+        productName: item.product.name,
+        productImage: item.product.image,
+        sku: item.product.sku,
+        quantity: item.quantity,
+        price: price,
+        subtotal: price * item.quantity,
+        customizations: item.customizations || {},
+      };
+    });
+
     const publicId = crypto.randomBytes(4).toString("hex").toUpperCase();
 
-    // Create order
     const orderData = {
       publicId,
-      customer: req.user?._id,
-      guestInfo: req.user
-        ? undefined
-        : {
-          name: shippingAddress.fullName,
-          email: shippingAddress.email,
-          phone: shippingAddress.phone,
-        },
-      items: orderItems,
+      customerId: userId || null,
+      guestInfo: userId ? null : { name: shippingAddress.fullName, email: shippingAddress.email, phone: shippingAddress.phone },
       shippingAddress,
       billingAddress: sameAsShipping ? shippingAddress : billingAddress,
-      sameAsShipping,
-      totals: {
-        subtotal: cart.totals.subtotal,
-        shipping: cart.totals.shipping || 0,
-        tax: cart.totals.tax || 0,
-        discount: cart.totals.discount || 0,
-        grandTotal: cart.totals.total,
-      },
-      couponCode: cart.couponCode,
-      discountAmount: cart.discountAmount,
-      payment: {
-        method: paymentMethod,
-        status: "pending",
-      },
-      shipping: {
-        method: shippingMethod || "standard",
-        cost: cart.totals.shipping || 0,
-      },
+      
+      subtotal: totals.subtotal,
+      shippingCost: totals.shipping || 0,
+      tax: totals.tax || 0,
+      discount: totals.discount || 0,
+      grandTotal: totals.total,
+      
+      paymentMethod,
       status: "pending",
+      
+      items: {
+          create: orderItems
+      }
     };
 
-    const order = await Order.create(orderData);
+    const order = await prisma.order.create({
+      data: orderData,
+      include: { items: true }
+    });
 
-    // Update coupon usage if applied
-    if (cart.couponCode) {
+    if (validCouponCode) {
       try {
-        const coupon = await Coupon.findOne({ code: cart.couponCode });
+        const coupon = await prisma.coupon.findUnique({ where: { code: validCouponCode } });
         if (coupon) {
-          coupon.usageCount += 1;
-          coupon.usedBy.push({
-            user: req.user?._id,
-            email: req.user?.email || shippingAddress.email,
-            orderId: order._id,
-          });
-          await coupon.save();
+            const usedByList = Array.isArray(coupon.usedBy) ? [...coupon.usedBy] : [];
+            usedByList.push({
+                user: userId || null,
+                email: req.user?.email || shippingAddress.email,
+                orderId: order.id
+            });
+            await prisma.coupon.update({
+                where: { id: coupon.id },
+                data: {
+                    usageCount: { increment: 1 },
+                    usedBy: usedByList
+                }
+            });
         }
       } catch (error) {
         logger.error({ err: error }, "Failed to update coupon usage");
       }
     }
 
-    // Deduct stock
     for (const item of cart.items) {
-      await Product.findByIdAndUpdate(item.product._id, {
-        $inc: { stock: -item.quantity, salesCount: item.quantity },
+      await prisma.product.update({
+        where: { id: item.productId },
+        data: {
+            stock: { decrement: item.quantity },
+            salesCount: { increment: item.quantity }
+        }
       });
     }
 
-    // Clear cart
-    await cart.clearCart();
+    await prisma.cartItem.deleteMany({ where: { cartId: cart.id } });
 
-    logger.info({ orderId: order._id, publicId }, "Order created from cart");
+    logger.info({ orderId: order.id, publicId }, "Order created from cart");
 
     res.status(201).json({
       success: true,
       message: "Order created successfully",
       data: {
-        orderId: order._id,
+        orderId: order.id,
         publicId: order.publicId,
-        total: order.totals.grandTotal,
+        total: order.grandTotal,
         status: order.status,
       },
     });
@@ -165,15 +222,7 @@ export const createOrderFromCart = async (req, res, next) => {
 export const calculateShipping = async (req, res, next) => {
   try {
     const { address, items } = req.body;
-
-    // Placeholder logic - in real implementation:
-    // - Calculate based on address (zone)
-    // - Calculate based on weight/dimensions
-    // - Integrate with carrier APIs
-
     let shippingCost = 0;
-
-    // Simple example: flat rate for now
     if (address?.country === "Rwanda") {
       shippingCost = address.city === "Kigali" ? 2000 : 5000; // RWF
     } else {
@@ -199,16 +248,8 @@ export const calculateShipping = async (req, res, next) => {
 export const calculateTax = async (req, res, next) => {
   try {
     const { subtotal, address } = req.body;
-
-    // Placeholder logic - in real implementation:
-    // - Tax rates by country/region
-    // - Tax classes per product
-    // - Integration with tax services (TaxJar, Avalara)
-
     let taxRate = 0;
     let taxAmount = 0;
-
-    // Simple example: Rwanda VAT
     if (address?.country === "Rwanda") {
       taxRate = 0.18; // 18% VAT
       taxAmount = subtotal * taxRate;

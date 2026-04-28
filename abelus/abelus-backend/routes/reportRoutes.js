@@ -1,8 +1,8 @@
 import express from "express";
 import path from "path";
+import prisma from "../prisma.js";
 import { createabelusPDF } from "../utils/pdfLayout.js";
 import { verifyAdmin } from "../middleware/authMiddleware.js";
-import User from "../models/User.js";
 
 const router = express.Router();
 
@@ -11,7 +11,9 @@ router.get("/generate", verifyAdmin, async (req, res) => {
 
   if (type === "users" && format === "pdf") {
     try {
-      const users = await User.find().select("name email role createdAt");
+      const users = await prisma.user.findMany({
+          select: { name: true, email: true, role: true, createdAt: true }
+      });
 
       const userRows = users.map(user => ({
         name: user.name,
@@ -41,7 +43,7 @@ router.get("/generate", verifyAdmin, async (req, res) => {
       };
 
       const signatory = {
-        name: "abelus Admin",
+        name: "Abelus Admin",
         title: "System Generated",
         signatureImage: null,
         stampImage: null,
@@ -66,7 +68,9 @@ router.get("/generate", verifyAdmin, async (req, res) => {
     }
   } else if (type === "users" && format === "csv") {
     try {
-      const users = await User.find().select("name email role createdAt");
+      const users = await prisma.user.findMany({
+          select: { name: true, email: true, role: true, createdAt: true }
+      });
       const header = ["Name", "Email", "Role", "Created At"].join(",");
       const rows = users.map(u => [
         (u.name || "").replaceAll(",", " "),

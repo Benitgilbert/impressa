@@ -1,90 +1,98 @@
-import TaxRate from "../models/TaxRate.js";
+import prisma from "../prisma.js";
 
-// Get all rates (Admin)
+/**
+ * 🧾 Get all tax rates (Admin)
+ */
 export const getTaxRates = async (req, res, next) => {
     try {
-        const rates = await TaxRate.find().sort({ priority: 1, createdAt: -1 });
+        const rates = await prisma.taxRate.findMany({
+            orderBy: [{ priority: 'asc' }, { createdAt: 'desc' }]
+        });
         res.json({ success: true, data: rates });
     } catch (error) {
         next(error);
     }
 };
 
-// Create rate (Admin)
+/**
+ * 🧾 Create tax rate (Admin)
+ */
 export const createTaxRate = async (req, res, next) => {
     try {
-        const rate = await TaxRate.create(req.body);
+        const rate = await prisma.taxRate.create({
+            data: req.body
+        });
         res.status(201).json({ success: true, data: rate });
     } catch (error) {
         next(error);
     }
 };
 
-// Update rate (Admin)
+/**
+ * 🧾 Update tax rate (Admin)
+ */
 export const updateTaxRate = async (req, res, next) => {
     try {
-        const rate = await TaxRate.findByIdAndUpdate(req.params.id, req.body, { new: true });
-        if (!rate) {
-            const error = new Error("Tax rate not found");
-            error.statusCode = 404;
-            throw error;
-        }
+        const rate = await prisma.taxRate.update({
+            where: { id: req.params.id },
+            data: req.body
+        });
         res.json({ success: true, data: rate });
     } catch (error) {
+        if (error.code === 'P2025') {
+            const err = new Error("Tax rate not found");
+            err.statusCode = 404;
+            return next(err);
+        }
         next(error);
     }
 };
 
-// Delete rate (Admin)
+/**
+ * 🧾 Delete tax rate (Admin)
+ */
 export const deleteTaxRate = async (req, res, next) => {
     try {
-        const rate = await TaxRate.findByIdAndDelete(req.params.id);
-        if (!rate) {
-            const error = new Error("Tax rate not found");
-            error.statusCode = 404;
-            throw error;
-        }
+        await prisma.taxRate.delete({
+            where: { id: req.params.id }
+        });
         res.json({ success: true, message: "Tax rate deleted" });
     } catch (error) {
+        if (error.code === 'P2025') {
+            const err = new Error("Tax rate not found");
+            err.statusCode = 404;
+            return next(err);
+        }
         next(error);
     }
 };
 
-// Calculate taxes for an order (Public)
+/**
+ * 🧾 Calculate taxes for an order (Public)
+ */
 export const calculateTax = async (req, res, next) => {
     try {
         const { province, district, sector, cell, subtotal, shippingCost } = req.body;
 
-        // Find matching tax rates using cascading hierarchy
-        // Priority: More specific matches take precedence over generic ones
-        const rates = await TaxRate.find().sort({ priority: 1 });
+        const rates = await prisma.taxRate.findMany({
+            orderBy: { priority: 'asc' }
+        });
 
         let totalTax = 0;
         const taxes = [];
 
         for (const rate of rates) {
-            // Check if this rate matches the address using cascading logic
-            // A wildcard (*) means "applies to all" at that level
-
-            // Province match
             if (rate.province !== "*" && rate.province !== province) continue;
-
-            // District match (only check if rate specifies a district)
             if (rate.district !== "*") {
                 if (!district || rate.district !== district) continue;
             }
-
-            // Sector match (only check if rate specifies a sector)
             if (rate.sector !== "*") {
                 if (!sector || rate.sector !== sector) continue;
             }
-
-            // Cell match (only check if rate specifies a cell)
             if (rate.cell !== "*") {
                 if (!cell || rate.cell !== cell) continue;
             }
 
-            // Calculate tax amount
             let taxableAmount = subtotal;
             if (rate.shipping) {
                 taxableAmount += shippingCost;
@@ -106,17 +114,17 @@ export const calculateTax = async (req, res, next) => {
     }
 };
 
-// 🔄 Mock Fetch Live Rates (Rwanda Tax Simulation)
+/**
+ * 🧾 Mock Fetch Live Rates (Rwanda Tax Simulation)
+ */
 export const fetchLiveRates = async (req, res, next) => {
     try {
-        // Simulate API delay
         await new Promise(resolve => setTimeout(resolve, 1500));
 
-        // Mock Rwanda tax data
         const liveRates = [
             {
                 name: "Rwanda VAT",
-                province: "*",  // Applies to all provinces
+                province: "*",
                 district: "*",
                 sector: "*",
                 cell: "*",
@@ -124,14 +132,13 @@ export const fetchLiveRates = async (req, res, next) => {
                 priority: 1,
                 shipping: true
             },
-            // Example: Special tax zone for Kigali
             {
                 name: "Kigali City Tax",
                 province: "Kigali City",
                 district: "*",
                 sector: "*",
                 cell: "*",
-                rate: 0.5,  // Additional 0.5% for Kigali
+                rate: 0.5,
                 priority: 2,
                 shipping: false
             }
@@ -140,13 +147,16 @@ export const fetchLiveRates = async (req, res, next) => {
         const addedRates = [];
 
         for (const rateData of liveRates) {
-            // Check if exists to avoid duplicates (simple check by name)
-            const exists = await TaxRate.findOne({
-                name: rateData.name,
-                province: rateData.province
+            const exists = await prisma.taxRate.findFirst({
+                where: {
+                    name: rateData.name,
+                    province: rateData.province
+                }
             });
             if (!exists) {
-                const newRate = await TaxRate.create(rateData);
+                const newRate = await prisma.taxRate.create({
+                    data: rateData
+                });
                 addedRates.push(newRate);
             }
         }

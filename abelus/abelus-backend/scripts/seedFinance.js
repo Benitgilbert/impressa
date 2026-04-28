@@ -1,18 +1,7 @@
-import mongoose from "mongoose";
 import dotenv from "dotenv";
-import Account from "../models/Account.js";
+import prisma from "../prisma.js";
 
 dotenv.config();
-
-const connectDB = async () => {
-    try {
-        const conn = await mongoose.connect(process.env.MONGO_URI);
-        console.log(`MongoDB Connected: ${conn.connection.host}`);
-    } catch (error) {
-        console.error(`Error: ${error.message}`);
-        process.exit(1);
-    }
-};
 
 const systemAccounts = [
     {
@@ -49,18 +38,15 @@ const systemAccounts = [
 
 const seedFinance = async () => {
     try {
-        await connectDB();
-
         console.log("Seeding System Accounts...");
 
         for (const account of systemAccounts) {
-            const exists = await Account.findOne({ code: account.code });
-            if (!exists) {
-                await Account.create(account);
-                console.log(`Created account: ${account.code} - ${account.name}`);
-            } else {
-                console.log(`Account exists: ${account.code} - ${account.name}`);
-            }
+            const acc = await prisma.account.upsert({
+                where: { code: account.code },
+                update: {},
+                create: account
+            });
+            console.log(`Ensured account: ${acc.code} - ${acc.name}`);
         }
 
         console.log("Finance seeding completed.");

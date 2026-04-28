@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import api from "../utils/axiosInstance";
+import { supabase } from "../utils/supabaseClient";
 import {
     FaUser, FaEnvelope, FaLock, FaArrowRight, FaArrowLeft, FaStore, FaPhone,
     FaInfoCircle, FaGoogle, FaIdCard, FaBuilding, FaFileUpload,
@@ -190,8 +191,11 @@ function Register() {
         setStep(prev => Math.max(prev - 1, 1));
     };
 
-    const handleGoogleLogin = () => {
-        window.location.href = API_URL + "/auth/google";
+    const handleGoogleLogin = async () => {
+        const { error } = await supabase.auth.signInWithOAuth({
+            provider: 'google',
+        });
+        if (error) setError(error.message);
     };
 
     const handleSubmit = async (e) => {
@@ -208,20 +212,32 @@ function Register() {
 
         setLoading(true);
         try {
+            // Step 1: Register with Supabase
+            const { data: authData, error: authError } = await supabase.auth.signUp({
+                email: formData.email,
+                password: formData.password,
+                options: {
+                    data: {
+                        name: formData.name,
+                        role: isSeller ? "seller" : "customer"
+                    }
+                }
+            });
+
+            if (authError) throw authError;
+
             if (isSeller) {
-                // Step 1: Register the account first
-                const registerPayload = {
-                    name: formData.name,
-                    email: formData.email,
-                    password: formData.password,
-                    role: "seller" // Pending until RDB approved
-                };
-
-                const registerRes = await api.post("/auth/register", registerPayload);
-                const { token } = registerRes.data;
-
-                // Store token temporarily
-                localStorage.setItem("authToken", token);
+                // If Supabase didn't auto-login (e.g. email confirmation required), we might need to sign in
+                // But usually, with default settings, it might auto-login.
+                // We'll use the session from signUp if available.
+                const token = authData.session?.access_token;
+                
+                if (!token) {
+                    // If no token, maybe email confirmation is needed
+                    setError("Registration successful! Please check your email to confirm your account before completing your seller application.");
+                    setLoading(false);
+                    return;
+                }
 
                 // Step 2: Submit seller verification with RDB documents
                 const sellerData = new FormData();
@@ -238,72 +254,23 @@ function Register() {
                     sellerData.append("nationalId", formData.nationalId);
                 }
 
+                // Note: api (axiosInstance) will automatically attach the token if we use it correctly
+                // or we can pass it in headers to be sure
                 await api.post("/seller-verification/apply", sellerData, {
                     headers: {
-                        "Content-Type": "multipart/form-data",
-                        Authorization: `Bearer ${token}`
+                        "Content-Type": "multipart/form-data"
                     }
                 });
 
                 setSuccess(true);
             } else {
-                // Customer registration
-                const payload = {
-                    name: formData.name,
-                    email: formData.email,
-                    password: formData.password,
-                    role: "customer"
-                };
-
-                await api.post("/auth/register", payload);
-                alert("Registration successful! Please login.");
+                // Customer registration successful
+                alert("Registration successful! Please check your email if confirmation is required, then login.");
                 navigate("/login");
             }
         } catch (err) {
-            const errorMsg = err.response?.data?.message;
-
-            // 🔄 Auto-Recovery: If account exists (from failed previous attempt), try to login and resume
-            if (errorMsg === "User already exists" && isSeller) {
-                try {
-                    const loginRes = await api.post("/auth/login", {
-                        email: formData.email,
-                        password: formData.password
-                    });
-
-                    const { accessToken } = loginRes.data;
-                    localStorage.setItem("authToken", accessToken);
-
-                    // Resume Step 2: Submit seller verification
-                    const sellerData = new FormData();
-                    sellerData.append("storeName", formData.storeName);
-                    sellerData.append("storeDescription", formData.storeDescription);
-                    sellerData.append("storePhone", formData.storePhone);
-                    sellerData.append("tinNumber", formData.tinNumber);
-                    sellerData.append("businessName", formData.businessName);
-                    sellerData.append("businessType", formData.businessType);
-                    sellerData.append("termsAccepted", formData.termsAccepted);
-                    sellerData.append("digitalSignature", formData.digitalSignature);
-                    sellerData.append("rdbCertificate", formData.rdbCertificate);
-                    if (formData.nationalId) {
-                        sellerData.append("nationalId", formData.nationalId);
-                    }
-
-                    await api.post("/seller-verification/apply", sellerData, {
-                        headers: {
-                            "Content-Type": "multipart/form-data",
-                            Authorization: `Bearer ${accessToken}`
-                        }
-                    });
-
-                    setSuccess(true);
-                    return; // Exit successfully
-                } catch (recoveryErr) {
-                    // If login also fails (e.g. wrong password), show original error
-                    setError("Account already exists. Please login to continue your application.");
-                }
-            } else {
-                setError(errorMsg || "Registration failed");
-            }
+            console.error("Registration error:", err);
+            setError(err.message || "Registration failed");
         } finally {
             setLoading(false);
         }

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import axios from "axios"; // or use your axiosInstance if configured
+import api from "../utils/axiosInstance";
 
 function CreateUserForm() {
   const [form, setForm] = useState({
@@ -19,9 +19,8 @@ function CreateUserForm() {
     e.preventDefault();
     setLoading(true);
     setMessage("");
-    const API_URL = process.env.REACT_APP_API_URL || "http://localhost:5000/api";
     try {
-      await axios.post(`${API_URL}/auth/register`, form);
+      await api.post("/auth/users", form);
       setMessage("✅ User created successfully");
       setForm({ name: "", email: "", password: "", role: "cashier" });
     } catch (err) {

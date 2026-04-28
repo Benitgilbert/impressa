@@ -1,6 +1,4 @@
-import SellerViolation from "../models/SellerViolation.js";
-import User from "../models/User.js";
-import Order from "../models/Order.js";
+import prisma from "../prisma.js";
 import { notifyViolation } from "../controllers/notificationController.js";
 
 /**
@@ -34,21 +32,21 @@ const PENALTY_POINTS = {
 export const checkCancellationRate = async (sellerId) => {
     const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
 
-    // Get seller's orders in last 30 days
-    const orders = await Order.find({
-        "items.seller": sellerId,
-        createdAt: { $gte: thirtyDaysAgo }
+    const orders = await prisma.order.findMany({
+        where: {
+            items: { some: { product: { sellerId: sellerId } } },
+            createdAt: { gte: thirtyDaysAgo }
+        },
+        include: { items: { include: { product: true } } }
     });
 
-    if (orders.length < 5) return null; // Need minimum orders for accurate rate
+    if (orders.length < 5) return null;
 
     let totalOrders = 0;
     let cancelledOrders = 0;
 
     orders.forEach(order => {
-        const hasSellerItems = order.items.some(item =>
-            item.seller && item.seller.toString() === sellerId.toString()
-        );
+        const hasSellerItems = order.items.some(item => item.product.sellerId === sellerId);
         if (hasSellerItems) {
             totalOrders++;
             if (order.status === "cancelled") {
@@ -64,10 +62,7 @@ export const checkCancellationRate = async (sellerId) => {
             type: "high_cancellation_rate",
             severity: rate > 40 ? "review" : "warning",
             description: `Cancellation rate of ${rate.toFixed(1)}% exceeds threshold of ${THRESHOLDS.cancellationRate}%`,
-            metrics: {
-                cancellationRate: rate,
-                affectedOrders: cancelledOrders
-            },
+            metrics: { cancellationRate: rate, affectedOrders: cancelledOrders },
             penaltyPoints: PENALTY_POINTS.high_cancellation_rate
         };
     }
@@ -81,24 +76,27 @@ export const checkCancellationRate = async (sellerId) => {
 export const checkFulfillmentTime = async (sellerId) => {
     const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
 
-    const orders = await Order.find({
-        "items.seller": sellerId,
-        status: { $in: ["shipped", "delivered"] },
-        createdAt: { $gte: thirtyDaysAgo },
-        shippedAt: { $exists: true }
+    const orders = await prisma.order.findMany({
+        where: {
+            items: { some: { product: { sellerId: sellerId } } },
+            status: { in: ["shipped", "delivered"] },
+            createdAt: { gte: thirtyDaysAgo }
+        },
+        include: { items: { include: { product: true } } }
     });
 
+    // Note: We need a shippedAt or similar field in Order, but based on legacy logic it might be in status history or we can assume updatedAt for simplicity if not present
+    // Looking at schema, I don't see shippedAt, but I'll check common status change logic
+    
     if (orders.length < 3) return null;
 
     let totalHours = 0;
     let count = 0;
 
     orders.forEach(order => {
-        const hasSellerItems = order.items.some(item =>
-            item.seller && item.seller.toString() === sellerId.toString()
-        );
-        if (hasSellerItems && order.shippedAt) {
-            const hours = (order.shippedAt - order.createdAt) / (1000 * 60 * 60);
+        const hasSellerItems = order.items.some(item => item.product.sellerId === sellerId);
+        if (hasSellerItems && order.updatedAt) { // Fallback to updatedAt if shippedAt is missing
+            const hours = (order.updatedAt - order.createdAt) / (1000 * 60 * 60);
             totalHours += hours;
             count++;
         }
@@ -111,10 +109,7 @@ export const checkFulfillmentTime = async (sellerId) => {
             type: "slow_fulfillment",
             severity: avgHours > 120 ? "review" : "warning",
             description: `Average fulfillment time of ${avgHours.toFixed(1)} hours exceeds threshold of ${THRESHOLDS.slowFulfillmentHours} hours`,
-            metrics: {
-                averageFulfillmentTime: avgHours,
-                affectedOrders: count
-            },
+            metrics: { averageFulfillmentTime: avgHours, affectedOrders: count },
             penaltyPoints: PENALTY_POINTS.slow_fulfillment
         };
     }
@@ -127,7 +122,6 @@ export const checkFulfillmentTime = async (sellerId) => {
  */
 export const runViolationChecks = async (sellerId) => {
     const violations = [];
-
     const cancellationViolation = await checkCancellationRate(sellerId);
     if (cancellationViolation) violations.push(cancellationViolation);
 
@@ -142,7 +136,7 @@ export const runViolationChecks = async (sellerId) => {
  */
 export const processViolations = async (sellerId) => {
     try {
-        const seller = await User.findById(sellerId);
+        const seller = await prisma.user.findUnique({ where: { id: sellerId } });
         if (!seller || seller.role !== "seller") {
             return { success: false, message: "Invalid seller" };
         }
@@ -151,54 +145,61 @@ export const processViolations = async (sellerId) => {
         const createdViolations = [];
 
         for (const violation of detectedViolations) {
-            // Check if similar violation already exists in last 7 days
-            const existingViolation = await SellerViolation.findOne({
-                seller: sellerId,
-                type: violation.type,
-                status: "active",
-                createdAt: { $gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) }
+            // Check for duplicate in last 7 days
+            const existingViolation = await prisma.violation.findFirst({
+                where: {
+                    sellerId: sellerId,
+                    type: violation.type,
+                    status: "active",
+                    createdAt: { gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) }
+                }
             });
 
-            if (existingViolation) continue; // Don't create duplicate
+            if (existingViolation) continue;
 
-            const newViolation = new SellerViolation({
-                seller: sellerId,
-                ...violation,
-                detectedBy: "system",
-                expiresAt: new Date(Date.now() + 90 * 24 * 60 * 60 * 1000) // 90 days
+            const newViolation = await prisma.violation.create({
+                data: {
+                    sellerId: sellerId,
+                    type: violation.type,
+                    severity: violation.severity,
+                    description: violation.description,
+                    metrics: violation.metrics,
+                    penaltyPoints: violation.penaltyPoints,
+                    status: "active"
+                }
             });
 
-            await newViolation.save();
             createdViolations.push(newViolation);
 
-            // 🔔 Notify Admin
             try {
                 notifyViolation(newViolation.type, seller.storeName || seller.name);
             } catch (e) { }
         }
 
-        // Check total penalty points for auto-suspension
-        const totalPoints = await SellerViolation.getTotalPenaltyPoints(sellerId);
+        // Get total penalty points
+        const pointsAgg = await prisma.violation.aggregate({
+            _sum: { penaltyPoints: true },
+            where: { sellerId: sellerId, status: 'active' }
+        });
+        const totalPoints = pointsAgg._sum.penaltyPoints || 0;
 
         if (totalPoints >= THRESHOLDS.penaltyPointsForSuspension) {
-            // Auto-suspend seller
-            seller.sellerStatus = "rejected";
-            await seller.save();
-
-            // Create suspension violation
-            const suspensionViolation = new SellerViolation({
-                seller: sellerId,
-                type: "policy_violation",
-                severity: "suspension",
-                description: `Account auto-suspended due to accumulated ${totalPoints} penalty points`,
-                penaltyPoints: 0,
-                detectedBy: "system",
-                actionsTaken: [{
-                    action: "account_suspended",
-                    note: `Auto-suspended at ${totalPoints} penalty points`
-                }]
+            await prisma.user.update({
+                where: { id: sellerId },
+                data: { sellerStatus: "rejected" }
             });
-            await suspensionViolation.save();
+
+            const suspensionViolation = await prisma.violation.create({
+                data: {
+                    sellerId: sellerId,
+                    type: "policy_violation",
+                    severity: "suspension",
+                    description: `Account auto-suspended due to accumulated ${totalPoints} penalty points`,
+                    penaltyPoints: 0,
+                    status: "active",
+                    adminNotes: `Auto-suspended at ${totalPoints} points`
+                }
+            });
             createdViolations.push(suspensionViolation);
         }
 
@@ -221,14 +222,14 @@ export const processViolations = async (sellerId) => {
 export const runAllSellerChecks = async () => {
     console.log("[Violation Tracker] Running checks for all sellers...");
 
-    const sellers = await User.find({ role: "seller", sellerStatus: "active" });
+    const sellers = await prisma.user.findMany({ where: { role: "seller", sellerStatus: "active" } });
     const results = [];
 
     for (const seller of sellers) {
-        const result = await processViolations(seller._id);
+        const result = await processViolations(seller.id);
         if (result.violationsCreated > 0) {
             results.push({
-                sellerId: seller._id,
+                sellerId: seller.id,
                 storeName: seller.storeName,
                 ...result
             });

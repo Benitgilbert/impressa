@@ -1,5 +1,4 @@
-import Category from "../models/Category.js";
-import Product from "../models/Product.js";
+import prisma from "../prisma.js";
 
 /**
  * Get all categories (flat list)
@@ -14,12 +13,14 @@ export const getAllCategories = async (req, res, next) => {
     }
 
     if (parent !== undefined) {
-      filter.parent = parent === "null" ? null : parent;
+      filter.parentId = parent === "null" ? null : parent;
     }
 
-    const categories = await Category.find(filter)
-      .populate("parent", "name slug")
-      .sort({ order: 1, name: 1 });
+    const categories = await prisma.category.findMany({
+      where: filter,
+      include: { parent: { select: { id: true, name: true, slug: true } } },
+      orderBy: [{ order: 'asc' }, { name: 'asc' }]
+    });
 
     res.json({
       success: true,
@@ -36,7 +37,20 @@ export const getAllCategories = async (req, res, next) => {
  */
 export const getCategoryTree = async (req, res, next) => {
   try {
-    const tree = await Category.getCategoryTree();
+    const categories = await prisma.category.findMany({
+      orderBy: [{ order: 'asc' }, { name: 'asc' }]
+    });
+
+    const buildTree = (cats, parentId = null) => {
+      return cats
+        .filter(c => c.parentId === parentId)
+        .map(c => ({
+          ...c,
+          children: buildTree(cats, c.id)
+        }));
+    };
+
+    const tree = buildTree(categories);
 
     res.json({
       success: true,
@@ -54,12 +68,12 @@ export const getCategoryByIdOrSlug = async (req, res, next) => {
   try {
     const { identifier } = req.params;
 
-    // Check if identifier is a valid ObjectId
-    const isObjectId = identifier.match(/^[0-9a-fA-F]{24}$/);
+    const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(identifier);
 
-    const category = isObjectId
-      ? await Category.findById(identifier).populate("parent", "name slug")
-      : await Category.findOne({ slug: identifier }).populate("parent", "name slug");
+    const category = await prisma.category.findFirst({
+      where: isUUID ? { id: identifier } : { slug: identifier },
+      include: { parent: { select: { id: true, name: true, slug: true } } }
+    });
 
     if (!category) {
       const error = new Error("Category not found");
@@ -67,18 +81,29 @@ export const getCategoryByIdOrSlug = async (req, res, next) => {
       return next(error);
     }
 
-    // Get path (breadcrumb)
-    const path = await category.getPath();
+    // Build breadcrumb path
+    const path = [];
+    let current = category;
+    while (current) {
+      path.unshift({ _id: current.id, name: current.name, slug: current.slug });
+      if (current.parentId) {
+        current = await prisma.category.findUnique({ where: { id: current.parentId } });
+      } else {
+        current = null;
+      }
+    }
 
     // Get direct children
-    const children = await Category.find({ parent: category._id, isActive: true })
-      .sort({ order: 1, name: 1 });
+    const children = await prisma.category.findMany({
+      where: { parentId: category.id, isActive: true },
+      orderBy: [{ order: 'asc' }, { name: 'asc' }]
+    });
 
     res.json({
       success: true,
       data: {
-        ...category.toObject(),
-        path: path.map(c => ({ _id: c._id, name: c.name, slug: c.slug })),
+        ...category,
+        path,
         children,
       },
     });
@@ -92,7 +117,9 @@ export const getCategoryByIdOrSlug = async (req, res, next) => {
  */
 export const createCategory = async (req, res, next) => {
   try {
-    const category = await Category.create(req.body);
+    const category = await prisma.category.create({
+      data: req.body
+    });
 
     res.status(201).json({
       success: true,
@@ -111,17 +138,10 @@ export const updateCategory = async (req, res, next) => {
   try {
     const { id } = req.params;
 
-    const category = await Category.findByIdAndUpdate(
-      id,
-      req.body,
-      { new: true, runValidators: true }
-    );
-
-    if (!category) {
-      const error = new Error("Category not found");
-      error.statusCode = 404;
-      return next(error);
-    }
+    const category = await prisma.category.update({
+      where: { id },
+      data: req.body
+    });
 
     res.json({
       success: true,
@@ -129,6 +149,11 @@ export const updateCategory = async (req, res, next) => {
       data: category,
     });
   } catch (error) {
+    if (error.code === 'P2025') {
+      const err = new Error("Category not found");
+      err.statusCode = 404;
+      return next(err);
+    }
     next(error);
   }
 };
@@ -140,7 +165,7 @@ export const deleteCategory = async (req, res, next) => {
   try {
     const { id } = req.params;
 
-    const category = await Category.findById(id);
+    const category = await prisma.category.findUnique({ where: { id } });
 
     if (!category) {
       const error = new Error("Category not found");
@@ -149,7 +174,7 @@ export const deleteCategory = async (req, res, next) => {
     }
 
     // Check if category has children
-    const childrenCount = await Category.countDocuments({ parent: id });
+    const childrenCount = await prisma.category.count({ where: { parentId: id } });
     if (childrenCount > 0) {
       const error = new Error(
         "Cannot delete category with subcategories. Delete subcategories first."
@@ -159,7 +184,10 @@ export const deleteCategory = async (req, res, next) => {
     }
 
     // Check if category has products
-    const productsCount = await Product.countDocuments({ categories: id });
+    const productsCount = await prisma.product.count({
+      where: { categories: { some: { id } } }
+    });
+    
     if (productsCount > 0) {
       const error = new Error(
         `Cannot delete category. It has ${productsCount} product(s) assigned.`
@@ -168,7 +196,7 @@ export const deleteCategory = async (req, res, next) => {
       return next(error);
     }
 
-    await category.deleteOne();
+    await prisma.category.delete({ where: { id } });
 
     res.json({
       success: true,
@@ -187,11 +215,11 @@ export const getProductsByCategory = async (req, res, next) => {
     const { identifier } = req.params;
     const { includeDescendants = "true" } = req.query;
 
-    // Find category
-    const isObjectId = identifier.match(/^[0-9a-fA-F]{24}$/);
-    const category = isObjectId
-      ? await Category.findById(identifier)
-      : await Category.findOne({ slug: identifier });
+    const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(identifier);
+
+    const category = await prisma.category.findFirst({
+      where: isUUID ? { id: identifier } : { slug: identifier }
+    });
 
     if (!category) {
       const error = new Error("Category not found");
@@ -199,21 +227,34 @@ export const getProductsByCategory = async (req, res, next) => {
       return next(error);
     }
 
-    let categoryIds = [category._id];
+    let categoryIds = [category.id];
 
-    // Include products from descendant categories
     if (includeDescendants === "true") {
-      const descendants = await Category.getDescendants(category._id);
-      categoryIds = [...categoryIds, ...descendants.map(d => d._id)];
+      const allCats = await prisma.category.findMany();
+      
+      const getDescendants = (cats, parentId) => {
+        let descendants = [];
+        const children = cats.filter(c => c.parentId === parentId);
+        for (const child of children) {
+          descendants.push(child.id);
+          descendants = descendants.concat(getDescendants(cats, child.id));
+        }
+        return descendants;
+      };
+
+      const descendantIds = getDescendants(allCats, category.id);
+      categoryIds = [...categoryIds, ...descendantIds];
     }
 
-    const products = await Product.find({
-      categories: { $in: categoryIds },
-      visibility: "public",
-      approvalStatus: "approved"
-    })
-      .populate("categories", "name slug")
-      .sort({ featured: -1, createdAt: -1 });
+    const products = await prisma.product.findMany({
+      where: {
+        categories: { some: { id: { in: categoryIds } } },
+        visibility: "public",
+        approvalStatus: "approved"
+      },
+      include: { categories: { select: { id: true, name: true, slug: true } } },
+      orderBy: [{ featured: 'desc' }, { createdAt: 'desc' }]
+    });
 
     res.json({
       success: true,
@@ -238,9 +279,11 @@ export const reorderCategories = async (req, res, next) => {
       return next(error);
     }
 
-    // Update each category's order
     const updatePromises = categoryOrders.map(({ id, order }) =>
-      Category.findByIdAndUpdate(id, { order }, { new: true })
+      prisma.category.update({
+        where: { id },
+        data: { order }
+      })
     );
 
     await Promise.all(updatePromises);

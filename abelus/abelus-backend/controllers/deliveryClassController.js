@@ -1,26 +1,34 @@
-import ShippingClass from "../models/ShippingClass.js";
+import prisma from "../prisma.js";
 import slugify from "slugify";
 
-// Get all delivery classes
+/**
+ * 🚚 Get all delivery classes
+ */
 export const getDeliveryClasses = async (req, res, next) => {
     try {
-        const classes = await ShippingClass.find().sort({ name: 1 });
+        const classes = await prisma.shippingClass.findMany({
+            orderBy: { name: 'asc' }
+        });
         res.json({ success: true, data: classes });
     } catch (error) {
         next(error);
     }
 };
 
-// Create delivery class
+/**
+ * 🚚 Create delivery class
+ */
 export const createDeliveryClass = async (req, res, next) => {
     try {
         const { name, description } = req.body;
         const slug = slugify(name, { lower: true, strict: true });
 
-        const shippingClass = await ShippingClass.create({
-            name,
-            slug,
-            description,
+        const shippingClass = await prisma.shippingClass.create({
+            data: {
+                name,
+                slug,
+                description,
+            }
         });
 
         res.status(201).json({ success: true, data: shippingClass });
@@ -29,7 +37,9 @@ export const createDeliveryClass = async (req, res, next) => {
     }
 };
 
-// Update delivery class
+/**
+ * 🚚 Update delivery class
+ */
 export const updateDeliveryClass = async (req, res, next) => {
     try {
         const { name, description } = req.body;
@@ -39,37 +49,38 @@ export const updateDeliveryClass = async (req, res, next) => {
             updateData.slug = slugify(name, { lower: true, strict: true });
         }
 
-        const shippingClass = await ShippingClass.findByIdAndUpdate(
-            req.params.id,
-            updateData,
-            { new: true, runValidators: true }
-        );
-
-        if (!shippingClass) {
-            const error = new Error("Delivery Class not found");
-            error.statusCode = 404;
-            throw error;
-        }
+        const shippingClass = await prisma.shippingClass.update({
+            where: { id: req.params.id },
+            data: updateData
+        });
 
         res.json({ success: true, data: shippingClass });
     } catch (error) {
+        if (error.code === 'P2025') {
+            const err = new Error("Delivery Class not found");
+            err.statusCode = 404;
+            return next(err);
+        }
         next(error);
     }
 };
 
-// Delete delivery class
+/**
+ * 🚚 Delete delivery class
+ */
 export const deleteDeliveryClass = async (req, res, next) => {
     try {
-        const shippingClass = await ShippingClass.findByIdAndDelete(req.params.id);
-
-        if (!shippingClass) {
-            const error = new Error("Shipping Class not found");
-            error.statusCode = 404;
-            throw error;
-        }
+        await prisma.shippingClass.delete({
+            where: { id: req.params.id }
+        });
 
         res.json({ success: true, message: "Shipping Class deleted" });
     } catch (error) {
+        if (error.code === 'P2025') {
+            const err = new Error("Shipping Class not found");
+            err.statusCode = 404;
+            return next(err);
+        }
         next(error);
     }
 };

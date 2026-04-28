@@ -1,62 +1,47 @@
-import Order from "../models/Order.js";
-import Product from "../models/Product.js";
-import FlashSale from "../models/FlashSale.js";
-import Category from "../models/Category.js";
-import mongoose from "mongoose";
+import prisma from "../prisma.js";
 import Fuse from "fuse.js";
 import { notifyProductAdded, notifyProductDeleted } from "./notificationController.js";
-import User from "../models/User.js";
-
-
 
 /**
  * Smart Recommendation Engine
- * Uses Collaborative Filtering (Co-occurrence) to recommend products.
- * Context: 'productId' (Item-based) or 'userId' (User-based)
  */
 export const getProductRecommendations = async (req, res) => {
   try {
     const { productId } = req.query;
     const userId = req.user?.id;
 
-    // 1. Determine Base Context
     let baseProductIds = [];
     if (productId) {
       baseProductIds = [productId];
     } else if (userId) {
-      // User-based: Find last purchased items
-      const lastOrder = await Order.findOne({ customer: userId }).sort({ createdAt: -1 });
+      const lastOrder = await prisma.order.findFirst({
+        where: { customerId: userId },
+        orderBy: { createdAt: 'desc' },
+        include: { items: true }
+      });
       if (lastOrder && lastOrder.items) {
-        baseProductIds = lastOrder.items.map(i => i.product.toString());
+        baseProductIds = lastOrder.items.map(i => i.productId);
       }
     }
 
-    // 2. Fetch Orders for Co-occurrence Analysis
-    // Optimization: Analyze last 1000 delivered orders to find patterns
-    // (In production, this should be pre-calculated via cron job)
-    const orders = await Order.find({ status: "delivered" })
-      .sort({ createdAt: -1 })
-      .limit(1000)
-      .select("items.product");
+    const orders = await prisma.order.findMany({
+      where: { status: "delivered" },
+      orderBy: { createdAt: 'desc' },
+      take: 1000,
+      select: { items: { select: { productId: true } } }
+    });
 
     if (orders.length === 0) return res.json([]);
 
-    // 3. Build Matrices
-    const pairCounts = {};   // { "ProdA_ProdB": 5 }
-    const itemCounts = {};   // { "ProdA": 20 }
+    const pairCounts = {};
+    const itemCounts = {};
 
     orders.forEach(order => {
-      // Unique products in this order
-      const productsInOrder = [...new Set(order.items.map(i => i.product.toString()))];
-
+      const productsInOrder = [...new Set(order.items.map(i => i.productId))];
       productsInOrder.forEach(p1 => {
         itemCounts[p1] = (itemCounts[p1] || 0) + 1;
-
         productsInOrder.forEach(p2 => {
           if (p1 !== p2) {
-            // Sort to ensure "A_B" is same as "B_A" if undirected, 
-            // BUT for recommendations "Bought A -> Buy B", direction matters if we want "Next Best Action".
-            // Here we assume symmetric relation "Frequently Bought Together".
             const key = `${p1}_${p2}`;
             pairCounts[key] = (pairCounts[key] || 0) + 1;
           }
@@ -64,30 +49,17 @@ export const getProductRecommendations = async (req, res) => {
       });
     });
 
-    // 4. Score Candidates
     let candidates = [];
-
-    // Iterate all pairs
     for (const key in pairCounts) {
       const [pA, pB] = key.split("_");
-
-      // Filter: We only care if pA is in our baseProductIds
       if (baseProductIds.length > 0 && !baseProductIds.includes(pA)) continue;
 
-      // Confidence = P(B|A) = Count(A & B) / Count(A)
       const confidence = pairCounts[key] / (itemCounts[pA] || 1);
-
-      // Thresholds to reduce noise
       if (confidence > 0.15 && pairCounts[key] >= 2) {
-        candidates.push({
-          recommendedId: pB,
-          confidence,
-          support: pairCounts[key]
-        });
+        candidates.push({ recommendedId: pB, confidence, support: pairCounts[key] });
       }
     }
 
-    // Deduplicate candidates (pick max confidence if same product recommended by multiple base items)
     const uniqueCandidates = {};
     candidates.forEach(c => {
       if (!uniqueCandidates[c.recommendedId] || c.confidence > uniqueCandidates[c.recommendedId].confidence) {
@@ -95,64 +67,64 @@ export const getProductRecommendations = async (req, res) => {
       }
     });
 
-    // Sort by Confidence
     const sortedRecs = Object.values(uniqueCandidates)
       .sort((a, b) => b.confidence - a.confidence)
-      .slice(0, 8); // Top 8
+      .slice(0, 8);
 
-    if (sortedRecs.length === 0) {
-      // Fallback: Trending Products
-      // Logic handled by frontend calling /trending endpoint or we return empty
-      return res.json([]);
-    }
+    if (sortedRecs.length === 0) return res.json([]);
 
-    // 5. Hydrate Products
     const recommendedIds = sortedRecs.map(r => r.recommendedId);
-    const products = await Product.find({
-      _id: { $in: recommendedIds },
-      visibility: "public",
-      approvalStatus: "approved"
-    }).select("name price image slug averageRating seller").populate("seller", "storeName");
+    const products = await prisma.product.findMany({
+      where: {
+        id: { in: recommendedIds },
+        visibility: "public",
+        approvalStatus: "approved"
+      },
+      select: {
+        id: true, name: true, price: true, image: true, slug: true,
+        seller: { select: { id: true, storeName: true } }
+      }
+    });
 
-    // Merge score
     const result = products.map(p => {
-      const score = uniqueCandidates[p._id.toString()];
+      const score = uniqueCandidates[p.id];
       return {
-        ...p.toObject(),
+        ...p,
         recommendationScore: score.confidence,
         boughtTogetherCount: score.support
       };
     }).sort((a, b) => b.recommendationScore - a.recommendationScore);
 
     res.json(result);
-
   } catch (err) {
     console.error("Recommendation Error:", err);
     res.status(500).json({ message: "Failed to generate recommendations" });
   }
 };
 
-// Helper to attach flash sale info to products
 const attachFlashSaleInfo = async (products) => {
   const isArray = Array.isArray(products);
   const items = isArray ? products : [products];
   if (items.length === 0) return products;
 
   const now = new Date();
-  const activeSales = await FlashSale.find({
-    isActive: true,
-    startDate: { $lte: now },
-    endDate: { $gte: now }
+  const activeSales = await prisma.flashSale.findMany({
+    where: {
+      isActive: true,
+      startDate: { lte: now },
+      endDate: { gte: now }
+    },
+    include: { products: true }
   });
 
   const productSaleMap = new Map();
   activeSales.forEach(sale => {
     sale.products.forEach(sp => {
-      productSaleMap.set(sp.product.toString(), {
+      productSaleMap.set(sp.productId, {
         flashSalePrice: sp.flashSalePrice,
         stockLimit: sp.stockLimit,
         soldCount: sp.soldCount,
-        saleId: sale._id,
+        saleId: sale.id,
         saleName: sale.name,
         endDate: sale.endDate
       });
@@ -160,67 +132,79 @@ const attachFlashSaleInfo = async (products) => {
   });
 
   const results = items.map(p => {
-    // FIX: flattenMaps ensures attributes Map is converted to Object for JSON
-    const plain = p.toObject ? p.toObject({ flattenMaps: true }) : p;
-    const saleInfo = productSaleMap.get(plain._id.toString());
+    const saleInfo = productSaleMap.get(p.id);
     if (saleInfo) {
-      plain.flashSaleInfo = saleInfo;
+      return { ...p, flashSaleInfo: saleInfo };
     }
-    return plain;
+    return p;
   });
 
   return isArray ? results : results[0];
 };
 
-// Create product (seller only)
 export const createProduct = async (req, res) => {
   try {
     const body = { ...req.body };
+    const sellerId = req.user.id;
 
-    // Assign seller from authenticated user
-    body.seller = req.user.id;
-
-    // Auto-approve if created by admin
     if (req.user.role === 'admin') {
       body.approvalStatus = 'approved';
       body.visibility = 'public';
     }
 
-    // Parse JSON fields
-    ["customizationOptions", "tags", "attributes", "variations", "crossSells", "upSells"].forEach(field => {
+    ["customizationOptions", "tags"].forEach(field => {
       if (typeof body[field] === "string") {
         try { body[field] = JSON.parse(body[field]); } catch { body[field] = []; }
       }
     });
 
-    // Coerce booleans and numbers
+    // We skip variations, crossSells, upSells for simple create since they require nested connect/create logic in Prisma
+    // Will need dedicated endpoints or specific parsing to handle those cleanly.
+    delete body.variations;
+    delete body.crossSells;
+    delete body.upSells;
+    delete body.attributes;
+
     if (typeof body.customizable === "string") body.customizable = body.customizable === "true";
     if (typeof body.featured === "string") body.featured = body.featured === "true";
     if (typeof body.isDigital === "string") body.isDigital = body.isDigital === "true";
     if (typeof body.price === "string") body.price = Number(body.price);
     if (typeof body.stock === "string") body.stock = Number(body.stock);
 
-    // Handle File Uploads
     if (req.files && req.files.length > 0) {
       req.files.forEach(file => {
         if (file.fieldname === "image") {
           body.image = file.path;
-        } else if (file.fieldname.startsWith("variation_image_")) {
-          const index = parseInt(file.fieldname.split("_")[2]);
-          if (body.variations && body.variations[index]) {
-            body.variations[index].image = file.path;
-          }
         }
       });
     }
 
-    const product = new Product(body);
-    await product.save();
+    // Connect categories if provided
+    let categoryConnect = undefined;
+    if (body.categories) {
+      const catArray = typeof body.categories === 'string' ? JSON.parse(body.categories) : body.categories;
+      if (Array.isArray(catArray)) {
+        categoryConnect = { connect: catArray.map(id => ({ id })) };
+      }
+      delete body.categories;
+    }
 
-    // 🔔 Notify Admin
+    // Ensure slug is unique or fallback
+    if (!body.slug) {
+        body.slug = body.name.toLowerCase().replace(/[^a-z0-9]+/g, '-') + '-' + Date.now();
+    }
+
+    const product = await prisma.product.create({
+      data: {
+        ...body,
+        sellerId,
+        ...(categoryConnect && { categories: categoryConnect })
+      }
+    });
+
     try {
       if (req.user.role === 'seller') {
-        const user = await User.findById(req.user.id).select('name');
+        const user = await prisma.user.findUnique({ where: { id: req.user.id }, select: { name: true } });
         notifyProductAdded(user?.name || "Seller", product.name);
       }
     } catch (e) { console.error("Notification failed", e); }
@@ -231,70 +215,53 @@ export const createProduct = async (req, res) => {
   }
 };
 
-// Get seller's own products
 export const getSellerProducts = async (req, res) => {
   try {
-    // Only fetch products belonging to the logged-in seller
-    const products = await Product.find({ seller: req.user.id })
-      .populate("seller", "name storeName")
-      .sort({ createdAt: -1 });
-
-    // Using a common response structure
+    const products = await prisma.product.findMany({
+      where: { sellerId: req.user.id },
+      include: { seller: { select: { id: true, name: true, storeName: true } } },
+      orderBy: { createdAt: 'desc' }
+    });
     res.json({ success: true, data: products });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
   }
 };
 
-// Get all products (public)
 export const getAllProducts = async (req, res) => {
   try {
-    const q = {
+    const where = {
       visibility: "public",
       approvalStatus: "approved"
     };
-    if (typeof req.query.featured !== 'undefined') q.featured = req.query.featured === 'true';
-    if (req.query.tags) q.tags = { $in: req.query.tags.split(',') };
-    // Filter by seller (optional)
-    if (req.query.seller) q.seller = req.query.seller;
 
-    // Category
+    if (typeof req.query.featured !== 'undefined') where.featured = req.query.featured === 'true';
+    if (req.query.tags) where.tags = { hasSome: req.query.tags.split(',') };
+    if (req.query.seller) where.sellerId = req.query.seller;
+
     if (req.query.category) {
-      if (mongoose.Types.ObjectId.isValid(req.query.category)) {
-        // It's an ID
-        // 1. Try to find products linked relationally
-        // 2. Also try to find products with the matching Category Name string
-        const category = await Category.findById(req.query.category);
-        if (category) {
-          q.$or = [
-            { categories: req.query.category },
-            { category: category.name },
-            // Handle case where category field might store the ID as string
-            { category: req.query.category }
-          ];
-        } else {
-          q.categories = req.query.category;
-        }
-      } else {
-        // It's a string name
-        q.category = req.query.category;
-      }
+      where.OR = [
+        { categories: { some: { id: req.query.category } } },
+        { categories: { some: { name: req.query.category } } }
+      ];
     }
 
-    // Price Range
     if (req.query.minPrice || req.query.maxPrice) {
-      q.price = {};
-      if (req.query.minPrice) q.price.$gte = Number(req.query.minPrice);
-      if (req.query.maxPrice) q.price.$lte = Number(req.query.maxPrice);
+      where.price = {};
+      if (req.query.minPrice) where.price.gte = Number(req.query.minPrice);
+      if (req.query.maxPrice) where.price.lte = Number(req.query.maxPrice);
     }
 
-    let products = await Product.find(q).populate("seller", "name storeName");
+    let products = await prisma.product.findMany({
+      where,
+      include: { seller: { select: { id: true, name: true, storeName: true } } },
+      take: 200 // Prevent massive loads before fuse search
+    });
 
-    // Fuzzy Search with Fuse.js if search query is present
     if (req.query.search) {
       const fuse = new Fuse(products, {
         keys: ["name", "description", "tags"],
-        threshold: 0.4, // Adjust for fuzziness (0.0 exact, 1.0 matches anything)
+        threshold: 0.4,
         includeScore: true
       });
       const results = fuse.search(req.query.search);
@@ -304,11 +271,7 @@ export const getAllProducts = async (req, res) => {
     const limit = Math.min(parseInt(req.query.limit) || 0, 100) || undefined;
     const sort = req.query.sort || undefined;
 
-    // Apply sorting
     if (sort && !req.query.search) {
-      // If we have a search, Fuse.js already sorted by relevance. 
-      // Only sort if no search OR if explicit sort is requested (user preference over relevance)
-      // For now, let's allow explicit sort to override relevance if requested.
       if (sort === "price-asc") products.sort((a, b) => a.price - b.price);
       else if (sort === "price-desc") products.sort((a, b) => b.price - a.price);
       else if (sort === "newest") products.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
@@ -323,19 +286,19 @@ export const getAllProducts = async (req, res) => {
   }
 };
 
-// Search suggestions (fuzzy)
 export const getSuggestions = async (req, res) => {
   try {
     const { q } = req.query;
     if (!q) return res.json([]);
 
-    // Get only approved/active products for suggestions
-    const products = await Product.find({
-      visibility: 'public',
-      approvalStatus: 'approved'
-    })
-      .select("name price image _id")
-      .limit(100); // Fetch a reasonable amount for fuse to search locally
+    const products = await prisma.product.findMany({
+      where: {
+        visibility: 'public',
+        approvalStatus: 'approved'
+      },
+      select: { id: true, name: true, price: true, image: true },
+      take: 100
+    });
 
     const fuse = new Fuse(products, {
       keys: ["name"],
@@ -354,15 +317,17 @@ export const getSuggestions = async (req, res) => {
 
 export const getFeaturedProducts = async (req, res) => {
   try {
-    const limit = Math.min(parseInt(req.query.limit) || 8, 50);
-    const products = await Product.find({
-      featured: true,
-      visibility: "public",
-      approvalStatus: "approved"
-    })
-      .populate("seller", "name storeName")
-      .sort({ createdAt: -1 })
-      .limit(limit);
+    const take = Math.min(parseInt(req.query.limit) || 8, 50);
+    const products = await prisma.product.findMany({
+      where: {
+        featured: true,
+        visibility: "public",
+        approvalStatus: "approved"
+      },
+      include: { seller: { select: { id: true, name: true, storeName: true } } },
+      orderBy: { createdAt: 'desc' },
+      take
+    });
 
     const enriched = await attachFlashSaleInfo(products);
     res.json(enriched);
@@ -375,11 +340,14 @@ export const getProductsByIds = async (req, res) => {
   try {
     const ids = (req.query.ids || '').split(',').filter(Boolean);
     if (!ids.length) return res.json([]);
-    const products = await Product.find({
-      _id: { $in: ids },
-      visibility: "public",
-      approvalStatus: "approved"
-    }).populate("seller", "name storeName");
+    const products = await prisma.product.findMany({
+      where: {
+        id: { in: ids },
+        visibility: "public",
+        approvalStatus: "approved"
+      },
+      include: { seller: { select: { id: true, name: true, storeName: true } } }
+    });
 
     const enriched = await attachFlashSaleInfo(products);
     res.json(enriched);
@@ -392,65 +360,66 @@ export const getTrendingProducts = async (req, res) => {
   try {
     const days = Math.min(parseInt(req.query.days) || 30, 180);
     const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
-    const Order = (await import('../models/Order.js')).default;
-    const top = await Order.aggregate([
-      { $match: { createdAt: { $gte: since } } },
-      { $group: { _id: "$product", count: { $sum: 1 } } },
-      { $sort: { count: -1 } },
-      { $limit: Math.min(parseInt(req.query.limit) || 8, 50) },
-    ]);
-    const ids = top.map(t => t._id).filter(Boolean);
-    const products = await Product.find({
-      _id: { $in: ids },
-      visibility: "public",
-      approvalStatus: "approved"
-    }).populate("seller", "name storeName");
-    // maintain ranking order
-    const map = new Map(products.map(p => [String(p._id), p]));
-    const ordered = ids.map(id => map.get(String(id))).filter(Boolean);
+    
+    // Prisma aggregation alternative for popular items
+    const topItems = await prisma.orderItem.groupBy({
+      by: ['productId'],
+      where: {
+        order: { createdAt: { gte: since } }
+      },
+      _count: { productId: true },
+      orderBy: { _count: { productId: 'desc' } },
+      take: Math.min(parseInt(req.query.limit) || 8, 50)
+    });
 
-    if (ordered.length === 0) {
-      const fallback = await Product.find({
-        featured: true,
+    const ids = topItems.map(t => t.productId).filter(Boolean);
+    
+    let products = await prisma.product.findMany({
+      where: {
+        id: { in: ids },
         visibility: "public",
         approvalStatus: "approved"
-      })
-        .populate("seller", "name storeName")
-        .limit(5);
-      if (fallback.length > 0) {
-        const enriched = await attachFlashSaleInfo(fallback);
-        return res.json(enriched);
-      }
+      },
+      include: { seller: { select: { id: true, name: true, storeName: true } } }
+    });
 
-      const latest = await Product.find({
-        visibility: "public",
-        approvalStatus: "approved"
-      })
-        .populate("seller", "name storeName")
-        .sort({ createdAt: -1 })
-        .limit(5);
-      const enriched = await attachFlashSaleInfo(latest);
-      return res.json(enriched);
+    if (products.length === 0) {
+      const fallback = await prisma.product.findMany({
+        where: { featured: true, visibility: "public", approvalStatus: "approved" },
+        include: { seller: { select: { id: true, name: true, storeName: true } } },
+        take: 5
+      });
+      if (fallback.length > 0) return res.json(await attachFlashSaleInfo(fallback));
+
+      const latest = await prisma.product.findMany({
+        where: { visibility: "public", approvalStatus: "approved" },
+        include: { seller: { select: { id: true, name: true, storeName: true } } },
+        orderBy: { createdAt: 'desc' },
+        take: 5
+      });
+      return res.json(await attachFlashSaleInfo(latest));
     }
 
-    const enriched = await attachFlashSaleInfo(ordered);
+    const enriched = await attachFlashSaleInfo(products);
     res.json(enriched);
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
 };
 
-// Get single product
 export const getProductById = async (req, res) => {
   try {
-    const product = await Product.findById(req.params.id)
-      .populate("crossSells", "name price image slug")
-      .populate("upSells", "name price image slug")
-      .populate("seller", "name storeName storeDescription storeLogo sellerStatus");
+    const product = await prisma.product.findUnique({
+      where: { id: req.params.id },
+      include: {
+        seller: { select: { id: true, name: true, storeName: true, storeDescription: true, storeLogo: true, sellerStatus: true } },
+        categories: true,
+        variations: true
+      }
+    });
 
     if (!product) return res.status(404).json({ message: "Product not found" });
 
-    // Attach sale info
     const enriched = await attachFlashSaleInfo(product);
     res.json(enriched);
   } catch (err) {
@@ -460,46 +429,57 @@ export const getProductById = async (req, res) => {
 
 export const updateProduct = async (req, res) => {
   try {
-    const product = await Product.findById(req.params.id);
-    if (!product) return res.status(404).json({ message: "Product not found" });
+    const existing = await prisma.product.findUnique({ where: { id: req.params.id } });
+    if (!existing) return res.status(404).json({ message: "Product not found" });
 
-    // Enforce ownership
-    if (req.user.role !== 'admin' && product.seller.toString() !== req.user.id) {
+    if (req.user.role !== 'admin' && existing.sellerId !== req.user.id) {
       return res.status(403).json({ message: "Access denied: You do not own this product" });
     }
 
     const body = { ...req.body };
 
-    // Parse JSON fields
-    ["customizationOptions", "tags", "attributes", "variations", "crossSells", "upSells"].forEach(field => {
+    ["customizationOptions", "tags"].forEach(field => {
       if (typeof body[field] === "string") {
         try { body[field] = JSON.parse(body[field]); } catch { body[field] = []; }
       }
     });
 
-    // Coerce booleans and numbers
+    delete body.variations;
+    delete body.crossSells;
+    delete body.upSells;
+    delete body.attributes;
+
     if (typeof body.customizable === "string") body.customizable = body.customizable === "true";
     if (typeof body.featured === "string") body.featured = body.featured === "true";
     if (typeof body.isDigital === "string") body.isDigital = body.isDigital === "true";
     if (typeof body.price === "string") body.price = Number(body.price);
     if (typeof body.stock === "string") body.stock = Number(body.stock);
 
-    // Handle File Uploads
     if (req.files && req.files.length > 0) {
       req.files.forEach(file => {
         if (file.fieldname === "image") {
           body.image = file.path;
-        } else if (file.fieldname.startsWith("variation_image_")) {
-          const index = parseInt(file.fieldname.split("_")[2]);
-          if (body.variations && body.variations[index]) {
-            body.variations[index].image = file.path;
-          }
         }
       });
     }
 
-    Object.assign(product, body);
-    await product.save();
+    let categoryConnect = undefined;
+    if (body.categories) {
+      const catArray = typeof body.categories === 'string' ? JSON.parse(body.categories) : body.categories;
+      if (Array.isArray(catArray)) {
+        categoryConnect = { set: catArray.map(id => ({ id })) };
+      }
+      delete body.categories;
+    }
+
+    const product = await prisma.product.update({
+      where: { id: req.params.id },
+      data: {
+        ...body,
+        ...(categoryConnect && { categories: categoryConnect })
+      }
+    });
+
     res.json(product);
   } catch (err) {
     console.error("Update Product Error:", err);
@@ -507,27 +487,21 @@ export const updateProduct = async (req, res) => {
   }
 };
 
-// Delete product (seller/admin only)
 export const deleteProduct = async (req, res) => {
   try {
-    const product = await Product.findById(req.params.id);
-    if (!product) return res.status(404).json({ message: "Product not found" });
+    const existing = await prisma.product.findUnique({ where: { id: req.params.id } });
+    if (!existing) return res.status(404).json({ message: "Product not found" });
 
-    // Enforce ownership
-    if (req.user.role !== 'admin' && product.seller.toString() !== req.user.id) {
+    if (req.user.role !== 'admin' && existing.sellerId !== req.user.id) {
       return res.status(403).json({ message: "Access denied: You do not own this product" });
     }
 
-    // Capture details before deletion
-    const productName = product.name;
+    await prisma.product.delete({ where: { id: req.params.id } });
 
-    await product.deleteOne();
-
-    // 🔔 Notify Admin if deleted by Seller
     try {
       if (req.user.role === 'seller') {
-        const user = await User.findById(req.user.id).select('name');
-        notifyProductDeleted(user?.name || "Seller", productName);
+        const user = await prisma.user.findUnique({ where: { id: req.user.id }, select: { name: true } });
+        notifyProductDeleted(user?.name || "Seller", existing.name);
       }
     } catch (e) { }
 
@@ -537,28 +511,30 @@ export const deleteProduct = async (req, res) => {
   }
 };
 
-
-// Get related products (same category or seller)
 export const getRelatedProducts = async (req, res) => {
   try {
-    const product = await Product.findById(req.params.id);
+    const product = await prisma.product.findUnique({ 
+      where: { id: req.params.id },
+      include: { categories: true }
+    });
+    
     if (!product) return res.status(404).json({ message: "Product not found" });
 
-    const related = await Product.find({
-      $and: [
-        { _id: { $ne: product._id } },
-        { visibility: "public" },
-        { approvalStatus: "approved" },
-        {
-          $or: [
-            { category: product.category },
-            { seller: product.seller }
-          ]
-        }
-      ]
-    })
-      .limit(4)
-      .populate("seller", "name storeName");
+    const categoryIds = product.categories.map(c => c.id);
+
+    const related = await prisma.product.findMany({
+      where: {
+        id: { not: product.id },
+        visibility: "public",
+        approvalStatus: "approved",
+        OR: [
+          { categories: { some: { id: { in: categoryIds } } } },
+          { sellerId: product.sellerId }
+        ]
+      },
+      take: 4,
+      include: { seller: { select: { id: true, name: true, storeName: true } } }
+    });
 
     res.json(related);
   } catch (err) {

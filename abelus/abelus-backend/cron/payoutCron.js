@@ -1,18 +1,15 @@
 import cron from "node-cron";
-import Payout from "../models/Payout.js";
-import User from "../models/User.js";
-import Order from "../models/Order.js";
-import SiteSettings from "../models/SiteSettings.js";
+import prisma from "../prisma.js";
 
 /**
- * Process automated payouts for sellers
- * Runs based on configured schedule
+ * 💰 Process automated payouts for sellers
  */
 export const processAutomatedPayouts = async () => {
     console.log("[Payout Cron] Starting automated payout processing...");
 
     try {
-        const settings = await SiteSettings.getSettings();
+        const settingsRecord = await prisma.siteSettings.findUnique({ where: { key: 'general' } });
+        const settings = settingsRecord?.value || {};
         const { autoPayoutEnabled, minimumAmount, maxAutoPayoutAmount } = settings.payoutSettings || {};
         const commissionRate = settings.commissionRate || 10;
 
@@ -21,10 +18,8 @@ export const processAutomatedPayouts = async () => {
             return { success: true, message: "Auto payouts disabled", processed: 0 };
         }
 
-        // Get all active sellers
-        const activeSellers = await User.find({
-            role: "seller",
-            sellerStatus: "active"
+        const activeSellers = await prisma.user.findMany({
+            where: { role: "seller", sellerStatus: "active" }
         });
 
         console.log(`[Payout Cron] Processing ${activeSellers.length} active sellers...`);
@@ -35,112 +30,90 @@ export const processAutomatedPayouts = async () => {
 
         for (const seller of activeSellers) {
             try {
-                // Get seller's pending balance
-                const balance = await Payout.getSellerPendingBalance(seller._id);
+                // Get pending earnings for seller
+                const earnings = await prisma.sellerEarning.findMany({
+                    where: { sellerId: seller.id, status: { in: ['pending', 'confirmed'] } }
+                });
 
-                // Skip if below minimum
-                if (balance.balance < (minimumAmount || 10000)) {
+                const totalPending = earnings.reduce((sum, e) => sum + e.netAmount, 0);
+                const orderIds = [...new Set(earnings.map(e => e.orderId))];
+
+                if (totalPending < (minimumAmount || 10000)) {
                     skipped++;
                     continue;
                 }
 
-                // Calculate commission and net amount
-                const grossAmount = balance.balance;
-                const platformFee = Math.round(grossAmount * (commissionRate / 100));
-                const netAmount = grossAmount - platformFee;
-
-                // Check max auto payout limit
-                if (netAmount > (maxAutoPayoutAmount || 500000)) {
-                    console.log(`[Payout Cron] Seller ${seller._id} exceeds max auto payout. Requires manual review.`);
+                if (totalPending > (maxAutoPayoutAmount || 500000)) {
+                    console.log(`[Payout Cron] Seller ${seller.id} exceeds max auto payout. Requires manual review.`);
                     skipped++;
                     continue;
                 }
 
-                // Create payout record
-                const payout = new Payout({
-                    seller: seller._id,
-                    amount: netAmount,
-                    grossAmount: grossAmount,
-                    platformFee: platformFee,
-                    commissionRate: commissionRate,
-                    orders: balance.orderIds,
-                    orderCount: balance.orderCount,
-                    periodStart: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000), // Last 30 days
-                    periodEnd: new Date(),
-                    status: "pending",
-                    isAutomatic: true,
-                    paymentMethod: seller.storePhone ? "mobile_money" : "bank_transfer",
-                    paymentDetails: {
-                        mobileNumber: seller.storePhone,
-                        mobileOperator: "MTN" // Default, should be from seller profile
+                const payout = await prisma.payout.create({
+                    data: {
+                        payoutId: `PAY-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+                        sellerId: seller.id,
+                        amount: totalPending,
+                        grossAmount: earnings.reduce((sum, e) => sum + e.grossAmount, 0),
+                        platformFee: earnings.reduce((sum, e) => sum + (e.commissionAmount || 0), 0),
+                        commissionRate,
+                        orderIds,
+                        status: "pending",
+                        isAutomatic: true,
+                        paymentMethod: seller.storePhone ? "mobile_money" : "bank_transfer",
+                        paymentDetails: {
+                            mobileNumber: seller.storePhone,
+                            mobileOperator: "MTN"
+                        }
                     }
                 });
 
-                await payout.save();
-                processed++;
+                // Update earnings status to processing
+                await prisma.sellerEarning.updateMany({
+                    where: { id: { in: earnings.map(e => e.id) } },
+                    data: { status: 'processing' }
+                });
 
+                processed++;
                 results.push({
-                    sellerId: seller._id,
+                    sellerId: seller.id,
                     storeName: seller.storeName,
                     payoutId: payout.payoutId,
-                    amount: netAmount,
+                    amount: totalPending,
                     status: "created"
                 });
 
-                console.log(`[Payout Cron] Created payout ${payout.payoutId} for seller ${seller.storeName}: ${netAmount} RWF`);
+                console.log(`[Payout Cron] Created payout ${payout.payoutId} for seller ${seller.storeName}: ${totalPending} RWF`);
 
             } catch (err) {
-                console.error(`[Payout Cron] Error processing seller ${seller._id}:`, err.message);
-                results.push({
-                    sellerId: seller._id,
-                    error: err.message
-                });
+                console.error(`[Payout Cron] Error processing seller ${seller.id}:`, err.message);
+                results.push({ sellerId: seller.id, error: err.message });
             }
         }
 
         console.log(`[Payout Cron] Complete. Processed: ${processed}, Skipped: ${skipped}`);
-
-        return {
-            success: true,
-            processed,
-            skipped,
-            results
-        };
+        return { success: true, processed, skipped, results };
 
     } catch (error) {
         console.error("[Payout Cron] Fatal error:", error);
-        return {
-            success: false,
-            error: error.message
-        };
+        return { success: false, error: error.message };
     }
 };
 
-/**
- * Get cron schedule based on frequency setting
- */
 const getCronSchedule = (frequency) => {
     switch (frequency) {
-        case "daily":
-            return "0 6 * * *"; // Every day at 6 AM
-        case "weekly":
-            return "0 6 * * 1"; // Every Monday at 6 AM
-        case "biweekly":
-            return "0 6 1,15 * *"; // 1st and 15th of each month at 6 AM
-        case "monthly":
-            return "0 6 1 * *"; // 1st of each month at 6 AM
-        default:
-            return "0 6 * * 1"; // Default to weekly
+        case "daily": return "0 6 * * *";
+        case "weekly": return "0 6 * * 1";
+        case "biweekly": return "0 6 1,15 * *";
+        case "monthly": return "0 6 1 * *";
+        default: return "0 6 * * 1";
     }
 };
 
-/**
- * Initialize payout cron job
- * Call this from your main server file
- */
 export const initPayoutCron = async () => {
     try {
-        const settings = await SiteSettings.getSettings();
+        const settingsRecord = await prisma.siteSettings.findUnique({ where: { key: 'general' } });
+        const settings = settingsRecord?.value || {};
         const frequency = settings.payoutSettings?.frequency || "weekly";
         const schedule = getCronSchedule(frequency);
 
@@ -159,61 +132,46 @@ export const initPayoutCron = async () => {
     }
 };
 
-/**
- * Manually trigger payout processing (for testing/admin use)
- */
 export const triggerManualPayout = async (sellerId = null) => {
     if (sellerId) {
-        // Process single seller
-        const seller = await User.findById(sellerId);
+        const seller = await prisma.user.findUnique({ where: { id: sellerId } });
         if (!seller || seller.role !== "seller") {
             return { success: false, message: "Seller not found" };
         }
 
-        const settings = await SiteSettings.getSettings();
-        const commissionRate = settings.commissionRate || 10;
-        const balance = await Payout.getSellerPendingBalance(sellerId);
-
-        if (balance.balance <= 0) {
-            return { success: false, message: "No pending balance" };
-        }
-
-        const grossAmount = balance.balance;
-        const platformFee = Math.round(grossAmount * (commissionRate / 100));
-        const netAmount = grossAmount - platformFee;
-
-        const payout = new Payout({
-            seller: sellerId,
-            amount: netAmount,
-            grossAmount: grossAmount,
-            platformFee: platformFee,
-            commissionRate: commissionRate,
-            orders: balance.orderIds,
-            orderCount: balance.orderCount,
-            periodStart: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000),
-            periodEnd: new Date(),
-            status: "pending",
-            isAutomatic: false,
-            paymentMethod: seller.storePhone ? "mobile_money" : "bank_transfer",
-            paymentDetails: {
-                mobileNumber: seller.storePhone
-            }
+        const earnings = await prisma.sellerEarning.findMany({
+            where: { sellerId, status: { in: ['pending', 'confirmed'] } }
         });
 
-        await payout.save();
+        if (earnings.length === 0) return { success: false, message: "No pending balance" };
+
+        const totalPending = earnings.reduce((sum, e) => sum + e.netAmount, 0);
+        const orderIds = [...new Set(earnings.map(e => e.orderId))];
+
+        const payout = await prisma.payout.create({
+            data: {
+                payoutId: `PAY-MAN-${Date.now()}`,
+                sellerId,
+                amount: totalPending,
+                grossAmount: earnings.reduce((sum, e) => sum + e.grossAmount, 0),
+                platformFee: earnings.reduce((sum, e) => sum + (e.commissionAmount || 0), 0),
+                orderIds,
+                status: "pending",
+                isAutomatic: false,
+                paymentMethod: seller.storePhone ? "mobile_money" : "bank_transfer",
+                paymentDetails: { mobileNumber: seller.storePhone }
+            }
+        });
 
         return {
             success: true,
             payout: {
                 payoutId: payout.payoutId,
-                amount: netAmount,
-                grossAmount,
-                platformFee
+                amount: totalPending
             }
         };
     }
 
-    // Process all sellers
     return await processAutomatedPayouts();
 };
 

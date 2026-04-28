@@ -1,11 +1,13 @@
-import BrandPartner from "../models/BrandPartner.js";
+import prisma from "../prisma.js";
 
 /**
- * Get all brand partners (admin)
+ * 🤝 Get all brand partners (admin)
  */
 export const getAllBrandPartners = async (req, res, next) => {
     try {
-        const partners = await BrandPartner.find().sort({ order: 1, createdAt: -1 });
+        const partners = await prisma.brandPartner.findMany({
+            orderBy: [{ order: 'asc' }, { createdAt: 'desc' }]
+        });
 
         res.json({
             success: true,
@@ -18,11 +20,14 @@ export const getAllBrandPartners = async (req, res, next) => {
 };
 
 /**
- * Get active brand partners for public display
+ * 🤝 Get active brand partners for public display
  */
 export const getActiveBrandPartners = async (req, res, next) => {
     try {
-        const partners = await BrandPartner.getActivePartners();
+        const partners = await prisma.brandPartner.findMany({
+            where: { isActive: true },
+            orderBy: { order: 'asc' }
+        });
 
         res.json({
             success: true,
@@ -35,12 +40,14 @@ export const getActiveBrandPartners = async (req, res, next) => {
 };
 
 /**
- * Get single brand partner by ID
+ * 🤝 Get single brand partner by ID
  */
 export const getBrandPartnerById = async (req, res, next) => {
     try {
         const { id } = req.params;
-        const partner = await BrandPartner.findById(id);
+        const partner = await prisma.brandPartner.findUnique({
+            where: { id }
+        });
 
         if (!partner) {
             const error = new Error("Brand partner not found");
@@ -58,7 +65,7 @@ export const getBrandPartnerById = async (req, res, next) => {
 };
 
 /**
- * Create new brand partner
+ * 🤝 Create new brand partner
  */
 export const createBrandPartner = async (req, res, next) => {
     try {
@@ -69,12 +76,14 @@ export const createBrandPartner = async (req, res, next) => {
             logo = req.file.path;
         }
 
-        const partner = await BrandPartner.create({
-            name,
-            logo: logo || null,
-            websiteUrl: websiteUrl || null,
-            isActive: isActive !== "false", // FormData sends boolean as string sometimes
-            order: order || 0
+        const partner = await prisma.brandPartner.create({
+            data: {
+                name,
+                logo: logo || "",
+                websiteUrl: websiteUrl || null,
+                isActive: isActive !== "false" && isActive !== false,
+                order: order ? parseInt(order) : 0
+            }
         });
 
         res.status(201).json({
@@ -88,7 +97,7 @@ export const createBrandPartner = async (req, res, next) => {
 };
 
 /**
- * Update brand partner
+ * 🤝 Update brand partner
  */
 export const updateBrandPartner = async (req, res, next) => {
     try {
@@ -99,21 +108,17 @@ export const updateBrandPartner = async (req, res, next) => {
             updates.logo = req.file.path;
         }
 
-        // Handle boolean conversion from FormData
-        if (updates.isActive) {
+        if (updates.isActive !== undefined) {
             updates.isActive = updates.isActive === "true" || updates.isActive === true;
         }
-
-        const partner = await BrandPartner.findByIdAndUpdate(id, updates, {
-            new: true,
-            runValidators: true
-        });
-
-        if (!partner) {
-            const error = new Error("Brand partner not found");
-            error.statusCode = 404;
-            return next(error);
+        if (updates.order !== undefined) {
+            updates.order = parseInt(updates.order);
         }
+
+        const partner = await prisma.brandPartner.update({
+            where: { id },
+            data: updates
+        });
 
         res.json({
             success: true,
@@ -121,35 +126,41 @@ export const updateBrandPartner = async (req, res, next) => {
             data: partner
         });
     } catch (error) {
+        if (error.code === 'P2025') {
+            const err = new Error("Brand partner not found");
+            err.statusCode = 404;
+            return next(err);
+        }
         next(error);
     }
 };
 
 /**
- * Delete brand partner
+ * 🤝 Delete brand partner
  */
 export const deleteBrandPartner = async (req, res, next) => {
     try {
         const { id } = req.params;
-        const partner = await BrandPartner.findByIdAndDelete(id);
-
-        if (!partner) {
-            const error = new Error("Brand partner not found");
-            error.statusCode = 404;
-            return next(error);
-        }
+        await prisma.brandPartner.delete({
+            where: { id }
+        });
 
         res.json({
             success: true,
             message: "Brand partner deleted successfully"
         });
     } catch (error) {
+        if (error.code === 'P2025') {
+            const err = new Error("Brand partner not found");
+            err.statusCode = 404;
+            return next(err);
+        }
         next(error);
     }
 };
 
 /**
- * Reorder brand partners
+ * 🤝 Reorder brand partners
  */
 export const reorderBrandPartners = async (req, res, next) => {
     try {
@@ -162,7 +173,10 @@ export const reorderBrandPartners = async (req, res, next) => {
         }
 
         const updatePromises = partners.map(({ id, order }) =>
-            BrandPartner.findByIdAndUpdate(id, { order })
+            prisma.brandPartner.update({
+                where: { id },
+                data: { order }
+            })
         );
 
         await Promise.all(updatePromises);
@@ -177,21 +191,23 @@ export const reorderBrandPartners = async (req, res, next) => {
 };
 
 /**
- * Toggle brand partner active status
+ * 🤝 Toggle brand partner active status
  */
 export const toggleBrandPartnerStatus = async (req, res, next) => {
     try {
         const { id } = req.params;
-        const partner = await BrandPartner.findById(id);
+        const current = await prisma.brandPartner.findUnique({ where: { id } });
 
-        if (!partner) {
+        if (!current) {
             const error = new Error("Brand partner not found");
             error.statusCode = 404;
             return next(error);
         }
 
-        partner.isActive = !partner.isActive;
-        await partner.save();
+        const partner = await prisma.brandPartner.update({
+            where: { id },
+            data: { isActive: !current.isActive }
+        });
 
         res.json({
             success: true,

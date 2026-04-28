@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import Sidebar from "../components/Sidebar";
 import Topbar from "../components/Topbar";
 import api from "../utils/axiosInstance";
+import { supabase } from "../utils/supabaseClient";
 import { FaDownload, FaFileAlt, FaFilePdf, FaFileCsv, FaHistory, FaSearch } from "react-icons/fa";
 
 function AdminReports() {
@@ -52,7 +53,9 @@ function AdminReports() {
       if (format === "pdf") {
         const params = new URLSearchParams(paramsObj);
         const url = `${api.defaults.baseURL.replace(/\/$/, "")}/orders/report?${params.toString()}`;
-        const token = localStorage.getItem("authToken");
+        
+        const { data: { session } } = await supabase.auth.getSession();
+        const token = session?.access_token;
 
         const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
         if (!res.ok) {

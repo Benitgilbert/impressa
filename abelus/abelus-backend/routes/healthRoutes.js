@@ -1,5 +1,5 @@
 import express from "express";
-import mongoose from "mongoose";
+import prisma from "../prisma.js";
 import logger from "../config/logger.js";
 
 const router = express.Router();
@@ -40,7 +40,6 @@ router.get("/time", (req, res) => {
 /**
  * Readiness check endpoint
  * Returns 200 only if all critical services are available
- * Used by load balancers and orchestrators (Kubernetes, Docker Swarm)
  */
 router.get("/ready", async (req, res) => {
   const checks = {
@@ -50,17 +49,11 @@ router.get("/ready", async (req, res) => {
 
   let isReady = true;
 
-  // Check MongoDB connection
+  // Check Prisma connection
   try {
-    if (mongoose.connection.readyState === 1) {
-      checks.database = "ok";
-
-      // Ping database to ensure it's responsive
-      await mongoose.connection.db.admin().ping();
-    } else {
-      checks.database = "not connected";
-      isReady = false;
-    }
+    // Ping database using raw query
+    await prisma.$queryRaw`SELECT 1`;
+    checks.database = "ok";
   } catch (error) {
     checks.database = "error";
     checks.databaseError = error.message;
@@ -81,8 +74,6 @@ router.get("/ready", async (req, res) => {
 
 /**
  * Liveness check endpoint
- * Returns 200 if server process is alive (even if dependencies are down)
- * Used to detect if application is completely frozen
  */
 router.get("/live", (req, res) => {
   res.json({

@@ -1,5 +1,4 @@
-import FlashSale from "../models/FlashSale.js";
-import Product from "../models/Product.js";
+import prisma from "../prisma.js";
 import { notifyFlashSaleCreated } from "./notificationController.js";
 
 /**
@@ -14,25 +13,31 @@ export const getAllFlashSales = async (req, res, next) => {
             const now = new Date();
             query = {
                 isActive: true,
-                startDate: { $lte: now },
-                endDate: { $gte: now }
+                startDate: { lte: now },
+                endDate: { gte: now }
             };
         } else if (status === "upcoming") {
             const now = new Date();
             query = {
                 isActive: true,
-                startDate: { $gt: now }
+                startDate: { gt: now }
             };
         } else if (status === "ended") {
             const now = new Date();
             query = {
-                endDate: { $lt: now }
+                endDate: { lt: now }
             };
         }
 
-        const flashSales = await FlashSale.find(query)
-            .populate("products.product", "name price images")
-            .sort({ startDate: -1 });
+        const flashSales = await prisma.flashSale.findMany({
+            where: query,
+            include: {
+                products: {
+                    include: { product: { select: { name: true, price: true, images: true } } }
+                }
+            },
+            orderBy: { startDate: 'desc' }
+        });
 
         res.json({
             success: true,
@@ -50,43 +55,55 @@ export const getAllFlashSales = async (req, res, next) => {
 export const getActiveFlashSales = async (req, res, next) => {
     try {
         const now = new Date();
-        const flashSales = await FlashSale.find({
-            isActive: true,
-            startDate: { $lte: now },
-            endDate: { $gte: now }
-        }).populate({
-            path: "products.product",
-            match: { visibility: "public", approvalStatus: "approved" },
-            select: "name price compareAtPrice image images stock description averageRating"
+        const flashSales = await prisma.flashSale.findMany({
+            where: {
+                isActive: true,
+                startDate: { lte: now },
+                endDate: { gte: now }
+            },
+            include: {
+                products: {
+                    where: { product: { visibility: "public", approvalStatus: "approved" } },
+                    include: {
+                        product: {
+                            select: { id: true, name: true, price: true, image: true, images: true, stock: true, description: true }
+                        }
+                    }
+                }
+            }
         });
 
         // Format response with product details
-        const formattedSales = flashSales.map((sale) => ({
-            _id: sale._id,
-            name: sale.name,
-            description: sale.description,
-            startDate: sale.startDate,
-            endDate: sale.endDate,
-            bannerImage: sale.bannerImage,
-            bannerColor: sale.bannerColor,
-            timeRemaining: sale.timeRemaining,
-            products: sale.products.map((sp) => ({
-                _id: sp.product?._id,
-                name: sp.product?.name,
-                originalPrice: sp.product?.price,
-                flashSalePrice: sp.flashSalePrice,
-                discount: sp.product?.price
-                    ? Math.round(((sp.product.price - sp.flashSalePrice) / sp.product.price) * 100)
-                    : 0,
-                images: sp.product?.images,
-                image: sp.product?.image,
-                averageRating: sp.product?.averageRating,
-                stockLimit: sp.stockLimit,
-                soldCount: sp.soldCount,
-                remaining: sp.stockLimit ? sp.stockLimit - sp.soldCount : null,
-                isAvailable: sp.stockLimit === null || sp.soldCount < sp.stockLimit
-            })).filter(p => p._id) // Filter out products that may have been deleted
-        }));
+        const formattedSales = flashSales.map((sale) => {
+            // Calculate time remaining in ms to mimic Mongoose virtual
+            const timeRemaining = sale.endDate.getTime() - now.getTime();
+
+            return {
+                _id: sale.id,
+                name: sale.name,
+                description: sale.description,
+                startDate: sale.startDate,
+                endDate: sale.endDate,
+                bannerImage: sale.bannerImage,
+                bannerColor: sale.bannerColor,
+                timeRemaining: timeRemaining > 0 ? timeRemaining : 0,
+                products: sale.products.map((sp) => ({
+                    _id: sp.product?.id,
+                    name: sp.product?.name,
+                    originalPrice: sp.product?.price,
+                    flashSalePrice: sp.flashSalePrice,
+                    discount: sp.product?.price
+                        ? Math.round(((sp.product.price - sp.flashSalePrice) / sp.product.price) * 100)
+                        : 0,
+                    images: sp.product?.images,
+                    image: sp.product?.image,
+                    stockLimit: sp.stockLimit,
+                    soldCount: sp.soldCount,
+                    remaining: sp.stockLimit ? sp.stockLimit - sp.soldCount : null,
+                    isAvailable: sp.stockLimit === null || sp.soldCount < sp.stockLimit
+                })).filter(p => p._id) // Filter out products that may have been deleted
+            };
+        });
 
         res.json({
             success: true,
@@ -105,10 +122,18 @@ export const getFlashSaleById = async (req, res, next) => {
     try {
         const { id } = req.params;
 
-        const flashSale = await FlashSale.findById(id).populate({
-            path: "products.product",
-            match: { visibility: "public", approvalStatus: "approved" },
-            select: "name price compareAtPrice images stock"
+        const flashSale = await prisma.flashSale.findUnique({
+            where: { id },
+            include: {
+                products: {
+                    where: { product: { visibility: "public", approvalStatus: "approved" } },
+                    include: {
+                        product: {
+                            select: { name: true, price: true, images: true, stock: true }
+                        }
+                    }
+                }
+            }
         });
 
         if (!flashSale) {
@@ -145,24 +170,37 @@ export const createFlashSale = async (req, res, next) => {
         // Validate products exist
         if (products && products.length > 0) {
             const productIds = products.map((p) => p.product);
-            const existingProducts = await Product.find({ _id: { $in: productIds } });
+            const existingProducts = await prisma.product.count({
+                where: { id: { in: productIds } }
+            });
 
-            if (existingProducts.length !== productIds.length) {
+            if (existingProducts !== productIds.length) {
                 const error = new Error("One or more products not found");
                 error.statusCode = 400;
                 return next(error);
             }
         }
 
-        const flashSale = await FlashSale.create({
-            name,
-            description,
-            startDate: new Date(startDate),
-            endDate: new Date(endDate),
-            products: products || [],
-            bannerImage,
-            bannerColor,
-            isActive: isActive !== false
+        const flashSale = await prisma.flashSale.create({
+            data: {
+                name,
+                description,
+                startDate: new Date(startDate),
+                endDate: new Date(endDate),
+                bannerImage,
+                bannerColor,
+                isActive: isActive !== false,
+                ...(products && products.length > 0 && {
+                    products: {
+                        create: products.map(p => ({
+                            productId: p.product,
+                            flashSalePrice: p.flashSalePrice,
+                            stockLimit: p.stockLimit || null
+                        }))
+                    }
+                })
+            },
+            include: { products: true }
         });
 
         // 🔔 Notify Admin
@@ -170,8 +208,7 @@ export const createFlashSale = async (req, res, next) => {
             notifyFlashSaleCreated({
                 name: flashSale.name,
                 status: 'Created',
-                recipientId: req.user.id // Although internal, good for logging? Or notify OTHER admins? 
-                // Wait, notifyAdmins ignores recipientId and broadcasts.
+                recipientId: req.user.id
             });
         } catch (e) { }
 
@@ -191,25 +228,18 @@ export const createFlashSale = async (req, res, next) => {
 export const updateFlashSale = async (req, res, next) => {
     try {
         const { id } = req.params;
-        const updates = req.body;
+        const updates = { ...req.body };
 
-        if (updates.startDate) {
-            updates.startDate = new Date(updates.startDate);
-        }
-        if (updates.endDate) {
-            updates.endDate = new Date(updates.endDate);
-        }
+        if (updates.startDate) updates.startDate = new Date(updates.startDate);
+        if (updates.endDate) updates.endDate = new Date(updates.endDate);
 
-        const flashSale = await FlashSale.findByIdAndUpdate(id, updates, {
-            new: true,
-            runValidators: true
+        // Remove products from updates if passed, since it requires nested logic
+        delete updates.products;
+
+        const flashSale = await prisma.flashSale.update({
+            where: { id },
+            data: updates
         });
-
-        if (!flashSale) {
-            const error = new Error("Flash sale not found");
-            error.statusCode = 404;
-            return next(error);
-        }
 
         res.json({
             success: true,
@@ -217,6 +247,11 @@ export const updateFlashSale = async (req, res, next) => {
             data: flashSale
         });
     } catch (error) {
+        if (error.code === 'P2025') {
+            const err = new Error("Flash sale not found");
+            err.statusCode = 404;
+            return next(err);
+        }
         next(error);
     }
 };
@@ -228,19 +263,18 @@ export const deleteFlashSale = async (req, res, next) => {
     try {
         const { id } = req.params;
 
-        const flashSale = await FlashSale.findByIdAndDelete(id);
-
-        if (!flashSale) {
-            const error = new Error("Flash sale not found");
-            error.statusCode = 404;
-            return next(error);
-        }
+        await prisma.flashSale.delete({ where: { id } });
 
         res.json({
             success: true,
             message: "Flash sale deleted successfully"
         });
     } catch (error) {
+        if (error.code === 'P2025') {
+            const err = new Error("Flash sale not found");
+            err.statusCode = 404;
+            return next(err);
+        }
         next(error);
     }
 };
@@ -254,14 +288,14 @@ export const addProductToSale = async (req, res, next) => {
         const { productId, flashSalePrice, stockLimit } = req.body;
 
         // Validate product exists
-        const product = await Product.findById(productId);
+        const product = await prisma.product.findUnique({ where: { id: productId } });
         if (!product) {
             const error = new Error("Product not found");
             error.statusCode = 404;
             return next(error);
         }
 
-        const flashSale = await FlashSale.findById(id);
+        const flashSale = await prisma.flashSale.findUnique({ where: { id } });
         if (!flashSale) {
             const error = new Error("Flash sale not found");
             error.statusCode = 404;
@@ -269,28 +303,30 @@ export const addProductToSale = async (req, res, next) => {
         }
 
         // Check if product already in sale
-        const existingProduct = flashSale.products.find(
-            (p) => p.product.toString() === productId
-        );
+        const existingProduct = await prisma.flashSaleProduct.findFirst({
+            where: { flashSaleId: id, productId }
+        });
+
         if (existingProduct) {
             const error = new Error("Product already in this flash sale");
             error.statusCode = 400;
             return next(error);
         }
 
-        flashSale.products.push({
-            product: productId,
-            flashSalePrice,
-            stockLimit: stockLimit || null,
-            soldCount: 0
+        const flashSaleProduct = await prisma.flashSaleProduct.create({
+            data: {
+                flashSaleId: id,
+                productId,
+                flashSalePrice,
+                stockLimit: stockLimit || null,
+                soldCount: 0
+            }
         });
-
-        await flashSale.save();
 
         res.json({
             success: true,
             message: "Product added to flash sale",
-            data: flashSale
+            data: flashSaleProduct
         });
     } catch (error) {
         next(error);
@@ -304,23 +340,20 @@ export const removeProductFromSale = async (req, res, next) => {
     try {
         const { id, productId } = req.params;
 
-        const flashSale = await FlashSale.findById(id);
+        const flashSale = await prisma.flashSale.findUnique({ where: { id } });
         if (!flashSale) {
             const error = new Error("Flash sale not found");
             error.statusCode = 404;
             return next(error);
         }
 
-        flashSale.products = flashSale.products.filter(
-            (p) => p.product.toString() !== productId
-        );
-
-        await flashSale.save();
+        await prisma.flashSaleProduct.deleteMany({
+            where: { flashSaleId: id, productId }
+        });
 
         res.json({
             success: true,
-            message: "Product removed from flash sale",
-            data: flashSale
+            message: "Product removed from flash sale"
         });
     } catch (error) {
         next(error);
@@ -335,14 +368,19 @@ export const getFlashSalePriceForProduct = async (req, res, next) => {
         const { productId } = req.params;
         const now = new Date();
 
-        const flashSale = await FlashSale.findOne({
-            isActive: true,
-            startDate: { $lte: now },
-            endDate: { $gte: now },
-            "products.product": productId
+        const flashSale = await prisma.flashSale.findFirst({
+            where: {
+                isActive: true,
+                startDate: { lte: now },
+                endDate: { gte: now },
+                products: { some: { productId } }
+            },
+            include: {
+                products: { where: { productId } }
+            }
         });
 
-        if (!flashSale) {
+        if (!flashSale || !flashSale.products.length) {
             return res.json({
                 success: true,
                 inFlashSale: false,
@@ -350,15 +388,13 @@ export const getFlashSalePriceForProduct = async (req, res, next) => {
             });
         }
 
-        const saleProduct = flashSale.products.find(
-            (p) => p.product.toString() === productId
-        );
+        const saleProduct = flashSale.products[0];
 
         res.json({
             success: true,
             inFlashSale: true,
             data: {
-                flashSaleId: flashSale._id,
+                flashSaleId: flashSale.id,
                 flashSaleName: flashSale.name,
                 flashSalePrice: saleProduct.flashSalePrice,
                 stockLimit: saleProduct.stockLimit,

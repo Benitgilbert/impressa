@@ -1,55 +1,50 @@
-import Order from "../models/Order.js";
+import prisma from "../prisma.js";
 
+/**
+ * 📊 Get forecasted data based on monthly trends
+ */
 export const getForecastData = async () => {
   try {
-    const monthlyData = await Order.aggregate([
-      { $match: { status: "delivered" } },
-      {
-        $lookup: {
-          from: "products",
-          localField: "product",
-          foreignField: "_id",
-          as: "product"
+    const orders = await prisma.order.findMany({
+      where: { status: "delivered" },
+      select: { grandTotal: true, createdAt: true },
+      orderBy: { createdAt: 'asc' }
+    });
+
+    const monthlyStats = {};
+    orders.forEach(order => {
+        const monthKey = `${order.createdAt.getFullYear()}-${order.createdAt.getMonth() + 1}`;
+        if (!monthlyStats[monthKey]) monthlyStats[monthKey] = { revenue: 0, count: 0 };
+        monthlyStats[monthKey].revenue += order.grandTotal;
+        monthlyStats[monthKey].count += 1;
+    });
+
+    const dataPoints = Object.values(monthlyStats);
+    const revenues = dataPoints.map(d => d.revenue);
+    const counts = dataPoints.map(d => d.count);
+
+    const calcAverageGrowth = (arr) => {
+        const slice = arr.slice(-3);
+        if (slice.length < 2) return 0;
+        let totalGrowth = 0;
+        for (let i = 1; i < slice.length; i++) {
+            totalGrowth += (slice[i] - slice[i-1]);
         }
-      },
-      { $unwind: "$product" },
-      {
-        $group: {
-          _id: { $month: "$createdAt" },
-          revenue: { $sum: { $multiply: ["$product.price", "$quantity"] } },
-          orders: { $sum: "$quantity" }
-        }
-      },
-      { $sort: { "_id": 1 } }
-    ]);
+        return totalGrowth / (slice.length - 1);
+    };
 
-    const revenues = monthlyData.map((d) => d.revenue);
-    const orders = monthlyData.map((d) => d.orders);
+    const avgRevenueGrowth = calcAverageGrowth(revenues);
+    const avgOrderGrowth = calcAverageGrowth(counts);
 
-    const revenueGrowth = revenues.slice(-3).map((v, i, arr) =>
-      i === 0 ? 0 : v - arr[i - 1]
-    );
-    const orderGrowth = orders.slice(-3).map((v, i, arr) =>
-      i === 0 ? 0 : v - arr[i - 1]
-    );
-
-    const avgRevenueGrowth =
-      revenueGrowth.reduce((a, b) => a + b, 0) / revenueGrowth.length || 0;
-    const avgOrderGrowth =
-      orderGrowth.reduce((a, b) => a + b, 0) / orderGrowth.length || 0;
-
-    const projectedRevenue = revenues.at(-1) + avgRevenueGrowth;
-    const projectedOrders = orders.at(-1) + avgOrderGrowth;
+    const lastRevenue = revenues.at(-1) || 0;
+    const lastCount = counts.at(-1) || 0;
 
     return {
-      projectedRevenue: Math.round(projectedRevenue),
-      projectedOrders: Math.round(projectedOrders)
+      projectedRevenue: Math.round(lastRevenue + avgRevenueGrowth),
+      projectedOrders: Math.round(lastCount + avgOrderGrowth)
     };
   } catch (err) {
     console.error("Forecasting failed:", err);
-    return {
-      projectedRevenue: 0,
-      projectedOrders: 0
-    };
+    return { projectedRevenue: 0, projectedOrders: 0 };
   }
 };

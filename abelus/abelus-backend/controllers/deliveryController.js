@@ -1,133 +1,115 @@
-import ShippingZone from "../models/ShippingZone.js";
+import prisma from "../prisma.js";
 
-// Get all zones (Admin)
+/**
+ * 🗺️ Get all zones (Admin)
+ */
 export const getZones = async (req, res, next) => {
     try {
-        const zones = await ShippingZone.find().sort({ createdAt: -1 });
+        const zones = await prisma.shippingZone.findMany({
+            orderBy: { createdAt: 'desc' }
+        });
         res.json({ success: true, data: zones });
     } catch (error) {
         next(error);
     }
 };
 
-// Create zone (Admin)
+/**
+ * 🗺️ Create zone (Admin)
+ */
 export const createZone = async (req, res, next) => {
     try {
-        const zone = await ShippingZone.create(req.body);
+        const zone = await prisma.shippingZone.create({
+            data: req.body
+        });
         res.status(201).json({ success: true, data: zone });
     } catch (error) {
         next(error);
     }
 };
 
-// Update zone (Admin)
+/**
+ * 🗺️ Update zone (Admin)
+ */
 export const updateZone = async (req, res, next) => {
     try {
-        const zone = await ShippingZone.findByIdAndUpdate(req.params.id, req.body, { new: true });
-        if (!zone) {
-            const error = new Error("Zone not found");
-            error.statusCode = 404;
-            throw error;
-        }
+        const zone = await prisma.shippingZone.update({
+            where: { id: req.params.id },
+            data: req.body
+        });
         res.json({ success: true, data: zone });
     } catch (error) {
+        if (error.code === 'P2025') {
+            const err = new Error("Zone not found");
+            err.statusCode = 404;
+            return next(err);
+        }
         next(error);
     }
 };
 
-// Delete zone (Admin)
+/**
+ * 🗺️ Delete zone (Admin)
+ */
 export const deleteZone = async (req, res, next) => {
     try {
-        const zone = await ShippingZone.findByIdAndDelete(req.params.id);
-        if (!zone) {
-            const error = new Error("Zone not found");
-            error.statusCode = 404;
-            throw error;
-        }
+        await prisma.shippingZone.delete({
+            where: { id: req.params.id }
+        });
         res.json({ success: true, message: "Zone deleted" });
     } catch (error) {
+        if (error.code === 'P2025') {
+            const err = new Error("Zone not found");
+            err.statusCode = 404;
+            return next(err);
+        }
         next(error);
     }
 };
 
-// Calculate delivery methods for an address (Public)
+/**
+ * 🚚 Calculate delivery methods for an address (Public)
+ */
 export const calculateDelivery = async (req, res, next) => {
     try {
         const { province, district, sector, cell, total, items } = req.body;
 
         // 1. Find matching zone using cascading hierarchy
-        // Priority: Cell > Sector > District > Province > Default
+        // We fetch all active zones and find the match in memory for better JSON flexibility
+        const activeZones = await prisma.shippingZone.findMany({
+            where: { isActive: true }
+        });
+
         let matchedZone = null;
 
-        // Try to find most specific match first (all fields match)
+        // Helper to check region match
+        const checkMatch = (regions, p, d, s, c) => {
+            return regions.some(r => 
+                (p === (r.province || null)) && 
+                (d === (r.district || null)) && 
+                (s === (r.sector || null)) && 
+                (c === (r.cell || null))
+            );
+        };
+
+        // Priority: Full Match > Sector > District > Province > Default
         if (province && district && sector && cell) {
-            matchedZone = await ShippingZone.findOne({
-                isActive: true,
-                "regions": {
-                    $elemMatch: {
-                        province: province,
-                        district: district,
-                        sector: sector,
-                        cell: cell
-                    }
-                }
-            });
+            matchedZone = activeZones.find(z => checkMatch(z.regions, province, district, sector, cell));
         }
-
-        // Fallback to sector-level match (cell is wildcard)
         if (!matchedZone && province && district && sector) {
-            matchedZone = await ShippingZone.findOne({
-                isActive: true,
-                "regions": {
-                    $elemMatch: {
-                        province: province,
-                        district: district,
-                        sector: sector,
-                        cell: null
-                    }
-                }
-            });
+            matchedZone = activeZones.find(z => checkMatch(z.regions, province, district, sector, null));
         }
-
-        // Fallback to district-level match (sector and cell are wildcards)
         if (!matchedZone && province && district) {
-            matchedZone = await ShippingZone.findOne({
-                isActive: true,
-                "regions": {
-                    $elemMatch: {
-                        province: province,
-                        district: district,
-                        sector: null,
-                        cell: null
-                    }
-                }
-            });
+            matchedZone = activeZones.find(z => checkMatch(z.regions, province, district, null, null));
         }
-
-        // Fallback to province-level match (district, sector, cell are wildcards)
         if (!matchedZone && province) {
-            matchedZone = await ShippingZone.findOne({
-                isActive: true,
-                "regions": {
-                    $elemMatch: {
-                        province: province,
-                        district: null,
-                        sector: null,
-                        cell: null
-                    }
-                }
-            });
+            matchedZone = activeZones.find(z => checkMatch(z.regions, province, null, null, null));
+        }
+        if (!matchedZone) {
+            matchedZone = activeZones.find(z => z.name === "Default");
         }
 
-        // Final fallback to default zone
-        if (!matchedZone) {
-            matchedZone = await ShippingZone.findOne({
-                isActive: true,
-                name: "Default"
-            });
-        }
-
-        if (!matchedZone) {
+        if (!matchedZone || !matchedZone.methods) {
             return res.json({ success: true, data: [] });
         }
 
@@ -136,29 +118,31 @@ export const calculateDelivery = async (req, res, next) => {
             if (!method.isActive) return null;
 
             // Check free shipping threshold
-            if (method.type === "free_shipping" && total < method.minOrderAmount) return null;
+            if (method.type === "free_shipping" && total < (method.minOrderAmount || 0)) return null;
 
-            let finalCost = method.cost;
+            let finalCost = Number(method.cost || 0);
 
             // Add class costs per item
             if (items && items.length > 0) {
                 items.forEach(item => {
                     const shippingClassId = item.product?.shippingClass;
-                    if (shippingClassId && method.classCosts && method.classCosts.has(shippingClassId)) {
-                        const classCost = method.classCosts.get(shippingClassId);
-                        finalCost += (classCost * item.quantity);
+                    // In Prisma/JSON, classCosts is a plain object { classId: cost }
+                    if (shippingClassId && method.classCosts && method.classCosts[shippingClassId]) {
+                        const classCost = Number(method.classCosts[shippingClassId]);
+                        finalCost += (classCost * Number(item.quantity || 1));
                     }
                 });
             }
 
             return {
-                ...method.toObject(),
+                ...method,
                 cost: finalCost
             };
         }).filter(Boolean);
 
         res.json({ success: true, data: methods });
     } catch (error) {
+        console.error("Calculate delivery error:", error);
         next(error);
     }
 };

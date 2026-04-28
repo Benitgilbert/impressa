@@ -1,53 +1,57 @@
-import Review from "../models/Review.js";
+import prisma from "../prisma.js";
 
 /**
- * Get all reviews for admin (with filters)
+ * ⭐ Get all reviews for admin (with filters)
  */
 export const getAllReviews = async (req, res, next) => {
     try {
-        const { status, rating, reported, page = 1, limit = 20, search } = req.query;
+        const { status, rating, reported, page = 1, limit = 20 } = req.query;
 
-        const filter = {};
-        if (status && status !== 'all') filter.status = status;
-        if (rating) filter.rating = parseInt(rating);
-        if (reported === 'true') filter.reported = true;
+        const where = {};
+        if (status && status !== 'all') where.status = status;
+        if (rating) where.rating = parseInt(rating);
+        if (reported === 'true') where.reported = true;
 
-        const reviews = await Review.find(filter)
-            .populate('user', 'name email')
-            .populate('product', 'name image slug')
-            .populate('moderatedBy', 'name')
-            .sort({ createdAt: -1 })
-            .skip((page - 1) * limit)
-            .limit(parseInt(limit));
+        const reviews = await prisma.review.findMany({
+            where,
+            include: {
+                user: { select: { name: true, email: true } },
+                product: { select: { name: true, image: true, slug: true } },
+                moderatedBy: { select: { name: true } }
+            },
+            orderBy: { createdAt: 'desc' },
+            skip: (Number(page) - 1) * Number(limit),
+            take: Number(limit)
+        });
 
-        const total = await Review.countDocuments(filter);
+        const total = await prisma.review.count({ where });
 
         // Stats
         const stats = {
-            total: await Review.countDocuments(),
-            pending: await Review.countDocuments({ status: 'pending' }),
-            approved: await Review.countDocuments({ status: 'approved' }),
-            rejected: await Review.countDocuments({ status: 'rejected' }),
-            reported: await Review.countDocuments({ reported: true }),
+            total: await prisma.review.count(),
+            pending: await prisma.review.count({ where: { status: 'pending' } }),
+            approved: await prisma.review.count({ where: { status: 'approved' } }),
+            rejected: await prisma.review.count({ where: { status: 'rejected' } }),
+            reported: await prisma.review.count({ where: { reported: true } }),
         };
 
         // Average rating
-        const avgRating = await Review.aggregate([
-            { $match: { status: 'approved' } },
-            { $group: { _id: null, avg: { $avg: '$rating' } } }
-        ]);
+        const avgRatingResult = await prisma.review.aggregate({
+            _avg: { rating: true },
+            where: { status: 'approved' }
+        });
 
-        stats.averageRating = avgRating[0]?.avg?.toFixed(1) || 0;
+        stats.averageRating = avgRatingResult._avg.rating ? avgRatingResult._avg.rating.toFixed(1) : 0;
 
         res.json({
             success: true,
             data: reviews,
             stats,
             pagination: {
-                page: parseInt(page),
-                limit: parseInt(limit),
+                page: Number(page),
+                limit: Number(limit),
                 total,
-                pages: Math.ceil(total / limit)
+                pages: Math.ceil(total / Number(limit))
             }
         });
     } catch (error) {
@@ -56,24 +60,27 @@ export const getAllReviews = async (req, res, next) => {
 };
 
 /**
- * Get single review details
+ * ⭐ Get single review details
  */
 export const getReviewDetails = async (req, res, next) => {
     try {
         const { id } = req.params;
 
-        const review = await Review.findById(id)
-            .populate('user', 'name email')
-            .populate('product', 'name image slug seller')
-            .populate('moderatedBy', 'name')
-            .populate('reply.author', 'name');
+        const review = await prisma.review.findUnique({
+            where: { id },
+            include: {
+                user: { select: { name: true, email: true } },
+                product: { select: { name: true, image: true, slug: true, sellerId: true } },
+                moderatedBy: { select: { name: true } }
+            }
+        });
 
         if (!review) {
-            return res.status(404).json({
-                success: false,
-                message: "Review not found"
-            });
+            return res.status(404).json({ success: false, message: "Review not found" });
         }
+
+        // Note: reply.author is an ID in JSON, if we want the name we might need a separate query
+        // But for simplicity we'll keep it as is or handle it in frontend
 
         res.json({
             success: true,
@@ -85,30 +92,22 @@ export const getReviewDetails = async (req, res, next) => {
 };
 
 /**
- * Approve review
+ * ⭐ Approve review
  */
 export const approveReview = async (req, res, next) => {
     try {
         const { id } = req.params;
 
-        const review = await Review.findByIdAndUpdate(
-            id,
-            {
+        const review = await prisma.review.update({
+            where: { id },
+            data: {
                 status: 'approved',
-                moderatedBy: req.user.id,
+                moderatedById: req.user.id,
                 moderatedAt: new Date(),
                 reported: false,
                 reportReason: ''
-            },
-            { new: true }
-        );
-
-        if (!review) {
-            return res.status(404).json({
-                success: false,
-                message: "Review not found"
-            });
-        }
+            }
+        });
 
         res.json({
             success: true,
@@ -116,35 +115,30 @@ export const approveReview = async (req, res, next) => {
             data: review
         });
     } catch (error) {
+        if (error.code === 'P2025') {
+            return res.status(404).json({ success: false, message: "Review not found" });
+        }
         next(error);
     }
 };
 
 /**
- * Reject review
+ * ⭐ Reject review
  */
 export const rejectReview = async (req, res, next) => {
     try {
         const { id } = req.params;
         const { reason } = req.body;
 
-        const review = await Review.findByIdAndUpdate(
-            id,
-            {
+        const review = await prisma.review.update({
+            where: { id },
+            data: {
                 status: 'rejected',
-                moderatedBy: req.user.id,
+                moderatedById: req.user.id,
                 moderatedAt: new Date(),
                 moderationNote: reason || ''
-            },
-            { new: true }
-        );
-
-        if (!review) {
-            return res.status(404).json({
-                success: false,
-                message: "Review not found"
-            });
-        }
+            }
+        });
 
         res.json({
             success: true,
@@ -152,12 +146,15 @@ export const rejectReview = async (req, res, next) => {
             data: review
         });
     } catch (error) {
+        if (error.code === 'P2025') {
+            return res.status(404).json({ success: false, message: "Review not found" });
+        }
         next(error);
     }
 };
 
 /**
- * Reply to review
+ * ⭐ Reply to review
  */
 export const replyToReview = async (req, res, next) => {
     try {
@@ -165,30 +162,20 @@ export const replyToReview = async (req, res, next) => {
         const { text } = req.body;
 
         if (!text) {
-            return res.status(400).json({
-                success: false,
-                message: "Reply text is required"
-            });
+            return res.status(400).json({ success: false, message: "Reply text is required" });
         }
 
-        const review = await Review.findByIdAndUpdate(
-            id,
-            {
+        const review = await prisma.review.update({
+            where: { id },
+            data: {
                 reply: {
                     text,
                     author: req.user.id,
+                    authorName: req.user.name, // Added for easier display
                     createdAt: new Date()
                 }
-            },
-            { new: true }
-        ).populate('reply.author', 'name');
-
-        if (!review) {
-            return res.status(404).json({
-                success: false,
-                message: "Review not found"
-            });
-        }
+            }
+        });
 
         res.json({
             success: true,
@@ -196,47 +183,47 @@ export const replyToReview = async (req, res, next) => {
             data: review
         });
     } catch (error) {
+        if (error.code === 'P2025') {
+            return res.status(404).json({ success: false, message: "Review not found" });
+        }
         next(error);
     }
 };
 
 /**
- * Delete review
+ * ⭐ Delete review
  */
 export const deleteReview = async (req, res, next) => {
     try {
         const { id } = req.params;
 
-        const review = await Review.findByIdAndDelete(id);
-
-        if (!review) {
-            return res.status(404).json({
-                success: false,
-                message: "Review not found"
-            });
-        }
+        await prisma.review.delete({
+            where: { id }
+        });
 
         res.json({
             success: true,
             message: "Review deleted"
         });
     } catch (error) {
+        if (error.code === 'P2025') {
+            return res.status(404).json({ success: false, message: "Review not found" });
+        }
         next(error);
     }
 };
 
 /**
- * Clear report flag
+ * ⭐ Clear report flag
  */
 export const clearReport = async (req, res, next) => {
     try {
         const { id } = req.params;
 
-        const review = await Review.findByIdAndUpdate(
-            id,
-            { reported: false, reportReason: '' },
-            { new: true }
-        );
+        const review = await prisma.review.update({
+            where: { id },
+            data: { reported: false, reportReason: '' }
+        });
 
         res.json({
             success: true,
@@ -244,6 +231,9 @@ export const clearReport = async (req, res, next) => {
             data: review
         });
     } catch (error) {
+        if (error.code === 'P2025') {
+            return res.status(404).json({ success: false, message: "Review not found" });
+        }
         next(error);
     }
 };

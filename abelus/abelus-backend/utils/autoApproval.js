@@ -1,41 +1,32 @@
-import SiteSettings from "../models/SiteSettings.js";
-import User from "../models/User.js";
+import prisma from "../prisma.js";
 
 /**
  * Calculate seller approval score based on profile completeness
- * @param {Object} user - User document
- * @param {Object} criteria - Scoring criteria from settings
- * @returns {Object} - { score, breakdown }
  */
 export const calculateSellerScore = (user, criteria) => {
     const breakdown = {};
     let score = 0;
 
-    // Email verified (always true if they can register as seller)
     if (user.email) {
         breakdown.emailVerified = criteria.emailVerified || 30;
         score += breakdown.emailVerified;
     }
 
-    // Phone provided
     if (user.storePhone) {
         breakdown.phoneProvided = criteria.phoneProvided || 20;
         score += breakdown.phoneProvided;
     }
 
-    // Store name set
     if (user.storeName && user.storeName.trim()) {
         breakdown.storeNameSet = criteria.storeNameSet || 20;
         score += breakdown.storeNameSet;
     }
 
-    // Store description set
     if (user.storeDescription && user.storeDescription.trim()) {
         breakdown.storeDescriptionSet = criteria.storeDescriptionSet || 15;
         score += breakdown.storeDescriptionSet;
     }
 
-    // Profile photo set
     if (user.storeLogo || user.profileImage) {
         breakdown.profilePhotoSet = criteria.profilePhotoSet || 15;
         score += breakdown.profilePhotoSet;
@@ -46,12 +37,11 @@ export const calculateSellerScore = (user, criteria) => {
 
 /**
  * Check if a seller should be auto-approved
- * @param {Object} user - User document
- * @returns {Object} - { shouldApprove, score, breakdown, minScore }
  */
 export const checkAutoApproval = async (user) => {
     try {
-        const settings = await SiteSettings.getSettings();
+        const settingsRecord = await prisma.siteSettings.findUnique({ where: { key: 'general' } });
+        const settings = settingsRecord?.value || {};
         const autoApproval = settings.sellerAutoApproval || {};
 
         if (!autoApproval.enabled) {
@@ -80,12 +70,10 @@ export const checkAutoApproval = async (user) => {
 
 /**
  * Process seller auto-approval
- * @param {String} userId - User ID to check and potentially approve
- * @returns {Object} - Result of the operation
  */
 export const processSellerAutoApproval = async (userId) => {
     try {
-        const user = await User.findById(userId);
+        const user = await prisma.user.findUnique({ where: { id: userId } });
 
         if (!user || user.role !== 'seller') {
             return { success: false, message: 'User not found or not a seller' };
@@ -98,10 +86,14 @@ export const processSellerAutoApproval = async (userId) => {
         const result = await checkAutoApproval(user);
 
         if (result.shouldApprove) {
-            user.sellerStatus = 'active';
-            user.autoApproved = true;
-            user.approvedAt = new Date();
-            await user.save();
+            await prisma.user.update({
+                where: { id: userId },
+                data: {
+                    sellerStatus: 'active',
+                    autoApproved: true,
+                    approvedAt: new Date()
+                }
+            });
 
             return {
                 success: true,

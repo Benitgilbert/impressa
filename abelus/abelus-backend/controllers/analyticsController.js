@@ -1,29 +1,31 @@
-import mongoose from "mongoose";
-import Order from "../models/Order.js";
+import prisma from "../prisma.js";
 
+/**
+ * 📈 Get weekly profit data (admin)
+ */
 export const getWeeklyProfit = async (req, res) => {
   try {
-    const weeklyProfit = await Order.aggregate([
-      {
-        $match: {
-          status: "delivered",
-          createdAt: { $gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) }
-        }
+    const orders = await prisma.order.findMany({
+      where: {
+        status: "delivered",
+        createdAt: { gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) }
       },
-      {
-        $group: {
-          _id: { $dayOfWeek: "$createdAt" },
-          profit: { $sum: "$totals.grandTotal" }
-        }
-      },
-      { $sort: { "_id": 1 } }
-    ]);
+      select: { grandTotal: true, createdAt: true }
+    });
 
-    // Format the response to match frontend expectations
     // MongoDB $dayOfWeek returns 1 (Sunday) to 7 (Saturday)
-    const formattedData = weeklyProfit.map((item) => ({
-      day: item._id,
-      profit: item.profit
+    // JS getDay() returns 0 (Sunday) to 6 (Saturday)
+    const profitByDay = {};
+    for (let i = 1; i <= 7; i++) profitByDay[i] = 0;
+
+    orders.forEach(order => {
+      const day = order.createdAt.getDay() + 1;
+      profitByDay[day] += order.grandTotal;
+    });
+
+    const formattedData = Object.entries(profitByDay).map(([day, profit]) => ({
+      day: parseInt(day),
+      profit
     }));
 
     res.json(formattedData);
@@ -33,12 +35,19 @@ export const getWeeklyProfit = async (req, res) => {
   }
 };
 
+/**
+ * 📈 Get recent orders (admin)
+ */
 export const getRecentOrders = async (req, res) => {
   try {
-    const recentOrders = await Order.find()
-      .sort({ createdAt: -1 })
-      .limit(5)
-      .populate("items.product customer");
+    const recentOrders = await prisma.order.findMany({
+      orderBy: { createdAt: 'desc' },
+      take: 5,
+      include: {
+        items: { include: { product: { select: { name: true, image: true } } } },
+        customer: { select: { name: true, email: true } }
+      }
+    });
 
     res.json(recentOrders);
   } catch (err) {
@@ -47,27 +56,33 @@ export const getRecentOrders = async (req, res) => {
   }
 };
 
+/**
+ * 📈 Get customization demand stats
+ */
 export const getCustomizationDemand = async (req, res) => {
   try {
-    const demandData = await Order.aggregate([
-      { $unwind: "$items" },
-      {
-        $group: {
-          _id: null,
-          customText: { $sum: { $cond: [{ $ifNull: ["$items.customizations.customText", false] }, 1, 0] } },
-          customFile: { $sum: { $cond: [{ $ifNull: ["$items.customizations.customFile", false] }, 1, 0] } },
-          cloudLink: { $sum: { $cond: [{ $ifNull: ["$items.customizations.cloudLink", false] }, 1, 0] } }
-        }
-      }
-    ]);
+    // Note: In high-scale apps, this should be a periodic aggregation or use raw SQL JSON paths
+    const items = await prisma.orderItem.findMany({
+        select: { customizations: true }
+    });
 
-    const result = demandData[0] || { customText: 0, customFile: 0, cloudLink: 0 };
-    const total = result.customText + result.customFile + result.cloudLink;
+    let customText = 0;
+    let customFile = 0;
+    let cloudLink = 0;
+
+    items.forEach(item => {
+      const c = item.customizations || {};
+      if (c.customText) customText++;
+      if (c.customFile) customFile++;
+      if (c.cloudLink) cloudLink++;
+    });
+
+    const total = customText + customFile + cloudLink;
 
     res.json({
-      customText: result.customText,
-      customFile: result.customFile,
-      cloudLink: result.cloudLink,
+      customText,
+      customFile,
+      cloudLink,
       total
     });
   } catch (err) {
@@ -76,38 +91,32 @@ export const getCustomizationDemand = async (req, res) => {
   }
 };
 
+/**
+ * 📈 Get top products by volume
+ */
 export const getTopProducts = async (req, res) => {
   try {
-    const topProducts = await Order.aggregate([
-      { $match: { status: { $ne: "cancelled" } } },
-      { $unwind: "$items" },
-      {
-        $group: {
-          _id: "$items.product",
-          totalQuantity: { $sum: "$items.quantity" },
-          totalOrders: { $sum: 1 }
-        }
-      },
-      {
-        $lookup: {
-          from: "products",
-          localField: "_id",
-          foreignField: "_id",
-          as: "product"
-        }
-      },
-      { $unwind: { path: "$product", preserveNullAndEmptyArrays: true } },
-      { $sort: { totalQuantity: -1 } },
-      { $limit: 5 },
-      {
-        $project: {
-          _id: 1,
-          productName: { $ifNull: ["$product.name", "Unknown Product"] },
-          totalQuantity: 1,
-          totalOrders: 1
-        }
-      }
-    ]);
+    const topProductsRaw = await prisma.orderItem.groupBy({
+      by: ['productId'],
+      _sum: { quantity: true },
+      _count: { productId: true },
+      where: { order: { status: { not: 'cancelled' } } },
+      orderBy: { _sum: { quantity: 'desc' } },
+      take: 5
+    });
+
+    const topProducts = await Promise.all(topProductsRaw.map(async (tp) => {
+      const product = await prisma.product.findUnique({ 
+          where: { id: tp.productId },
+          select: { name: true }
+      });
+      return {
+        _id: tp.productId,
+        productName: product?.name || "Unknown Product",
+        totalQuantity: tp._sum.quantity,
+        totalOrders: tp._count.productId
+      };
+    }));
 
     res.json(topProducts);
   } catch (err) {
@@ -116,63 +125,49 @@ export const getTopProducts = async (req, res) => {
   }
 };
 
+/**
+ * 📈 Get revenue data over time (admin)
+ */
 export const getRevenueData = async (req, res) => {
   try {
     const { period = "month" } = req.query;
-    let groupId;
-    let matchStage = { status: "delivered" };
-    let sortStage = { "_id": 1 };
-
     const now = new Date();
+    let startDate = new Date();
 
-    if (period === "day") {
-      // Last 30 days
-      const thirtyDaysAgo = new Date(now);
-      thirtyDaysAgo.setDate(now.getDate() - 30);
-      matchStage.createdAt = { $gte: thirtyDaysAgo };
-      groupId = { $dateToString: { format: "%Y-%m-%d", date: "$createdAt" } };
-    } else if (period === "week") {
-      // Last 12 weeks
-      const twelveWeeksAgo = new Date(now);
-      twelveWeeksAgo.setDate(now.getDate() - 12 * 7);
-      matchStage.createdAt = { $gte: twelveWeeksAgo };
-      groupId = { $isoWeek: "$createdAt" };
-    } else {
-      // Default: Month (Last 12 months)
-      const twelveMonthsAgo = new Date(now);
-      twelveMonthsAgo.setMonth(now.getMonth() - 12);
-      matchStage.createdAt = { $gte: twelveMonthsAgo };
-      groupId = { $month: "$createdAt" };
-    }
+    if (period === "day") startDate.setDate(now.getDate() - 30);
+    else if (period === "week") startDate.setDate(now.getDate() - 12 * 7);
+    else startDate.setMonth(now.getMonth() - 12);
 
-    const revenueData = await Order.aggregate([
-      { $match: matchStage },
-      {
-        $group: {
-          _id: groupId,
-          revenue: { $sum: "$totals.grandTotal" },
-          sales: { $sum: { $sum: "$items.quantity" } }
-        }
-      },
-      { $sort: sortStage }
-    ]);
-
-    // Format response
-    const formattedData = revenueData.map((item) => {
-      let label = item._id;
-      if (period === "month") {
-        const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-        label = months[item._id - 1] || item._id;
-      } else if (period === "week") {
-        label = `Week ${item._id}`;
-      }
-      // For 'day', label is already YYYY-MM-DD
-      return {
-        label,
-        revenue: item.revenue,
-        sales: item.sales
-      };
+    const orders = await prisma.order.findMany({
+      where: { status: "delivered", createdAt: { gte: startDate } },
+      include: { items: true }
     });
+
+    const stats = {};
+    const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+    orders.forEach(order => {
+      let label;
+      if (period === "day") label = order.createdAt.toISOString().split('T')[0];
+      else if (period === "week") {
+          // ISO Week (simplified)
+          const onejan = new Date(order.createdAt.getFullYear(), 0, 1);
+          const week = Math.ceil((((order.createdAt.getTime() - onejan.getTime()) / 86400000) + onejan.getDay() + 1) / 7);
+          label = `Week ${week}`;
+      } else {
+          label = months[order.createdAt.getMonth()];
+      }
+
+      if (!stats[label]) stats[label] = { revenue: 0, sales: 0 };
+      stats[label].revenue += order.grandTotal;
+      stats[label].sales += order.items.reduce((sum, i) => sum + i.quantity, 0);
+    });
+
+    const formattedData = Object.entries(stats).map(([label, data]) => ({
+      label,
+      revenue: data.revenue,
+      sales: data.sales
+    }));
 
     res.json(formattedData);
   } catch (err) {
@@ -181,75 +176,54 @@ export const getRevenueData = async (req, res) => {
   }
 };
 
+/**
+ * 📈 Get revenue data for a specific seller
+ */
 export const getSellerRevenueData = async (req, res) => {
   try {
     const { period = "day" } = req.query;
     const sellerId = req.user.id;
-
-    // Default to last 30 days for seller dashboard
-    let groupId;
-    let matchCreate = {};
     const now = new Date();
+    let startDate = new Date();
 
-    if (period === "week") {
-      const twelveWeeksAgo = new Date(now);
-      twelveWeeksAgo.setDate(now.getDate() - 12 * 7);
-      matchCreate = { createdAt: { $gte: twelveWeeksAgo } };
-      groupId = { $isoWeek: "$createdAt" };
-    } else if (period === "month") {
-      const twelveMonthsAgo = new Date(now);
-      twelveMonthsAgo.setMonth(now.getMonth() - 12);
-      matchCreate = { createdAt: { $gte: twelveMonthsAgo } };
-      groupId = { $month: "$createdAt" };
-    } else {
-      // Default day/30days
-      const thirtyDaysAgo = new Date(now);
-      thirtyDaysAgo.setDate(now.getDate() - 30);
-      matchCreate = { createdAt: { $gte: thirtyDaysAgo } };
-      groupId = { $dateToString: { format: "%Y-%m-%d", date: "$createdAt" } };
-    }
+    if (period === "week") startDate.setDate(now.getDate() - 12 * 7);
+    else if (period === "month") startDate.setMonth(now.getMonth() - 12);
+    else startDate.setDate(now.getDate() - 30);
 
-    const revenueData = await Order.aggregate([
-      {
-        $match: {
-          status: "delivered", // Only count delivered orders as realized revenue
-          ...matchCreate
-        }
+    const orderItems = await prisma.orderItem.findMany({
+      where: {
+        order: { status: "delivered", createdAt: { gte: startDate } },
+        product: { sellerId: sellerId }
       },
-      { $unwind: "$items" },
-      {
-        $match: {
-          "items.seller": new mongoose.Types.ObjectId(sellerId)
-        }
-      },
-      {
-        $group: {
-          _id: groupId,
-          revenue: { $sum: "$items.subtotal" },
-          sales: { $sum: "$items.quantity" }
-        }
-      },
-      { $sort: { "_id": 1 } }
-    ]);
-
-    // Format response (fill gaps if needed, but for now just return data)
-    const formattedData = revenueData.map((item) => {
-      let label = item._id;
-      if (period === "month") {
-        const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-        label = months[item._id - 1] || item._id;
-      } else if (period === "week") {
-        label = `Week ${item._id}`;
-      }
-      return {
-        label,
-        revenue: item.revenue,
-        sales: item.sales
-      };
+      include: { order: true }
     });
 
-    res.json(formattedData);
+    const stats = {};
+    const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
+    orderItems.forEach(item => {
+      let label;
+      if (period === "day") label = item.order.createdAt.toISOString().split('T')[0];
+      else if (period === "week") {
+          const onejan = new Date(item.order.createdAt.getFullYear(), 0, 1);
+          const week = Math.ceil((((item.order.createdAt.getTime() - onejan.getTime()) / 86400000) + onejan.getDay() + 1) / 7);
+          label = `Week ${week}`;
+      } else {
+          label = months[item.order.createdAt.getMonth()];
+      }
+
+      if (!stats[label]) stats[label] = { revenue: 0, sales: 0 };
+      stats[label].revenue += (item.price * item.quantity);
+      stats[label].sales += item.quantity;
+    });
+
+    const formattedData = Object.entries(stats).map(([label, data]) => ({
+      label,
+      revenue: data.revenue,
+      sales: data.sales
+    }));
+
+    res.json(formattedData);
   } catch (err) {
     console.error("Seller revenue data fetch failed:", err);
     res.status(500).json({ message: "Failed to load seller revenue data." });

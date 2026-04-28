@@ -1,39 +1,110 @@
-import mongoose from "mongoose";
-import Cart from "../models/Cart.js";
-import Product from "../models/Product.js";
-import FlashSale from "../models/FlashSale.js";
+import prisma from "../prisma.js";
 import logger from "../config/logger.js";
 
-/**
- * Get or create cart by session token
- */
+const formatCartResponse = (cart, couponCode = null, discountAmount = 0) => {
+  if (!cart) return null;
+
+  let subtotal = 0;
+  const items = cart.items.map(item => {
+    let price = 0;
+    if (item.product) {
+        price = item.product.price;
+        // Check variations if applicable
+        if (item.variationId && item.product.variations) {
+            const variation = item.product.variations.find(v => v.id === item.variationId || v.sku === item.variationId);
+            if (variation) price = variation.price;
+        }
+    }
+    const itemSubtotal = price * item.quantity;
+    subtotal += itemSubtotal;
+    return {
+      ...item,
+      price,
+      subtotal: itemSubtotal
+    };
+  });
+
+  const tax = 0; 
+  const shipping = 0;
+  const total = Math.max(0, subtotal - discountAmount + tax + shipping);
+
+  return {
+    ...cart,
+    items,
+    totals: {
+      subtotal,
+      discount: discountAmount,
+      tax,
+      shipping,
+      total
+    },
+    couponCode,
+    discountAmount
+  };
+};
+
+const findOrCreateCart = async (sessionToken, userId) => {
+    let cart = null;
+    if (userId) {
+        cart = await prisma.cart.findUnique({ where: { userId } });
+    }
+    if (!cart && sessionToken) {
+        // Find by session token (which is the cart id for guests)
+        // Ensure sessionToken is a valid UUID
+        const isUUID = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(sessionToken);
+        if (isUUID) {
+            cart = await prisma.cart.findUnique({ where: { id: sessionToken } });
+        }
+    }
+
+    if (!cart) {
+        cart = await prisma.cart.create({
+            data: userId ? { userId } : {}
+        });
+    } else if (userId && !cart.userId) {
+        // Associate guest cart to user
+        cart = await prisma.cart.update({
+            where: { id: cart.id },
+            data: { userId }
+        });
+    }
+    return cart;
+};
+
+const getCartPopulated = async (cartId) => {
+    return prisma.cart.findUnique({
+        where: { id: cartId },
+        include: {
+            items: {
+                include: {
+                    product: {
+                        select: { id: true, name: true, price: true, image: true, stock: true, visibility: true, weight: true }
+                    }
+                }
+            }
+        }
+    });
+};
+
 export const getCart = async (req, res, next) => {
   try {
     let sessionToken = req.cookies?.cartSession || req.headers["x-cart-session"];
+    const userId = req.user?.id;
 
-    // Generate new session token if not provided
-    if (!sessionToken) {
-      sessionToken = Cart.generateSessionToken();
-    }
+    const cart = await findOrCreateCart(sessionToken, userId);
+    sessionToken = userId ? sessionToken : cart.id;
 
-    const userId = req.user?.id; // From auth middleware if logged in
+    const populatedCart = await getCartPopulated(cart.id);
 
-    let cart = await Cart.findOrCreateBySession(sessionToken, userId);
-    cart = await Cart.findById(cart._id).populate({
-      path: "items.product",
-      select: "name price image stock visibility shippingClass weight dimensions",
-    });
-
-    // Set cookie for session tracking
     res.cookie("cartSession", sessionToken, {
       httpOnly: true,
-      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+      maxAge: 7 * 24 * 60 * 60 * 1000,
       sameSite: "lax",
     });
 
     res.json({
       success: true,
-      data: cart,
+      data: formatCartResponse(populatedCart),
       sessionToken,
     });
   } catch (error) {
@@ -41,19 +112,9 @@ export const getCart = async (req, res, next) => {
   }
 };
 
-/**
- * Add item to cart
- */
 export const addToCart = async (req, res, next) => {
   try {
-    const itemData = req.body;
-    if (!itemData) {
-      const error = new Error("Request body is missing");
-      error.statusCode = 400;
-      return next(error);
-    }
-
-    const { productId, quantity = 1, variationId, customizations = {}, price: priceOverride } = itemData;
+    const { productId, quantity = 1, variationId, customizations = {} } = req.body;
 
     if (!productId) {
       const error = new Error("Product ID is required");
@@ -61,123 +122,91 @@ export const addToCart = async (req, res, next) => {
       return next(error);
     }
 
-    if (!mongoose.Types.ObjectId.isValid(productId)) {
-      const error = new Error("Invalid Product ID");
-      error.statusCode = 400;
-      return next(error);
-    }
-
-    // Get session token
     let sessionToken = req.cookies?.cartSession || req.headers["x-cart-session"];
-    if (!sessionToken) {
-      sessionToken = Cart.generateSessionToken();
-    }
-
     const userId = req.user?.id;
 
-    // Find or create cart
-    const cart = await Cart.findOrCreateBySession(sessionToken, userId);
+    const cart = await findOrCreateCart(sessionToken, userId);
+    sessionToken = userId ? sessionToken : cart.id;
 
-    // Fetch product details
-    const product = await Product.findById(productId);
+    const product = await prisma.product.findUnique({
+        where: { id: productId },
+        include: { variations: true }
+    });
+
     if (!product) {
       const error = new Error("Product not found");
       error.statusCode = 404;
       return next(error);
     }
 
-    let price = (priceOverride !== undefined && priceOverride !== null) ? Number(priceOverride) : product.price;
-    let name = product.name;
-    let image = product.image;
-
-    // Handle Variable Product
-    if (variationId) {
-      const variation = product.variations.find(v => v.sku === variationId);
-      if (!variation) {
-        const error = new Error("Invalid variation");
-        error.statusCode = 400;
-        return next(error);
-      }
-
-      price = variation.price;
-      // Append attributes to name
-      let attrValues = [];
-      if (variation.attributes instanceof Map) {
-        attrValues = Array.from(variation.attributes.values());
-      } else if (variation.attributes && typeof variation.attributes === 'object') {
-        attrValues = Object.values(variation.attributes);
-      }
-
-      const attrString = attrValues.join(" / ");
-      name = `${product.name} - ${attrString}`;
-      if (variation.image) image = variation.image;
-
-      // Check variation stock if needed
-      // if (variation.stock < quantity) ...
-    }
-
-    // --- FLASH SALE CHECK ---
+    // Flash sale checks
     const now = new Date();
-    const activeFlashSale = await FlashSale.findOne({
-      isActive: true,
-      startDate: { $lte: now },
-      endDate: { $gte: now },
-      "products.product": productId
+    const activeFlashSale = await prisma.flashSale.findFirst({
+        where: {
+            isActive: true,
+            startDate: { lte: now },
+            endDate: { gte: now },
+            products: { some: { productId } }
+        },
+        include: { products: true }
     });
 
     if (activeFlashSale) {
-      const saleProduct = activeFlashSale.products.find(
-        (p) => p.product.toString() === productId.toString()
-      );
+        const saleProduct = activeFlashSale.products.find(p => p.productId === productId);
+        if (saleProduct && saleProduct.stockLimit !== null) {
+            const remaining = Math.max(0, saleProduct.stockLimit - saleProduct.soldCount);
+            
+            // Get current quantity in cart
+            const currentItem = await prisma.cartItem.findFirst({
+                where: { cartId: cart.id, productId }
+            });
+            const inCart = currentItem ? currentItem.quantity : 0;
 
-      if (saleProduct) {
-        // Enforce Flash Sale Stock Limit (null or undefined means unlimited)
-        const limit = saleProduct.stockLimit;
-        const hasLimit = limit !== null && limit !== undefined;
-
-        if (hasLimit) {
-          const limitVal = Number(limit);
-          const soldVal = Number(saleProduct.soldCount || 0);
-          const remaining = Math.max(0, limitVal - soldVal);
-
-          // Check if already in cart to see total requested
-          const existingCartItem = cart.items.find(item => item.product.toString() === productId.toString());
-          const alreadyInCartQuery = existingCartItem ? existingCartItem.quantity : 0;
-
-          if (quantity + alreadyInCartQuery > remaining) {
-            const error = new Error(`Flash sale limit reached. Only ${remaining} items allowed (You have ${alreadyInCartQuery} in cart).`);
-            error.statusCode = 400;
-            return next(error);
-          }
+            if (quantity + inCart > remaining) {
+                const error = new Error(`Flash sale limit reached. Only ${remaining} items allowed (You have ${inCart} in cart).`);
+                error.statusCode = 400;
+                return next(error);
+            }
         }
-
-        // Use Flash Sale Price (ensure it's a valid number)
-        if (saleProduct.flashSalePrice !== undefined && saleProduct.flashSalePrice !== null) {
-          price = Number(saleProduct.flashSalePrice);
-          logger.info({ productId, price }, "Applying flash sale price to cart item");
-        }
-      }
     }
-    // ------------------------
 
-    // Add item to cart
-    await cart.addItem({
-      product: productId,
-      quantity,
-      price,
-      variationId,
-      productName: name,
-      productImage: image,
-      customizations: customizations || {},
+    // Upsert cart item
+    const existingItem = await prisma.cartItem.findFirst({
+        where: {
+            cartId: cart.id,
+            productId,
+            ...(variationId ? { variationId } : {}),
+            // Customizations comparison can be tricky with JSON in Prisma depending on how it's saved. 
+            // We do a simple findFirst, then update it. If customizations differ, we should probably add a new item, but to keep it simple:
+        }
     });
 
-    // Reload cart with populated products
-    const updatedCart = await Cart.findById(cart._id).populate({
-      path: "items.product",
-      select: "name price image stock visibility",
-    });
+    // To handle customization equality, let's pull items and check in JS
+    const allItems = await prisma.cartItem.findMany({ where: { cartId: cart.id, productId } });
+    const exactMatch = allItems.find(i => 
+        i.variationId === variationId && 
+        JSON.stringify(i.customizations) === JSON.stringify(customizations || {})
+    );
 
-    // Set cookie
+    if (exactMatch) {
+        await prisma.cartItem.update({
+            where: { id: exactMatch.id },
+            data: { quantity: exactMatch.quantity + quantity }
+        });
+    } else {
+        await prisma.cartItem.create({
+            data: {
+                cartId: cart.id,
+                productId,
+                quantity,
+                variationId,
+                customizations: customizations || {}
+            }
+        });
+    }
+
+    const updatedCart = await getCartPopulated(cart.id);
+
     res.cookie("cartSession", sessionToken, {
       httpOnly: true,
       maxAge: 7 * 24 * 60 * 60 * 1000,
@@ -189,16 +218,13 @@ export const addToCart = async (req, res, next) => {
     res.json({
       success: true,
       message: "Item added to cart",
-      data: updatedCart,
+      data: formatCartResponse(updatedCart),
     });
   } catch (error) {
     next(error);
   }
 };
 
-/**
- * Update item quantity in cart
- */
 export const updateCartItem = async (req, res, next) => {
   try {
     const { productId, quantity } = req.body;
@@ -210,159 +236,110 @@ export const updateCartItem = async (req, res, next) => {
     }
 
     const sessionToken = req.cookies?.cartSession || req.headers["x-cart-session"];
-    if (!sessionToken) {
-      const error = new Error("Cart session not found");
-      error.statusCode = 404;
-      return next(error);
-    }
+    const userId = req.user?.id;
+    const cart = await findOrCreateCart(sessionToken, userId);
 
-    const cart = await Cart.findOne({ sessionToken });
-    if (!cart) {
-      const error = new Error("Cart not found");
-      error.statusCode = 404;
-      return next(error);
-    }
-
-    // If quantity > 0, check stock
     if (quantity > 0) {
-      const product = await Product.findById(productId);
+      const product = await prisma.product.findUnique({ where: { id: productId } });
       if (product && product.stock < quantity) {
         const error = new Error(`Only ${product.stock} items available in stock`);
         error.statusCode = 400;
         return next(error);
       }
 
-      // --- FLASH SALE CHECK FOR UPDATE ---
+      // Flash sale check
       const now = new Date();
-      const activeFlashSale = await FlashSale.findOne({
-        isActive: true,
-        startDate: { $lte: now },
-        endDate: { $gte: now },
-        "products.product": productId
+      const activeFlashSale = await prisma.flashSale.findFirst({
+        where: { isActive: true, startDate: { lte: now }, endDate: { gte: now }, products: { some: { productId } } },
+        include: { products: true }
       });
 
       if (activeFlashSale) {
-        const saleProduct = activeFlashSale.products.find(
-          (p) => p.product.toString() === productId.toString()
-        );
-
-        if (saleProduct) {
-          const hasLimit = saleProduct.stockLimit !== null && saleProduct.stockLimit !== undefined;
-          if (hasLimit) {
-            const limit = Number(saleProduct.stockLimit);
-            const sold = Number(saleProduct.soldCount || 0);
-            const remaining = limit - sold;
-            if (quantity > remaining) {
-              const error = new Error(`Flash sale limit reached. Only ${remaining} items allowed.`);
-              error.statusCode = 400;
-              return next(error);
-            }
-          }
-
-          // Also update the price in case it changed or was added before sale
-          if (saleProduct.flashSalePrice !== undefined && saleProduct.flashSalePrice !== null) {
-            const item = cart.items.find((it) => it.product.toString() === productId.toString());
-            if (item) {
-              item.price = Number(saleProduct.flashSalePrice);
-              logger.info({ productId, price: item.price }, "Updating flash sale price during cart update");
-            }
+        const saleProduct = activeFlashSale.products.find(p => p.productId === productId);
+        if (saleProduct && saleProduct.stockLimit !== null) {
+          const remaining = saleProduct.stockLimit - saleProduct.soldCount;
+          if (quantity > remaining) {
+            const error = new Error(`Flash sale limit reached. Only ${remaining} items allowed.`);
+            error.statusCode = 400;
+            return next(error);
           }
         }
       }
-      // ------------------------------------
     }
 
-    await cart.updateItemQuantity(productId, quantity);
+    const items = await prisma.cartItem.findMany({ where: { cartId: cart.id, productId } });
+    if (items.length > 0) {
+        if (quantity <= 0) {
+            await prisma.cartItem.deleteMany({ where: { cartId: cart.id, productId } });
+        } else {
+            // Update the first matching product item
+            await prisma.cartItem.update({
+                where: { id: items[0].id },
+                data: { quantity }
+            });
+        }
+    }
 
-    const updatedCart = await Cart.findById(cart._id).populate({
-      path: "items.product",
-      select: "name price image stock visibility",
-    });
+    const updatedCart = await getCartPopulated(cart.id);
 
     res.json({
       success: true,
       message: "Cart updated",
-      data: updatedCart,
+      data: formatCartResponse(updatedCart),
     });
   } catch (error) {
     next(error);
   }
 };
 
-/**
- * Remove item from cart
- */
 export const removeFromCart = async (req, res, next) => {
   try {
     const { productId } = req.params;
-
     const sessionToken = req.cookies?.cartSession || req.headers["x-cart-session"];
-    if (!sessionToken) {
-      const error = new Error("Cart session not found");
-      error.statusCode = 404;
-      return next(error);
-    }
+    const userId = req.user?.id;
+    const cart = await findOrCreateCart(sessionToken, userId);
 
-    const cart = await Cart.findOne({ sessionToken });
-    if (!cart) {
-      const error = new Error("Cart not found");
-      error.statusCode = 404;
-      return next(error);
-    }
+    await prisma.cartItem.deleteMany({ where: { cartId: cart.id, productId } });
 
-    await cart.removeItem(productId);
-
-    const updatedCart = await Cart.findById(cart._id).populate({
-      path: "items.product",
-      select: "name price image stock visibility",
-    });
+    const updatedCart = await getCartPopulated(cart.id);
 
     res.json({
       success: true,
       message: "Item removed from cart",
-      data: updatedCart,
+      data: formatCartResponse(updatedCart),
     });
   } catch (error) {
     next(error);
   }
 };
 
-/**
- * Clear entire cart
- */
 export const clearCart = async (req, res, next) => {
   try {
     const sessionToken = req.cookies?.cartSession || req.headers["x-cart-session"];
-    if (!sessionToken) {
-      // No session = already cleared
+    const userId = req.user?.id;
+
+    if (!sessionToken && !userId) {
       return res.json({ success: true, message: "Cart cleared (no session)" });
     }
 
-    const cart = await Cart.findOne({ sessionToken });
-    if (!cart) {
-      // No cart = already cleared
-      return res.json({ success: true, message: "Cart cleared (no cart found)" });
-    }
+    const cart = await findOrCreateCart(sessionToken, userId);
+    await prisma.cartItem.deleteMany({ where: { cartId: cart.id } });
 
-    await cart.clearCart();
+    const updatedCart = await getCartPopulated(cart.id);
 
     res.json({
       success: true,
       message: "Cart cleared",
-      data: cart,
+      data: formatCartResponse(updatedCart),
     });
   } catch (error) {
     next(error);
   }
 };
 
-/**
- * Apply coupon to cart
- */
 export const applyCoupon = async (req, res, next) => {
   try {
     const { couponCode } = req.body;
-
     if (!couponCode) {
       const error = new Error("Coupon code is required");
       error.statusCode = 400;
@@ -370,143 +347,127 @@ export const applyCoupon = async (req, res, next) => {
     }
 
     const sessionToken = req.cookies?.cartSession || req.headers["x-cart-session"];
-    if (!sessionToken) {
-      const error = new Error("Cart session not found");
-      error.statusCode = 404;
-      return next(error);
-    }
+    const userId = req.user?.id;
+    const cart = await findOrCreateCart(sessionToken, userId);
+    const populatedCart = await getCartPopulated(cart.id);
 
-    const cart = await Cart.findOne({ sessionToken });
-    if (!cart) {
-      const error = new Error("Cart not found");
-      error.statusCode = 404;
-      return next(error);
-    }
-
-    if (cart.items.length === 0) {
+    if (populatedCart.items.length === 0) {
       const error = new Error("Cart is empty");
       error.statusCode = 400;
       return next(error);
     }
 
-    // Import Coupon model here to avoid circular dependency
-    const Coupon = (await import("../models/Coupon.js")).default;
+    const coupon = await prisma.coupon.findUnique({ where: { code: couponCode } });
+    if (!coupon || !coupon.isActive || new Date() > new Date(coupon.expiresAt) || new Date() < new Date(coupon.validFrom)) {
+        const error = new Error("Invalid or expired coupon");
+        error.statusCode = 400;
+        return next(error);
+    }
 
-    // Find and validate coupon
-    const coupon = await Coupon.findValidCoupon(couponCode);
-
-    // Check minimum spend
-    if (coupon.minSpend && cart.totals.subtotal < coupon.minSpend) {
+    const cartResp = formatCartResponse(populatedCart);
+    
+    if (coupon.minSpend && cartResp.totals.subtotal < coupon.minSpend) {
       const error = new Error(`Minimum spend of ${coupon.minSpend} required`);
       error.statusCode = 400;
       return next(error);
     }
 
-    // Check user eligibility
-    const userId = req.user?.id;
-    const userEmail = req.user?.email || cart.user?.email;
-
-    if (userId || userEmail) {
-      const eligibility = coupon.canUserUse(userId, userEmail);
-      if (!eligibility.canUse) {
-        const error = new Error(eligibility.reason);
+    if (coupon.usageLimit && coupon.usageCount >= coupon.usageLimit) {
+        const error = new Error("Coupon usage limit reached");
         error.statusCode = 400;
         return next(error);
-      }
     }
 
-    // Apply coupon
-    await cart.applyCoupon(coupon);
-
-    const updatedCart = await Cart.findById(cart._id).populate({
-      path: "items.product",
-      select: "name price image stock visibility",
-    });
+    // Calculate discount
+    let discountAmount = 0;
+    if (coupon.type === "fixed") {
+        discountAmount = coupon.value;
+    } else if (coupon.type === "percentage") {
+        discountAmount = cartResp.totals.subtotal * (coupon.value / 100);
+        if (coupon.maxDiscount && discountAmount > coupon.maxDiscount) {
+            discountAmount = coupon.maxDiscount;
+        }
+    }
 
     res.json({
       success: true,
       message: "Coupon applied successfully",
-      data: updatedCart,
+      data: formatCartResponse(populatedCart, coupon.code, discountAmount),
     });
   } catch (error) {
     next(error);
   }
 };
 
-/**
- * Remove coupon from cart
- */
 export const removeCoupon = async (req, res, next) => {
   try {
     const sessionToken = req.cookies?.cartSession || req.headers["x-cart-session"];
-    if (!sessionToken) {
-      const error = new Error("Cart session not found");
-      error.statusCode = 404;
-      return next(error);
-    }
-
-    const cart = await Cart.findOne({ sessionToken });
-    if (!cart) {
-      const error = new Error("Cart not found");
-      error.statusCode = 404;
-      return next(error);
-    }
-
-    await cart.removeCoupon();
-
-    const updatedCart = await Cart.findById(cart._id).populate({
-      path: "items.product",
-      select: "name price image stock visibility",
-    });
+    const userId = req.user?.id;
+    const cart = await findOrCreateCart(sessionToken, userId);
+    const populatedCart = await getCartPopulated(cart.id);
 
     res.json({
       success: true,
       message: "Coupon removed",
-      data: updatedCart,
+      data: formatCartResponse(populatedCart),
     });
   } catch (error) {
     next(error);
   }
 };
 
-/**
- * Merge guest cart with user cart on login
- */
 export const mergeCarts = async (req, res, next) => {
   try {
     const { guestSessionToken } = req.body;
     const userId = req.user.id;
 
     if (!guestSessionToken) {
-      return res.json({
-        success: true,
-        message: "No guest cart to merge",
-      });
+      return res.json({ success: true, message: "No guest cart to merge" });
     }
 
-    const guestCart = await Cart.findOne({ sessionToken: guestSessionToken });
-    const userCart = await Cart.findOne({ user: userId });
-
-    if (!guestCart) {
-      return res.json({
-        success: true,
-        message: "No guest cart found",
-      });
+    const isUUID = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(guestSessionToken);
+    if (!isUUID) {
+        return res.json({ success: true, message: "Invalid guest session token" });
     }
 
-    const mergedCart = await Cart.mergeCarts(guestCart, userCart);
+    const guestCart = await prisma.cart.findUnique({ where: { id: guestSessionToken }, include: { items: true } });
+    let userCart = await prisma.cart.findUnique({ where: { userId }, include: { items: true } });
 
-    // Generate new session token for merged cart
-    const newSessionToken = Cart.generateSessionToken();
-    mergedCart.sessionToken = newSessionToken;
-    await mergedCart.save();
+    if (!userCart) {
+        userCart = await prisma.cart.create({ data: { userId }, include: { items: true } });
+    }
 
-    const populatedCart = await Cart.findById(mergedCart._id).populate({
-      path: "items.product",
-      select: "name price image stock visibility",
-    });
+    if (guestCart && guestCart.id !== userCart.id) {
+        for (const guestItem of guestCart.items) {
+            const existingItem = userCart.items.find(i => 
+                i.productId === guestItem.productId && 
+                i.variationId === guestItem.variationId &&
+                JSON.stringify(i.customizations) === JSON.stringify(guestItem.customizations)
+            );
 
-    res.cookie("cartSession", newSessionToken, {
+            if (existingItem) {
+                await prisma.cartItem.update({
+                    where: { id: existingItem.id },
+                    data: { quantity: existingItem.quantity + guestItem.quantity }
+                });
+            } else {
+                await prisma.cartItem.create({
+                    data: {
+                        cartId: userCart.id,
+                        productId: guestItem.productId,
+                        quantity: guestItem.quantity,
+                        variationId: guestItem.variationId,
+                        customizations: guestItem.customizations || {}
+                    }
+                });
+            }
+        }
+        await prisma.cart.delete({ where: { id: guestCart.id } });
+    }
+
+    const populatedCart = await getCartPopulated(userCart.id);
+
+    res.cookie("cartSession", userCart.id, {
       httpOnly: true,
       maxAge: 7 * 24 * 60 * 60 * 1000,
       sameSite: "lax",
@@ -515,8 +476,8 @@ export const mergeCarts = async (req, res, next) => {
     res.json({
       success: true,
       message: "Carts merged successfully",
-      data: populatedCart,
-      sessionToken: newSessionToken,
+      data: formatCartResponse(populatedCart),
+      sessionToken: userCart.id,
     });
   } catch (error) {
     next(error);

@@ -1,9 +1,9 @@
-import Shift from "../models/Shift.js";
+import prisma from "../prisma.js";
 import logger from "../config/logger.js";
 
-// @desc    Start a new shift
-// @route   POST /api/shifts/start
-// @access  Private (Admin/Seller)
+/**
+ * 🕒 Start a new shift
+ */
 export const startShift = async (req, res) => {
     try {
         const { startingDrawerAmount } = req.body;
@@ -13,18 +13,20 @@ export const startShift = async (req, res) => {
         }
 
         // Check if there is already an open shift for this user
-        const existingShift = await Shift.findOne({ user: req.user.id, status: "open" });
+        const existingShift = await prisma.shift.findFirst({
+            where: { userId: req.user.id, status: "open" }
+        });
         if (existingShift) {
             return res.status(400).json({ success: false, message: "You already have an open shift. Please close it first." });
         }
 
-        const newShift = new Shift({
-            user: req.user.id,
-            startingDrawerAmount,
-            expectedEndingDrawerAmount: startingDrawerAmount
+        const newShift = await prisma.shift.create({
+            data: {
+                userId: req.user.id,
+                startingDrawerAmount: Number(startingDrawerAmount),
+                expectedEndingDrawerAmount: Number(startingDrawerAmount)
+            }
         });
-
-        await newShift.save();
 
         res.status(201).json({ success: true, data: newShift });
     } catch (error) {
@@ -33,12 +35,14 @@ export const startShift = async (req, res) => {
     }
 };
 
-// @desc    Get current active shift for user
-// @route   GET /api/shifts/current
-// @access  Private (Admin/Seller)
+/**
+ * 🕒 Get current active shift for user
+ */
 export const getCurrentShift = async (req, res) => {
     try {
-        const shift = await Shift.findOne({ user: req.user.id, status: "open" });
+        const shift = await prisma.shift.findFirst({
+            where: { userId: req.user.id, status: "open" }
+        });
         
         if (!shift) {
             return res.status(200).json({ success: true, data: null });
@@ -51,9 +55,9 @@ export const getCurrentShift = async (req, res) => {
     }
 };
 
-// @desc    Close current active shift
-// @route   POST /api/shifts/close
-// @access  Private (Admin/Seller)
+/**
+ * 🕒 Close current active shift
+ */
 export const closeShift = async (req, res) => {
     try {
         const { actualEndingDrawerAmount, notes } = req.body;
@@ -62,40 +66,51 @@ export const closeShift = async (req, res) => {
             return res.status(400).json({ success: false, message: "Actual ending drawer amount is required" });
         }
 
-        const shift = await Shift.findOne({ user: req.user.id, status: "open" });
+        const shift = await prisma.shift.findFirst({
+            where: { userId: req.user.id, status: "open" }
+        });
         if (!shift) {
             return res.status(404).json({ success: false, message: "No open shift found" });
         }
 
-        shift.status = "closed";
-        shift.endTime = Date.now();
-        shift.actualEndingDrawerAmount = actualEndingDrawerAmount;
-        if (notes) shift.notes = notes;
+        const updatedShift = await prisma.shift.update({
+            where: { id: shift.id },
+            data: {
+                status: "closed",
+                endTime: new Date(),
+                actualEndingDrawerAmount: Number(actualEndingDrawerAmount),
+                notes: notes || shift.notes
+            }
+        });
 
-        await shift.save();
-
-        res.status(200).json({ success: true, data: shift });
+        res.status(200).json({ success: true, data: updatedShift });
     } catch (error) {
         logger.error({ err: error }, "Failed to close shift");
         res.status(500).json({ success: false, message: "Server Error" });
     }
 };
 
-// @desc    Get shift report by ID
-// @route   GET /api/shifts/:id/report
-// @access  Private (Admin/Seller)
+/**
+ * 🕒 Get shift report by ID
+ */
 export const getShiftReport = async (req, res) => {
     try {
-        const shift = await Shift.findById(req.params.id)
-            .populate("orders", "orderNumber totalAmount paymentMethod status createdAt")
-            .populate("user", "firstName lastName email");
+        const shift = await prisma.shift.findUnique({
+            where: { id: req.params.id },
+            include: {
+                orders: {
+                    select: { publicId: true, grandTotal: true, paymentMethod: true, status: true, createdAt: true }
+                },
+                user: { select: { id: true, name: true, email: true } }
+            }
+        });
 
         if (!shift) {
             return res.status(404).json({ success: false, message: "Shift not found" });
         }
 
         // Check if user is authorized (Admin or the shift owner)
-        if (req.user.role !== "admin" && shift.user._id.toString() !== req.user.id) {
+        if (req.user.role !== "admin" && shift.userId !== req.user.id) {
             return res.status(403).json({ success: false, message: "Not authorized to view this shift" });
         }
 

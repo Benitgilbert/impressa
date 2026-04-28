@@ -1,80 +1,23 @@
 import express from "express";
-import passport from "passport";
-import jwt from "jsonwebtoken";
-import { register, login } from "../controllers/authController.js";
 import {
-  authMiddleware,
   verifyToken,
   verifyAdmin,
 } from "../middleware/authMiddleware.js";
 import * as authController from "../controllers/authController.js";
-import {
-  validateRegister,
-  validateLogin,
-  validateAdminLoginStep1,
-  validateAdminLoginStep2,
-  validatePasswordResetRequest,
-  validatePasswordResetConfirm,
-  validateUpdateUser,
-  validateResendOTP,
-} from "../middleware/validation.js";
 import { uploadProfileImage } from "../middleware/uploadMiddleware.js";
 
 const router = express.Router();
 
-// Google OAuth Routes
-router.get(
-  "/google",
-  passport.authenticate("google", { scope: ["profile", "email"] })
-);
-
-router.get(
-  "/google/callback",
-  passport.authenticate("google", { failureRedirect: "/login" }),
-  (req, res) => {
-    // Generate JWT
-    const accessToken = jwt.sign(
-      { userId: req.user.id, role: req.user.role },
-      process.env.JWT_SECRET,
-      { expiresIn: "15m" }
-    );
-
-    const refreshToken = jwt.sign(
-      { userId: req.user.id },
-      process.env.REFRESH_TOKEN_SECRET,
-      { expiresIn: "7d" }
-    );
-
-    // Redirect to frontend with tokens
-    // Ideally, send via secure functionality or URL fragment
-    const frontendUrl = process.env.FRONTEND_URL || "http://localhost:5173";
-    res.redirect(`${frontendUrl}/auth/success?accessToken=${accessToken}&refreshToken=${refreshToken}&role=${req.user.role}`);
-  }
-);
-
-// Public routes with validation
+/**
+ * Public Routes
+ */
 router.get("/team", authController.getTeamMembers);
-router.post("/register", validateRegister, register);
-router.post("/admin/users", verifyToken, verifyAdmin, validateRegister, register);
-router.post("/login", validateLogin, login);
-router.post("/refresh", authController.refreshToken);
-router.post("/admin/resend-otp", validateResendOTP, authController.resendAdminOTP);
 
-// Admin login with 2FA (OTP)
-router.post("/admin/login-step1", validateAdminLoginStep1, authController.adminLoginStep1);
-router.post("/admin/login-step2", validateAdminLoginStep2, authController.adminLoginStep2);
-
-// Password reset routes
-router.post("/request-password-reset", validatePasswordResetRequest, authController.requestPasswordReset);
-router.post("/confirm-password-reset", validatePasswordResetConfirm, authController.confirmPasswordReset);
-
-// User management routes
-router.get("/users", authController.getAllUsers);
-router.delete("/users/:id", verifyToken, verifyAdmin, authController.deleteUser);
-router.put("/users/:id", verifyToken, verifyAdmin, validateUpdateUser, authController.updateUser);
-
-// User Profile Routes
-router.get("/me", verifyToken, authController.getProfile);
+/**
+ * Authenticated User Routes
+ */
+router.get("/me", verifyToken, authController.getMe);
+router.post("/complete-registration", verifyToken, authController.completeRegistration);
 router.put(
   "/me",
   verifyToken,
@@ -85,8 +28,23 @@ router.put(
   authController.updateProfile
 );
 
-router.get("/admin/dashboard", authMiddleware(["admin"]), (req, res) => {
-  res.json({ message: `Welcome, ${req.user.role} user` });
-});
+/**
+ * Admin Routes
+ */
+router.get("/users", verifyAdmin, authController.getAllUsers);
+router.post("/users", verifyAdmin, authController.createUser);
+router.put("/users/:id", verifyAdmin, authController.updateUser);
+router.delete("/users/:id", verifyAdmin, authController.deleteUser);
+
+/**
+ * Legacy / Stubbed Routes (prevent breakage)
+ */
+router.post("/register", (req, res) => res.status(410).json({ message: "Gone: Use Supabase Auth on frontend" }));
+router.post("/login", (req, res) => res.status(410).json({ message: "Gone: Use Supabase Auth on frontend" }));
+router.post("/refresh", (req, res) => res.status(410).json({ message: "Gone: Use Supabase Auth on frontend" }));
+router.post("/admin/login-step1", (req, res) => res.status(410).json({ message: "Gone: Use Supabase Auth on frontend" }));
+router.post("/admin/login-step2", (req, res) => res.status(410).json({ message: "Gone: Use Supabase Auth on frontend" }));
+router.post("/request-password-reset", (req, res) => res.status(410).json({ message: "Gone: Use Supabase Auth on frontend" }));
+router.post("/confirm-password-reset", (req, res) => res.status(410).json({ message: "Gone: Use Supabase Auth on frontend" }));
 
 export default router;

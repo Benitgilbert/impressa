@@ -1,15 +1,15 @@
 import path from "path";
-import User from "../models/User.js";
-import Order from "../models/Order.js";
-import ReportLog from "../models/ReportLog.js";
-
+import fs from "fs";
+import prisma from "../prisma.js";
 import { buildReportData } from "../services/reportBuilders.js";
 import { createabelusPDF } from "../utils/pdfLayout.js";
 import convertToCSV from "../utils/csvExporter.js";
-import convertLogsToCSV from "../utils/logCsvExporter.js";
 import generateAISummary from "../utils/aiSummary.js";
 import sendReportEmail from "../utils/sendReportEmail.js";
 
+/**
+ * 📊 Generate and export business reports
+ */
 export const generateReport = async (req, res) => {
     try {
         const { type, format, ...filters } = req.query;
@@ -18,10 +18,10 @@ export const generateReport = async (req, res) => {
             return res.status(400).json({ message: `Invalid report type. Must be one of: ${validTypes.join(", ")}` });
         }
 
-        const admin = await User.findById(req.user.id);
+        const admin = await prisma.user.findUnique({ where: { id: req.user.id } });
         if (!admin) return res.status(404).json({ message: "Admin profile not found." });
 
-        // Build report data with better error handling
+        // Build report data
         let orders, summary;
         try {
             const result = await buildReportData(type, filters);
@@ -34,14 +34,18 @@ export const generateReport = async (req, res) => {
 
         const aiSummary = generateAISummary(type, summary);
 
-        await ReportLog.create({
-            type,
-            filters,
-            generatedBy: admin._id,
-            format,
-            aiSummary,
+        // Log report generation
+        await prisma.reportLog.create({
+            data: {
+                type,
+                filters: filters || {},
+                generatedById: admin.id,
+                format: format || 'pdf',
+                aiSummary,
+            }
         });
 
+        // Async email sending
         try {
             await sendReportEmail({
                 to: admin.email,
@@ -49,9 +53,10 @@ export const generateReport = async (req, res) => {
                 text: `Your report has been generated.\n\nSummary:\n${aiSummary}`,
             });
         } catch (e) {
-            console.warn("sendReportEmail failed, continuing without email:", e.message);
+            console.warn("sendReportEmail failed:", e.message);
         }
 
+        // Export as CSV
         if (format === "csv") {
             const csv = convertToCSV(orders);
             res.setHeader("Content-Type", "text/csv");
@@ -59,267 +64,85 @@ export const generateReport = async (req, res) => {
             return res.send(csv);
         }
 
-        // Check if logo exists, otherwise use null
+        // Export as PDF
         const logoPath = path.join(path.resolve(), "assets/logo.png");
         let finalLogoPath = null;
-        try {
-            const fs = await import('fs');
-            if (fs.existsSync(logoPath)) {
-                finalLogoPath = logoPath;
-            } else {
-                console.warn("Logo file not found at:", logoPath);
-            }
-        } catch (err) {
-            console.warn("Could not check logo file:", err.message);
+        if (fs.existsSync(logoPath)) {
+            finalLogoPath = logoPath;
         }
 
-        // Monthly business report extras (charts + metrics)
-        let charts = null;
-        let extraMetrics = {};
-        let productRevenue = {};
-        let productUnits = {};
-        if (type === "monthly") {
-            const { getChartImage, buildRevenueTimeConfig, buildOrdersVolumeConfig, buildTopProductsConfig } = await import("../utils/chartImages.js");
-
-            // Determine start/end of the month
-            const month = parseInt(filters.month || (new Date().getMonth() + 1));
-            const year = parseInt(filters.year || new Date().getFullYear());
-            const start = new Date(year, month - 1, 1);
-            const end = new Date(year, month, 1);
-
-            // Aggregate metrics
-            let totalRevenue = 0;
-            let deliveredCount = 0;
-            productRevenue = {};
-            productUnits = {};
-            const customersInPeriod = new Set();
-            orders.forEach(o => {
-                const price = o.product?.price || 0;
-                const rev = price * (o.quantity || 0);
-                totalRevenue += (o.status === 'delivered' ? rev : 0);
-                if (o.status === 'delivered') deliveredCount++;
-                const name = o.product?.name || "Unknown";
-                productRevenue[name] = (productRevenue[name] || 0) + rev;
-                productUnits[name] = (productUnits[name] || 0) + (o.quantity || 0);
-                if (o.customer?._id) customersInPeriod.add(String(o.customer._id));
-            });
-            const avgOrderValue = deliveredCount ? +(totalRevenue / deliveredCount).toFixed(2) : 0;
-
-            // New customers = users created within month
-            let newCustomers = 0;
-            try {
-                const UserModel = (await import('../models/User.js')).default;
-                newCustomers = await UserModel.countDocuments({ createdAt: { $gte: start, $lt: end } });
-            } catch { /* ignore */ }
-
-            // Top product by revenue
-            const topProduct = Object.entries(productRevenue).sort((a, b) => b[1] - a[1])[0]?.[0] || 'N/A';
-
-            // Top customer by spend
-            const spendByCustomer = {};
-            orders.forEach(o => {
-                const cid = String(o.customer?._id || o.customer);
-                if (!cid) return;
-                const price = o.product?.price || 0;
-                const rev = price * (o.quantity || 0);
-                spendByCustomer[cid] = (spendByCustomer[cid] || 0) + rev;
-            });
-            let topCustomerId = null, topCustomerSpend = 0;
-            Object.entries(spendByCustomer).forEach(([cid, amt]) => {
-                if (amt > topCustomerSpend) { topCustomerSpend = amt; topCustomerId = cid; }
-            });
-            let topCustomerName = 'N/A';
-            if (topCustomerId) {
-                try {
-                    const UserModel = (await import('../models/User.js')).default;
-                    const u = await UserModel.findById(topCustomerId).select('name email');
-                    topCustomerName = u?.name || u?.email || topCustomerId;
-                } catch { /* ignore */ }
-            }
-
-            // Repeat vs new customer ratio (based on whether they had orders before this month)
-            const customerIds = Array.from(customersInPeriod);
-            let repeatCount = 0, newCount = 0;
-            if (customerIds.length) {
-                const priorOrders = await (await import('../models/Order.js')).default.find({
-                    customer: { $in: customerIds },
-                    createdAt: { $lt: start }
-                }).select('customer');
-                const priorSet = new Set(priorOrders.map(p => String(p.customer)));
-                customerIds.forEach(id => priorSet.has(id) ? repeatCount++ : newCount++);
-            }
-
-            // Build day labels
-            const dayCount = Math.ceil((end - start) / (1000 * 60 * 60 * 24));
-            const labels = Array.from({ length: dayCount }, (_, i) => {
-                const d = new Date(start); d.setDate(d.getDate() + i);
-                return d.toLocaleDateString('en-US', { month: 'short', day: '2-digit' });
-            });
-            const revenueSeries = Array(dayCount).fill(0);
-            const ordersSeries = Array(dayCount).fill(0);
-            orders.forEach(o => {
-                const idx = Math.floor((new Date(o.createdAt) - start) / (1000 * 60 * 60 * 24));
-                if (idx >= 0 && idx < dayCount) {
-                    const price = o.product?.price || 0;
-                    revenueSeries[idx] += price * (o.quantity || 0);
-                    ordersSeries[idx] += 1;
-                }
-            });
-
-            // Top 5 products by revenue
-            const top5 = Object.entries(productRevenue).sort((a, b) => b[1] - a[1]).slice(0, 5);
-            const topProdLabels = top5.map(([name]) => name);
-            const topProdData = top5.map(([, amt]) => Math.round(amt));
-
-            // Fetch chart images (best-effort)
-            try {
-                const [revImg, ordImg, topImg] = await Promise.all([
-                    getChartImage(buildRevenueTimeConfig(labels, revenueSeries)),
-                    getChartImage(buildOrdersVolumeConfig(labels, ordersSeries)),
-                    getChartImage(buildTopProductsConfig(topProdLabels, topProdData))
-                ]);
-                charts = { revImg, ordImg, topImg };
-            } catch (chartErr) {
-                console.warn("Chart generation failed, continuing without charts:", chartErr.message);
-                charts = null;
-            }
-            extraMetrics = { totalRevenue, totalOrders: orders.length, avgOrderValue, newCustomers, topProduct, topCustomerName, topCustomerSpend, repeatCount, newCount, month, year };
-        }
-
-        const monthTitle = (filters.month && filters.year) ? `Monthly Business Report – ${new Date(parseInt(filters.year), parseInt(filters.month) - 1, 1).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}` : `${type.charAt(0).toUpperCase() + type.slice(1)} Report`;
+        const monthTitle = (filters.month && filters.year) 
+            ? `Monthly Business Report – ${new Date(parseInt(filters.year), parseInt(filters.month) - 1, 1).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}` 
+            : `${type.charAt(0).toUpperCase() + type.slice(1)} Report`;
 
         const doc = createabelusPDF({
             title: monthTitle,
             logoPath: finalLogoPath,
             signatory: {
                 name: admin.name,
-                title: admin.title || "abelus Administrator",
+                title: "abelus Administrator",
                 signatureImage: admin.signatureImage,
                 stampImage: admin.stampImage,
             },
             contentBuilder: (doc, helpers) => {
-                try {
-                    // Executive Summary
-                    doc.fillColor("#1E40AF").fontSize(10).font("Helvetica-Bold");
-                    doc.text("Executive Summary", { underline: true });
-                    doc.font("Helvetica").moveDown(0.2);
-                    doc.fillColor("#374151").fontSize(9);
-                    doc.text(aiSummary);
-                    doc.moveDown(0.8);
+                // Executive Summary
+                doc.fillColor("#1E40AF").fontSize(10).font("Helvetica-Bold");
+                doc.text("Executive Summary", { underline: true });
+                doc.font("Helvetica").moveDown(0.2);
+                doc.fillColor("#374151").fontSize(9);
+                doc.text(aiSummary);
+                doc.moveDown(0.8);
 
-                    // Summary metrics
-                    doc.fillColor("#111827").fontSize(11).font("Helvetica-Bold");
-                    doc.text("Key Metrics", { underline: true });
-                    doc.font("Helvetica").moveDown(0.3);
+                // Key Metrics
+                doc.fillColor("#111827").fontSize(11).font("Helvetica-Bold");
+                doc.text("Key Metrics", { underline: true });
+                doc.font("Helvetica").moveDown(0.3);
 
-                    const metrics = type === 'monthly' ? [
-                        ["Total Revenue", `${(extraMetrics.totalRevenue || 0).toLocaleString()} Rwf`],
-                        ["Total Orders", (extraMetrics.totalOrders || 0).toLocaleString()],
-                        ["Average Order Value", `${(extraMetrics.avgOrderValue || 0).toLocaleString()} Rwf`],
-                        ["New Customers", (extraMetrics.newCustomers || 0).toLocaleString()],
-                        ["Top Product", extraMetrics.topProduct || 'N/A']
-                    ] : Object.entries(summary).map(([k, v]) => [k, String(v)]);
+                const metrics = Object.entries(summary).map(([k, v]) => [k, String(v)]);
+                const startY = doc.y; 
+                const leftX = doc.page.margins.left; 
+                const rightX = doc.page.width / 2 + 10; 
+                const lh = 12;
 
-                    const startY = doc.y; const leftX = doc.page.margins.left; const rightX = doc.page.width / 2 + 10; const lh = 12;
-                    metrics.forEach(([k, v], idx) => {
-                        const col = idx % 2 === 0 ? 0 : 1; const row = Math.floor(idx / 2);
-                        const x = col === 0 ? leftX : rightX; const y = startY + row * lh;
-                        doc.fillColor('#374151').fontSize(9).text(`${k}: ${v}`, x, y, { width: rightX - leftX - 30, lineBreak: false });
-                    });
-                    const rowsUsed = Math.ceil(metrics.length / 2); doc.y = startY + rowsUsed * lh; doc.moveDown(0.6);
+                metrics.forEach(([k, v], idx) => {
+                    const col = idx % 2 === 0 ? 0 : 1;
+                    const row = Math.floor(idx / 2);
+                    const x = col === 0 ? leftX : rightX;
+                    const y = startY + row * lh;
+                    doc.fillColor('#374151').fontSize(9).text(`${k}: ${v}`, x, y, { width: rightX - leftX - 30, lineBreak: false });
+                });
 
-                    if (type === 'monthly' && charts) {
-                        // Charts section
-                        doc.fillColor("#111827").fontSize(11).font("Helvetica-Bold");
-                        doc.text("Charts", { underline: true });
-                        doc.font("Helvetica").moveDown(0.3);
+                const rowsUsed = Math.ceil(metrics.length / 2);
+                doc.y = startY + rowsUsed * lh;
+                doc.moveDown(0.6);
 
-                        const placeChart = (img) => {
-                            const innerWidth = doc.page.width - doc.page.margins.left - doc.page.margins.right;
-                            const imgHeight = 160;
-                            const spacing = 16;
-                            let y = doc.y;
-                            const maxY = doc.page.height - doc.page.margins.bottom - 80;
-                            if (y + imgHeight > maxY) {
-                                doc.addPage();
-                                y = doc.y;
-                            }
-                            doc.image(img, doc.page.margins.left, y, { width: innerWidth, height: imgHeight });
-                            doc.y = y + imgHeight + spacing;
-                        };
-                        placeChart(charts.revImg);
-                        placeChart(charts.ordImg);
-                        placeChart(charts.topImg);
-                        doc.moveDown(0.4);
+                // Order Details Table
+                doc.fillColor("#111827").fontSize(11).font("Helvetica-Bold");
+                doc.text("Recent Orders in Report", { underline: true });
+                doc.font("Helvetica").moveDown(0.3);
 
-                        // Product performance table
-                        doc.fillColor("#111827").fontSize(11).font("Helvetica-Bold");
-                        doc.text("Product Performance", { underline: true });
-                        doc.font("Helvetica").moveDown(0.3);
-                        const prodData = Object.keys({ ...productUnits, ...productRevenue }).map(name => ({
-                            name,
-                            units: (productUnits[name] || 0),
-                            revenue: `${Math.round(productRevenue[name] || 0).toLocaleString()} Rwf`,
-                            returns: 0
-                        }));
-                        prodData.sort((a, b) => (parseInt(String(b.units)) - parseInt(String(a.units))));
+                const tableData = orders.slice(0, 30).map(o => ({
+                    id: o.publicId || o.id.slice(-6).toUpperCase(),
+                    customer: (o.customer?.name || o.customer?.email || "N/A").substring(0, 18),
+                    total: `${o.grandTotal.toLocaleString()} Rwf`,
+                    status: o.status.charAt(0).toUpperCase() + o.status.slice(1),
+                    date: new Date(o.createdAt).toLocaleDateString("en-US", { month: "short", day: "2-digit" })
+                }));
 
-                        helpers.table({
-                            columns: [
-                                { key: 'name', header: 'Product Name', width: 180 },
-                                { key: 'units', header: 'Units Sold', width: 80 },
-                                { key: 'revenue', header: 'Revenue', width: 100 },
-                                { key: 'returns', header: 'Returns', width: 70 }
-                            ],
-                            rows: prodData.slice(0, 30)
-                        });
+                helpers.table({
+                    columns: [
+                        { key: "id", header: "ID", width: 60 },
+                        { key: "customer", header: "Customer", width: 150 },
+                        { key: "total", header: "Total", width: 100 },
+                        { key: "status", header: "Status", width: 80 },
+                        { key: "date", header: "Date", width: 70 }
+                    ],
+                    rows: tableData
+                });
 
-                        // Customer insights
-                        doc.fillColor("#111827").fontSize(11).font("Helvetica-Bold");
-                        doc.text("Customer Insights", { underline: true });
-                        doc.font("Helvetica").moveDown(0.3);
-                        doc.fillColor('#374151').fontSize(9);
-                        doc.text(`Top customer by spend: ${extraMetrics.topCustomerName} ($${Math.round(extraMetrics.topCustomerSpend || 0).toLocaleString()})`);
-                        doc.text(`Repeat vs new customers: ${extraMetrics.repeatCount || 0} repeat / ${extraMetrics.newCount || 0} new`);
-                        doc.moveDown(0.6);
-                    }
-
-                    // Orders table (fallback or additional)
-                    if (type !== 'monthly') {
-                        doc.fillColor("#111827").fontSize(11).font("Helvetica-Bold");
-                        doc.text("Order Details", { underline: true });
-                        doc.font("Helvetica").moveDown(0.3);
-
-                        const tableData = orders.slice(0, 30).map(o => ({
-                            id: o._id.toString().slice(-6).toUpperCase(),
-                            product: (o.product?.name || "N/A").substring(0, 22),
-                            customer: (o.customer?.name || o.customer?.email || "N/A").substring(0, 18),
-                            qty: String(o.quantity),
-                            status: o.status.charAt(0).toUpperCase() + o.status.slice(1),
-                            date: new Date(o.createdAt).toLocaleDateString("en-US", { month: "short", day: "2-digit" })
-                        }));
-
-                        helpers.table({
-                            columns: [
-                                { key: "id", header: "ID", width: 50 },
-                                { key: "product", header: "Product", width: 130 },
-                                { key: "customer", header: "Customer", width: 110 },
-                                { key: "qty", header: "Qty", width: 35 },
-                                { key: "status", header: "Status", width: 70 },
-                                { key: "date", header: "Date", width: 60 }
-                            ],
-                            rows: tableData
-                        });
-
-                        if (orders.length > 30) {
-                            doc.moveDown(0.3);
-                            doc.fillColor("#6B7280").fontSize(8).text(`Showing 30 of ${orders.length} orders. Download CSV for complete report.`, { align: "center" });
-                        }
-                    }
-                } catch (contentError) {
-                    console.error("Content builder error:", contentError);
-                    doc.fillColor("#DC2626").fontSize(10);
-                    doc.text("Error generating detailed content. Please contact support.");
+                if (orders.length > 30) {
+                    doc.moveDown(0.3);
+                    doc.fillColor("#6B7280").fontSize(8).text(`Showing top 30 of ${orders.length} items. Download CSV for complete data.`, { align: "center" });
                 }
             }
         });
@@ -328,14 +151,11 @@ export const generateReport = async (req, res) => {
         res.setHeader("Content-Disposition", `inline; filename=${type}-report.pdf`);
         doc.pipe(res);
         doc.end();
+
     } catch (err) {
         console.error(`${req.query.type} report generation failed:`, err);
-        console.error("Error stack:", err.stack);
         if (!res.headersSent) {
-            res.status(500).json({
-                message: "Failed to generate report.",
-                error: process.env.NODE_ENV === "development" ? err.message : undefined
-            });
+            res.status(500).json({ message: "Failed to generate report." });
         }
     }
 };

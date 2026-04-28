@@ -1,12 +1,22 @@
-import Order from "../models/Order.js";
+import prisma from "../prisma.js";
 import { requestToPay, getTransactionStatus } from "../services/momoService.js";
+import { recordTransaction } from "./financeController.js";
+
+// Helper to ensure default accounts exist
+const ensureAccount = async (name, type, code) => {
+  let account = await prisma.account.findUnique({ where: { code } });
+  if (!account) {
+    account = await prisma.account.create({ data: { name, type, code } });
+  }
+  return account.id;
+};
 
 // Process Payment (Initiate)
 export const processPayment = async (req, res, next) => {
   try {
     const { orderId, paymentMethod, phone } = req.body;
 
-    const order = await Order.findById(orderId);
+    const order = await prisma.order.findUnique({ where: { id: orderId } });
     if (!order) {
       const error = new Error("Order not found");
       error.statusCode = 404;
@@ -22,16 +32,19 @@ export const processPayment = async (req, res, next) => {
 
       // Initiate MoMo Payment
       const result = await requestToPay({
-        amount: order.totals.grandTotal,
+        amount: order.grandTotal,
         phone,
         orderId: order.publicId, // Use public ID for external reference
       });
 
-      // Update order with transaction reference
-      order.payment.method = "mtn_momo";
-      order.payment.transactionId = result.referenceId;
-      order.payment.status = "pending";
-      await order.save();
+      await prisma.order.update({
+        where: { id: orderId },
+        data: {
+          paymentMethod: "mtn_momo",
+          transactionId: result.referenceId,
+          paymentStatus: "pending"
+        }
+      });
 
       res.json({
         success: true,
@@ -43,9 +56,13 @@ export const processPayment = async (req, res, next) => {
       });
     } else {
       // Handle other methods (e.g., Cash, Stripe placeholder)
-      order.payment.method = paymentMethod || "cash";
-      order.payment.status = "pending";
-      await order.save();
+      await prisma.order.update({
+        where: { id: orderId },
+        data: {
+          paymentMethod: paymentMethod || "cash",
+          paymentStatus: "pending"
+        }
+      });
 
       res.json({ success: true, data: { status: "pending", message: "Order placed successfully" } });
     }
@@ -55,31 +72,22 @@ export const processPayment = async (req, res, next) => {
 };
 
 // Check Payment Status (Polling Endpoint)
-import { recordTransaction } from "./financeController.js";
-import Account from "../models/Account.js";
-
-// Helper to ensure default accounts exist (duplicated from orderController, ideally should be shared)
-const ensureAccount = async (name, type, code) => {
-  let account = await Account.findOne({ code });
-  if (!account) {
-    account = await Account.create({ name, type, code });
-  }
-  return account._id;
-};
-
 export const checkPaymentStatus = async (req, res, next) => {
   try {
     const { orderId } = req.params;
-    const order = await Order.findById(orderId);
+    const order = await prisma.order.findUnique({ 
+        where: { id: orderId },
+        include: { items: true }
+    });
 
     if (!order) {
       return res.status(404).json({ message: "Order not found" });
     }
 
-    if (order.payment.method === "mtn_momo" && order.payment.transactionId) {
+    if (order.paymentMethod === "mtn_momo" && order.transactionId) {
       let statusData;
       try {
-        statusData = await getTransactionStatus(order.payment.transactionId);
+        statusData = await getTransactionStatus(order.transactionId);
 
         // --- SANDBOX AUTO-APPROVAL (FOR TESTING) ---
         if (process.env.MOMO_ENV === 'sandbox' && (statusData.status === 'PENDING' || !statusData.status)) {
@@ -94,11 +102,11 @@ export const checkPaymentStatus = async (req, res, next) => {
         if (msg.includes("404") || msg.includes("RESOURCE_NOT_FOUND") || msg.includes("Failed to check")) {
           // --- SANDBOX SIMULATION ON 404 ---
           if (process.env.MOMO_ENV === 'sandbox') {
-            console.log(`🧪 SANDBOX MODE: Transaction ${order.payment.transactionId} not found (404) -> SIMULATING SUCCESS`);
+            console.log(`🧪 SANDBOX MODE: Transaction ${order.transactionId} not found (404) -> SIMULATING SUCCESS`);
             statusData = { status: 'SUCCESSFUL' };
           } else {
             // Production behavior: keep waiting
-            console.log(`⚠️ Transaction ${order.payment.transactionId} not found yet (404). Continuing poll...`);
+            console.log(`⚠️ Transaction ${order.transactionId} not found yet (404). Continuing poll...`);
             return res.json({ success: true, status: "pending", systemMessage: "Transaction propagating..." });
           }
           // ---------------------------------
@@ -107,25 +115,17 @@ export const checkPaymentStatus = async (req, res, next) => {
         }
       }
 
-      if (statusData.status === "SUCCESSFUL" && order.payment.status !== "completed") {
-        order.payment.status = "completed";
-        order.payment.paidAt = new Date();
-        // For POS, we mark as delivered immediately upon payment (or 'processing' for online)
-        // Check if it's POS or Online. Default logic here was 'delivered' for POS? 
-        // Let's set it to 'processing' for standard online orders to be safe, or keep existing logic.
-        // Existing logic sets 'delivered'. If this is mainly POS, keep it. If online, 'processing' is better.
-        // Let's stick to existing logic but maybe fix the status for online orders if needed.
-        // For now, preserving existing 'delivered' logic to minimize side effects, 
-        // but typically online orders start as 'processing'.
-
-        if (order.channel === 'website') {
-          order.status = 'processing';
-        } else {
-          order.status = 'delivered';
-          order.deliveredAt = new Date();
-        }
-
-        await order.save();
+      if (statusData.status === "SUCCESSFUL" && order.paymentStatus !== "completed") {
+        const newStatus = order.channel === 'website' ? 'processing' : 'delivered';
+        
+        await prisma.order.update({
+            where: { id: orderId },
+            data: {
+                paymentStatus: "completed",
+                paidAt: new Date(),
+                status: newStatus
+            }
+        });
 
         // Record Financial Transaction
         const cashAccountId = await ensureAccount("Cash on Hand", "Asset", "1000");
@@ -141,48 +141,58 @@ export const checkPaymentStatus = async (req, res, next) => {
           reference: order.publicId,
           type: "Sales",
           entries: [
-            { account: cashAccountId, debit: order.totals.grandTotal },
-            { account: salesAccountId, credit: order.totals.grandTotal }
+            { account: cashAccountId, debit: order.grandTotal },
+            { account: salesAccountId, credit: order.grandTotal }
           ],
-          createdBy: order.customer || null // Or system user if null
+          createdBy: order.customerId || null 
         });
 
       } else if (statusData.status === "FAILED") {
-        order.payment.status = "failed";
-        await order.save();
+        await prisma.order.update({
+            where: { id: orderId },
+            data: { paymentStatus: "failed" }
+        });
       }
 
+      const latestOrder = await prisma.order.findUnique({ where: { id: orderId } });
       return res.json({
         success: true,
-        status: order.payment.status,
+        status: latestOrder.paymentStatus,
         momoStatus: statusData.status
       });
     }
 
-    res.json({ success: true, status: order.payment.status });
+    res.json({ success: true, status: order.paymentStatus });
   } catch (error) {
     next(error);
   }
 };
 
-// Webhook Handler (Optional if polling is used, but good for reliability)
+// Webhook Handler
 export const handleMomoWebhook = async (req, res) => {
   try {
-    const { resourceId, status } = req.body; // MTN sends this payload
-    // Note: resourceId is usually the transactionId (referenceId)
+    const { resourceId, status } = req.body; 
 
-    // Find order by transaction ID
-    const order = await Order.findOne({ "payment.transactionId": resourceId });
+    const order = await prisma.order.findFirst({
+        where: { transactionId: resourceId }
+    });
 
     if (order) {
       if (status === "SUCCESSFUL") {
-        order.payment.status = "completed";
-        order.payment.paidAt = new Date();
-        order.status = "processing";
+          await prisma.order.update({
+              where: { id: order.id },
+              data: {
+                  paymentStatus: "completed",
+                  paidAt: new Date(),
+                  status: "processing"
+              }
+          });
       } else if (status === "FAILED") {
-        order.payment.status = "failed";
+          await prisma.order.update({
+              where: { id: order.id },
+              data: { paymentStatus: "failed" }
+          });
       }
-      await order.save();
     }
 
     res.status(200).end();

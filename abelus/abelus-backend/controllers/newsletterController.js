@@ -1,10 +1,9 @@
-import Subscriber from "../models/Subscriber.js";
-import User from "../models/User.js";
+import prisma from "../prisma.js";
 import { notifyNewSubscriber } from "./notificationController.js";
 import { sendWelcomeEmail } from "../utils/emailService.js";
 
 /**
- * Subscribe to newsletter (public)
+ * 📧 Subscribe to newsletter (public)
  */
 export const subscribe = async (req, res, next) => {
     try {
@@ -17,8 +16,12 @@ export const subscribe = async (req, res, next) => {
             });
         }
 
+        const lowercaseEmail = email.toLowerCase();
+
         // Check if already subscribed
-        const existing = await Subscriber.findOne({ email: email.toLowerCase() });
+        const existing = await prisma.subscriber.findUnique({
+            where: { email: lowercaseEmail }
+        });
 
         if (existing) {
             if (existing.isActive) {
@@ -28,14 +31,18 @@ export const subscribe = async (req, res, next) => {
                 });
             } else {
                 // Reactivate subscription
-                existing.isActive = true;
-                existing.unsubscribedAt = null;
-                existing.subscribedAt = new Date();
-                await existing.save();
+                await prisma.subscriber.update({
+                    where: { email: lowercaseEmail },
+                    data: {
+                        isActive: true,
+                        unsubscribedAt: null,
+                        subscribedAt: new Date()
+                    }
+                });
 
                 // Send welcome email
                 try {
-                    await sendWelcomeEmail(email.toLowerCase());
+                    await sendWelcomeEmail(lowercaseEmail);
                 } catch (error) {
                     console.error("Failed to send welcome email:", error);
                 }
@@ -48,9 +55,11 @@ export const subscribe = async (req, res, next) => {
         }
 
         // Create new subscription
-        await Subscriber.create({
-            email: email.toLowerCase(),
-            source: source || 'homepage'
+        await prisma.subscriber.create({
+            data: {
+                email: lowercaseEmail,
+                source: source || 'homepage'
+            }
         });
 
         // 🔔 Notify Admin
@@ -60,7 +69,7 @@ export const subscribe = async (req, res, next) => {
 
         // Send welcome email
         try {
-            await sendWelcomeEmail(email.toLowerCase());
+            await sendWelcomeEmail(lowercaseEmail);
         } catch (error) {
             console.error("Failed to send welcome email:", error);
         }
@@ -70,7 +79,7 @@ export const subscribe = async (req, res, next) => {
             message: "Thanks for subscribing! You'll receive our latest updates."
         });
     } catch (error) {
-        if (error.code === 11000) {
+        if (error.code === 'P2002') {
             return res.status(400).json({
                 success: false,
                 message: "This email is already subscribed"
@@ -81,61 +90,64 @@ export const subscribe = async (req, res, next) => {
 };
 
 /**
- * Unsubscribe from newsletter (public)
+ * 📧 Unsubscribe from newsletter (public)
  */
 export const unsubscribe = async (req, res, next) => {
     try {
-        const { email } = req.params;
+        const email = req.params.email.toLowerCase();
 
-        const subscriber = await Subscriber.findOne({ email: email.toLowerCase() });
-
-        if (!subscriber) {
-            return res.status(404).json({
-                success: false,
-                message: "Email not found in our subscription list"
-            });
-        }
-
-        subscriber.isActive = false;
-        subscriber.unsubscribedAt = new Date();
-        await subscriber.save();
+        const subscriber = await prisma.subscriber.update({
+            where: { email },
+            data: {
+                isActive: false,
+                unsubscribedAt: new Date()
+            }
+        });
 
         res.json({
             success: true,
             message: "You have been successfully unsubscribed"
         });
     } catch (error) {
+        if (error.code === 'P2025') {
+            return res.status(404).json({
+                success: false,
+                message: "Email not found in our subscription list"
+            });
+        }
         next(error);
     }
 };
 
 /**
- * Get all subscribers (admin)
+ * 📧 Get all subscribers (admin)
  */
 export const getAllSubscribers = async (req, res, next) => {
     try {
         const { status, page = 1, limit = 50 } = req.query;
 
-        const filter = {};
-        if (status === 'active') filter.isActive = true;
-        if (status === 'inactive') filter.isActive = false;
+        const where = {};
+        if (status === 'active') where.isActive = true;
+        if (status === 'inactive') where.isActive = false;
 
-        const subscribers = await Subscriber.find(filter)
-            .sort({ subscribedAt: -1 })
-            .skip((page - 1) * limit)
-            .limit(parseInt(limit));
+        const subscribers = await prisma.subscriber.findMany({
+            where,
+            orderBy: { subscribedAt: 'desc' },
+            skip: (Number(page) - 1) * Number(limit),
+            take: Number(limit)
+        });
 
-        const total = await Subscriber.countDocuments(filter);
-        const activeCount = await Subscriber.countDocuments({ isActive: true });
+        const total = await prisma.subscriber.count({ where });
+        const activeCount = await prisma.subscriber.count({ where: { isActive: true } });
 
         res.json({
             success: true,
             data: subscribers,
             pagination: {
-                page: parseInt(page),
-                limit: parseInt(limit),
+                page: Number(page),
+                limit: Number(limit),
                 total,
-                pages: Math.ceil(total / limit)
+                pages: Math.ceil(total / Number(limit))
             },
             stats: {
                 total,
@@ -149,38 +161,41 @@ export const getAllSubscribers = async (req, res, next) => {
 };
 
 /**
- * Delete subscriber (admin)
+ * 📧 Delete subscriber (admin)
  */
 export const deleteSubscriber = async (req, res, next) => {
     try {
         const { id } = req.params;
 
-        const subscriber = await Subscriber.findByIdAndDelete(id);
-
-        if (!subscriber) {
-            return res.status(404).json({
-                success: false,
-                message: "Subscriber not found"
-            });
-        }
+        await prisma.subscriber.delete({
+            where: { id }
+        });
 
         res.json({
             success: true,
             message: "Subscriber deleted successfully"
         });
     } catch (error) {
+        if (error.code === 'P2025') {
+            return res.status(404).json({
+                success: false,
+                message: "Subscriber not found"
+            });
+        }
         next(error);
     }
 };
 
 /**
- * Export subscribers as CSV (admin)
+ * 📧 Export subscribers as CSV (admin)
  */
 export const exportSubscribers = async (req, res, next) => {
     try {
-        const subscribers = await Subscriber.find({ isActive: true })
-            .select('email subscribedAt source')
-            .sort({ subscribedAt: -1 });
+        const subscribers = await prisma.subscriber.findMany({
+            where: { isActive: true },
+            select: { email: true, subscribedAt: true, source: true },
+            orderBy: { subscribedAt: 'desc' }
+        });
 
         const csvHeader = 'Email,Subscribed Date,Source\n';
         const csvRows = subscribers.map(s =>
@@ -196,7 +211,7 @@ export const exportSubscribers = async (req, res, next) => {
 };
 
 /**
- * Send newsletter to subscribers (admin)
+ * 📧 Send newsletter to subscribers (admin)
  */
 export const sendNewsletter = async (req, res, next) => {
     try {
@@ -214,10 +229,10 @@ export const sendNewsletter = async (req, res, next) => {
         // Determine recipients based on type
         switch (recipientType) {
             case 'sellers':
-                recipients = await User.find({ role: 'seller' }).select('email');
+                recipients = await prisma.user.findMany({ where: { role: 'seller' }, select: { email: true } });
                 break;
             case 'customers':
-                recipients = await User.find({ role: 'customer' }).select('email');
+                recipients = await prisma.user.findMany({ where: { role: 'customer' }, select: { email: true } });
                 break;
             case 'specific':
                 if (!recipientId) {
@@ -226,12 +241,12 @@ export const sendNewsletter = async (req, res, next) => {
                         message: "Recipient ID is required for specific targeting"
                     });
                 }
-                const specificUser = await User.findById(recipientId).select('email');
+                const specificUser = await prisma.user.findUnique({ where: { id: recipientId }, select: { email: true } });
                 if (specificUser) recipients = [specificUser];
                 break;
             case 'subscribers':
             default:
-                recipients = await Subscriber.find({ isActive: true }).select('email');
+                recipients = await prisma.subscriber.findMany({ where: { isActive: true }, select: { email: true } });
                 break;
         }
 
