@@ -247,9 +247,12 @@ model Order {
   createdAt         DateTime     @default(now())
   updatedAt         DateTime     @updatedAt
 
+  notes             Json?        @default("[]") // Array of { text, author, createdAt }
+
   @@index([customerId])
   @@index([status])
   @@index([publicId])
+  @@index([createdAt])
 }
 
 model OrderItem {
@@ -680,6 +683,10 @@ model FlashSale {
 
   createdAt       DateTime           @default(now())
   updatedAt       DateTime           @updatedAt
+
+  @@index([startDate])
+  @@index([endDate])
+  @@index([isActive])
 }
 
 model FlashSaleProduct {
@@ -739,6 +746,9 @@ model ReportLog {
 
   generatedById   String?
   generatedBy     User?    @relation("GeneratedReports", fields: [generatedById], references: [id])
+
+  viewedBy        Json?    @default("[]") // Array of user IDs or session info
+  downloadedBy    Json?    @default("[]") // Array of user IDs or session info
 }
 
 model TaxRate {

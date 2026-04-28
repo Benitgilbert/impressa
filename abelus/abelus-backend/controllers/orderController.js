@@ -711,9 +711,19 @@ export const getReportLogs = async (req, res) => {
 
 export const markReportViewed = async (req, res) => {
   try {
-    // In Prisma schema, ReportLog doesn't have viewedBy field. 
-    // This function needs to be adjusted or schema updated.
-    // For now, returning success to maintain API parity.
+    const reportId = req.params.id;
+    const report = await prisma.reportLog.findUnique({ where: { id: reportId } });
+    if (!report) return res.status(404).json({ message: "Report not found" });
+
+    const viewedBy = Array.isArray(report.viewedBy) ? report.viewedBy : [];
+    if (!viewedBy.includes(req.user.id)) {
+      viewedBy.push(req.user.id);
+      await prisma.reportLog.update({
+        where: { id: reportId },
+        data: { viewedBy }
+      });
+    }
+
     res.json({ message: "Report marked as viewed." });
   } catch (err) {
     res.status(500).json({ message: "Failed to mark report as viewed." });
@@ -722,7 +732,19 @@ export const markReportViewed = async (req, res) => {
 
 export const markReportDownloaded = async (req, res) => {
   try {
-    // Similar to markReportViewed, field missing in Prisma schema.
+    const reportId = req.params.id;
+    const report = await prisma.reportLog.findUnique({ where: { id: reportId } });
+    if (!report) return res.status(404).json({ message: "Report not found" });
+
+    const downloadedBy = Array.isArray(report.downloadedBy) ? report.downloadedBy : [];
+    if (!downloadedBy.includes(req.user.id)) {
+      downloadedBy.push(req.user.id);
+      await prisma.reportLog.update({
+        where: { id: reportId },
+        data: { downloadedBy }
+      });
+    }
+
     res.json({ message: "Report marked as downloaded." });
   } catch (err) {
     res.status(500).json({ message: "Failed to mark report as downloaded." });
@@ -931,10 +953,26 @@ export const updateOrderItems = async (req, res) => {
 
 export const addOrderNote = async (req, res) => {
   try {
-    // Prisma schema for Order currently doesn't have a 'notes' field.
-    // Similar to viewedBy, returning success for now.
-    res.json({ message: "Note added successfully (stub)" });
+    const { note } = req.body;
+    const orderId = req.params.id;
+    const order = await prisma.order.findUnique({ where: { id: orderId } });
+    if (!order) return res.status(404).json({ message: "Order not found" });
+
+    const notes = Array.isArray(order.notes) ? order.notes : [];
+    notes.push({
+      text: note,
+      author: req.user?.name || "System",
+      createdAt: new Date()
+    });
+
+    const updated = await prisma.order.update({
+      where: { id: orderId },
+      data: { notes }
+    });
+
+    res.json({ message: "Note added successfully", data: updated });
   } catch (err) {
+    console.error("Add order note error:", err);
     res.status(500).json({ message: "Failed to add note" });
   }
 };

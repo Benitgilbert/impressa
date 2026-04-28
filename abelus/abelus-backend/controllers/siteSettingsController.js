@@ -49,6 +49,7 @@ export const getPublicSettings = async (req, res, next) => {
                 contactPhone: settings.contactPhone,
                 contactAddress: settings.contactAddress,
                 googleMapsQuery: settings.googleMapsQuery,
+                logo: settings.logo,
                 socialLinks: settings.socialLinks || {}
             }
         });
