@@ -46,7 +46,7 @@ function TrendingProductsSidebar() {
             <div className="hidden lg:flex w-1/2 relative bg-gradient-to-br from-violet-900 via-indigo-900 to-slate-900 overflow-hidden text-white flex-col items-center justify-center text-center p-12">
                 <h1 className="text-4xl font-black mb-4 tracking-tighter">ABELUS</h1>
                 <p className="text-xl text-violet-200 font-medium tracking-wide">Premium Shopping Experience</p>
-                <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-20 pointer-events-none"></div>
+                <div className="absolute inset-0 bg-[url('/noise.svg')] opacity-20 pointer-events-none"></div>
             </div>
         );
     }
@@ -117,7 +117,7 @@ function TrendingProductsSidebar() {
                 </div>
             </div>
 
-            <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-10 pointer-events-none z-20"></div>
+            <div className="absolute inset-0 bg-[url('/noise.svg')] opacity-10 pointer-events-none z-20"></div>
         </div>
     );
 }
