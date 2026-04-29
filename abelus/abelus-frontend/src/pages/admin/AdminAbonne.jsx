@@ -1,6 +1,6 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect } from "react";
 import axios from "../../utils/axiosInstance";
-import { FaUserPlus, FaFileInvoiceDollar, FaTimes, FaMoneyBillWave, FaPrint, FaEdit, FaTrash, FaTags, FaSearch, FaSpinner } from "react-icons/fa";
+import { FaUserPlus, FaTimes, FaMoneyBillWave, FaPrint, FaEdit, FaTrash, FaTags, FaSearch, FaSpinner } from "react-icons/fa";
 
 import Sidebar from "../../components/Sidebar";
 import Topbar from "../../components/Topbar";

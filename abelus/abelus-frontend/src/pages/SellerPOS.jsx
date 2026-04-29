@@ -381,7 +381,7 @@ export default function SellerPOS() {
             }, 3000);
         }
         return () => clearInterval(interval);
-    }, [pendingOrder, cart, seller, fetchProducts]);
+    }, [pendingOrder, cart, seller, fetchProducts, getItemPrice]);
 
     const handleReceiptClose = () => {
         setShowReceipt(false);
