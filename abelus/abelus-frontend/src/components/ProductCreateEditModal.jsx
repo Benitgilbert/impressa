@@ -14,10 +14,19 @@ function ProductCreateEditModal({ product, onClose, onSaved }) {
   // Helper to parse attributes from backend format to frontend format
   const parseAttributes = (attrs) => {
     if (!attrs) return [];
-    return attrs.map(a => ({
-      key: a.name,
-      value: Array.isArray(a.values) ? a.values.join(", ") : a.values,
-      isVariation: a.variation || false
+    // If it's already an array of {key, value, isVariation}, use it
+    if (Array.isArray(attrs)) {
+      return attrs.map(a => ({
+        key: a.key || a.name || "",
+        value: Array.isArray(a.value || a.values) ? (a.value || a.values).join(", ") : (a.value || a.values || ""),
+        isVariation: a.isVariation || a.variation || false
+      }));
+    }
+    // Handle legacy object format if any
+    return Object.entries(attrs).map(([key, value]) => ({
+      key,
+      value: Array.isArray(value) ? value.join(", ") : value,
+      isVariation: true
     }));
   };
 
@@ -26,7 +35,9 @@ function ProductCreateEditModal({ product, onClose, onSaved }) {
     if (!vars) return [];
     return vars.map(v => ({
       ...v,
-      attributes: v.attributes || {}
+      attributes: v.attributes || {},
+      price: v.price || "",
+      stock: v.stock || ""
     }));
   };
 
@@ -35,7 +46,7 @@ function ProductCreateEditModal({ product, onClose, onSaved }) {
     description: product?.description || "",
     price: product?.price || "",
     stock: product?.stock || "",
-    selectedCategories: product?.categories?.map(c => c.id || c._id) || [],
+    selectedCategories: product?.categories?.map(c => typeof c === 'object' ? (c.id || c._id) : c) || [],
     image: product?.image || "",
     type: product?.type || "simple",
     customizable: product?.customizable || false,
@@ -69,7 +80,8 @@ function ProductCreateEditModal({ product, onClose, onSaved }) {
   const fetchAllProducts = async () => {
     try {
       const res = await api.get("/products?limit=100");
-      setAllProducts(res.data.data?.products || res.data.products || []);
+      // The endpoint returns the array directly
+      setAllProducts(Array.isArray(res.data) ? res.data : (res.data.data || res.data.products || []));
     } catch (err) {
       console.error("Failed to fetch products:", err);
     }
@@ -334,6 +346,8 @@ function ProductCreateEditModal({ product, onClose, onSaved }) {
         <div className="flex px-6 border-b border-gray-100 dark:border-gray-700 overflow-x-auto scrollbar-hide bg-white dark:bg-gray-800 transition-colors">
           {["general", "attributes", "variations", "linked products", "shipping"].map((tab) => {
             if (tab === "variations" && form.type !== "variable") return null;
+            if (tab === "shipping" && form.type === "service") return null;
+            if (tab === "attributes" && form.type === "service") return null; // Simple services don't need attributes usually
             return (
               <button
                 key={tab}
@@ -374,6 +388,7 @@ function ProductCreateEditModal({ product, onClose, onSaved }) {
                 >
                   <option value="simple">Simple Product</option>
                   <option value="variable">Variable Product</option>
+                  <option value="service">Service (Print/Edit/etc)</option>
                 </select>
               </div>
 
@@ -445,17 +460,19 @@ function ProductCreateEditModal({ product, onClose, onSaved }) {
                 />
               </div>
 
-              <div className="md:col-span-1">
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Stock (Total)</label>
-                <input
-                  type="number"
-                  name="stock"
-                  value={form.stock}
-                  onChange={handleChange}
-                  placeholder="0"
-                  className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-white dark:bg-gray-700 dark:text-white transition-all text-sm placeholder-gray-400 dark:placeholder-gray-500"
-                />
-              </div>
+              {form.type !== 'service' && (
+                <div className="md:col-span-1">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Stock (Total)</label>
+                  <input
+                    type="number"
+                    name="stock"
+                    value={form.stock}
+                    onChange={handleChange}
+                    placeholder="0"
+                    className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-white dark:bg-gray-700 dark:text-white transition-all text-sm placeholder-gray-400 dark:placeholder-gray-500"
+                  />
+                </div>
+              )}
 
               <div className="md:col-span-2">
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Description</label>

@@ -103,6 +103,7 @@ const SellerOrders = () => {
                                             <tr>
                                                 <th className="px-6 py-4 font-medium text-sm">Order ID</th>
                                                 <th className="px-6 py-4 font-medium text-sm">Date</th>
+                                                <th className="px-6 py-4 font-medium text-sm">Source</th>
                                                 <th className="px-6 py-4 font-medium text-sm">Customer</th>
                                                 <th className="px-6 py-4 font-medium text-sm">Items</th>
                                                 <th className="px-6 py-4 font-medium text-sm">Total</th>
@@ -115,9 +116,18 @@ const SellerOrders = () => {
                                                 <tr key={order._id} className="hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors">
                                                     <td className="px-6 py-4 font-mono text-xs text-indigo-600 dark:text-indigo-400 font-medium">#{order.publicId}</td>
                                                     <td className="px-6 py-4 text-sm text-gray-600 dark:text-gray-300">{new Date(order.createdAt).toLocaleDateString()}</td>
+                                                    <td className="px-6 py-4">
+                                                        <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ${
+                                                            order.orderType === 'pos' 
+                                                            ? 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400 border border-orange-200 dark:border-orange-800' 
+                                                            : 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400 border border-blue-200 dark:border-blue-800'
+                                                        }`}>
+                                                            {order.orderType === 'pos' ? 'POS' : 'Online'}
+                                                        </span>
+                                                    </td>
                                                     <td className="px-6 py-4 text-sm text-gray-900 dark:text-white font-medium">{order.user?.name || order.guestInfo?.name || 'Guest'}</td>
                                                     <td className="px-6 py-4 text-sm text-gray-600 dark:text-gray-400">{order.items?.length || 0} items</td>
-                                                    <td className="px-6 py-4 text-sm font-medium text-gray-900 dark:text-white">RWF {order.totals?.grandTotal?.toLocaleString()}</td>
+                                                    <td className="px-6 py-4 text-sm font-medium text-gray-900 dark:text-white">RWF {order.totals?.grandTotal?.toLocaleString() || order.grandTotal?.toLocaleString()}</td>
                                                     <td className="px-6 py-4">{getStatusBadge(order.status)}</td>
                                                     <td className="px-6 py-4">
                                                         <Link

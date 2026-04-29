@@ -3,20 +3,31 @@ import prisma from "../prisma.js";
 /**
  * 📈 Shared Range Logic
  */
-const getRangeReport = async (start, end) => {
+const getRangeReport = async (start, end, sellerId) => {
+  const where = { createdAt: { gte: start, lt: end } };
+  if (sellerId) {
+    where.items = { some: { sellerId } };
+  }
+
   const orders = await prisma.order.findMany({
-    where: { createdAt: { gte: start, lt: end } },
+    where,
     include: { items: { include: { product: true } }, customer: true }
   });
 
   const productCount = {};
   const customizationCount = { customText: 0, customFile: 0, cloudLink: 0 };
+  let totalRevenue = 0;
 
   orders.forEach(order => {
     order.items.forEach(item => {
-        const name = item.product?.name;
+        // If filtering by seller, only count this seller's items
+        if (sellerId && item.sellerId !== sellerId) return;
+
+        const name = item.product?.name || item.productName;
         if (name) productCount[name] = (productCount[name] || 0) + item.quantity;
         
+        totalRevenue += (item.subtotal || 0);
+
         const cust = item.customizations || {};
         if (cust.customText) customizationCount.customText++;
         if (cust.customFile) customizationCount.customFile++;
@@ -29,6 +40,7 @@ const getRangeReport = async (start, end) => {
 
   const summary = {
     total: orders.length,
+    totalRevenue,
     delivered: orders.filter(o => o.status === "delivered").length,
     pending: orders.filter(o => o.status === "pending").length,
     cancelled: orders.filter(o => o.status === "cancelled").length,
@@ -42,35 +54,52 @@ const getRangeReport = async (start, end) => {
 /**
  * 📈 Monthly Report
  */
-const getMonthlyReport = async ({ month, year }) => {
+const getMonthlyReport = async ({ month, year, sellerId }) => {
   const start = new Date(year, month - 1, 1);
   const end = new Date(year, month, 1);
-  return await getRangeReport(start, end);
+  return await getRangeReport(start, end, sellerId);
+};
+
+/**
+ * 📈 Weekly Report
+ */
+const getWeeklyReport = async ({ sellerId }) => {
+  const now = new Date();
+  const start = new Date(now.setDate(now.getDate() - now.getDay())); // Start of current week (Sunday)
+  start.setHours(0, 0, 0, 0);
+  const end = new Date(start);
+  end.setDate(end.getDate() + 7);
+  return await getRangeReport(start, end, sellerId);
 };
 
 /**
  * 📈 Daily Report
  */
-const getDailyReport = async ({ date }) => {
+const getDailyReport = async ({ date, sellerId }) => {
   const day = new Date(date);
   const start = new Date(day.setHours(0, 0, 0, 0));
   const end = new Date(day.setHours(23, 59, 59, 999));
-  return await getRangeReport(start, end);
+  return await getRangeReport(start, end, sellerId);
 };
 
 /**
  * 📈 Custom Range Report
  */
-const getCustomRangeReport = async ({ start, end }) => {
-  return await getRangeReport(new Date(start), new Date(end));
+const getCustomRangeReport = async ({ start, end, sellerId }) => {
+  return await getRangeReport(new Date(start), new Date(end), sellerId);
 };
 
 /**
  * 📈 Status Report
  */
-const getStatusReport = async ({ status }) => {
+const getStatusReport = async ({ status, sellerId }) => {
+  const where = { status };
+  if (sellerId) {
+    where.items = { some: { sellerId } };
+  }
+
   const orders = await prisma.order.findMany({
-    where: { status },
+    where,
     include: { items: { include: { product: true } }, customer: true }
   });
   const summary = {
@@ -83,9 +112,14 @@ const getStatusReport = async ({ status }) => {
 /**
  * 📈 Customer Report
  */
-const getCustomerReport = async ({ customerId }) => {
+const getCustomerReport = async ({ customerId, sellerId }) => {
+  const where = { customerId };
+  if (sellerId) {
+    where.items = { some: { sellerId } };
+  }
+
   const orders = await prisma.order.findMany({
-    where: { customerId },
+    where,
     include: { items: { include: { product: true } }, customer: true }
   });
 
@@ -94,7 +128,9 @@ const getCustomerReport = async ({ customerId }) => {
 
   orders.forEach(order => {
     order.items.forEach(item => {
-        const name = item.product?.name;
+        if (sellerId && item.sellerId !== sellerId) return;
+
+        const name = item.product?.name || item.productName;
         if (name) productCount[name] = (productCount[name] || 0) + item.quantity;
         totalSpent += (item.price * item.quantity);
     });
@@ -115,12 +151,17 @@ const getCustomerReport = async ({ customerId }) => {
 /**
  * 📈 Revenue Report
  */
-const getRevenueReport = async ({ start, end }) => {
+const getRevenueReport = async ({ start, end, sellerId }) => {
+  const where = {
+    createdAt: { gte: new Date(start), lt: new Date(end) },
+    status: "delivered",
+  };
+  if (sellerId) {
+    where.items = { some: { sellerId } };
+  }
+
   const orders = await prisma.order.findMany({
-    where: {
-      createdAt: { gte: new Date(start), lt: new Date(end) },
-      status: "delivered",
-    },
+    where,
     include: { items: { include: { product: true } } }
   });
 
@@ -129,9 +170,11 @@ const getRevenueReport = async ({ start, end }) => {
 
   orders.forEach(order => {
     order.items.forEach(item => {
+        if (sellerId && item.sellerId !== sellerId) return;
+
         const rev = item.price * item.quantity;
         totalRevenue += rev;
-        const name = item.product?.name;
+        const name = item.product?.name || item.productName;
         if (name) productRevenue[name] = (productRevenue[name] || 0) + rev;
     });
   });
@@ -163,6 +206,9 @@ export const buildReportData = async (type, filters) => {
         }
         return await getMonthlyReport(filters);
       }
+      case "weekly": {
+        return await getWeeklyReport(filters);
+      }
       case "daily": {
         if (!filters.date) {
           filters.date = new Date().toISOString().split('T')[0];
@@ -193,3 +239,4 @@ export const buildReportData = async (type, filters) => {
     throw error;
   }
 };
+

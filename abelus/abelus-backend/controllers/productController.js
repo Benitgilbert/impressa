@@ -186,21 +186,22 @@ export const createProduct = async (req, res) => {
     const rawCategories = body.categories || body.category;
 
     if (rawCategories) {
-      let catArray = [];
-      try {
-        catArray = typeof rawCategories === 'string' && rawCategories.startsWith('[') 
-          ? JSON.parse(rawCategories) 
-          : [rawCategories];
-      } catch (e) {
-        catArray = [rawCategories];
+      let catArray = Array.isArray(rawCategories) ? rawCategories : [];
+      if (!Array.isArray(rawCategories)) {
+        try {
+          catArray = typeof rawCategories === 'string' && rawCategories.startsWith('[') 
+            ? JSON.parse(rawCategories) 
+            : [rawCategories];
+        } catch (e) {
+          catArray = [rawCategories];
+        }
       }
 
-      if (Array.isArray(catArray) && catArray.length > 0) {
+      if (catArray.length > 0) {
         const resolvedCategories = [];
         for (let item of catArray) {
           if (!item) continue;
           
-          // Handle object input from frontend
           let searchItem = item;
           if (typeof item === 'object' && item !== null) {
             searchItem = item.id || item._id || item.name || item.slug;
@@ -287,7 +288,11 @@ export const getSellerProducts = async (req, res) => {
   try {
     const products = await prisma.product.findMany({
       where: { sellerId: req.user.id },
-      include: { seller: { select: { id: true, name: true, storeName: true } } },
+      include: { 
+        seller: { select: { id: true, name: true, storeName: true } },
+        categories: { select: { id: true, name: true } },
+        variations: true
+      },
       orderBy: { createdAt: 'desc' }
     });
     res.json({ success: true, data: products });
@@ -538,21 +543,22 @@ export const updateProduct = async (req, res) => {
     const rawCategories = body.categories || body.category;
 
     if (rawCategories) {
-      let catArray = [];
-      try {
-        catArray = typeof rawCategories === 'string' && rawCategories.startsWith('[') 
-          ? JSON.parse(rawCategories) 
-          : [rawCategories];
-      } catch (e) {
-        catArray = [rawCategories];
+      let catArray = Array.isArray(rawCategories) ? rawCategories : [];
+      if (!Array.isArray(rawCategories)) {
+        try {
+          catArray = typeof rawCategories === 'string' && rawCategories.startsWith('[') 
+            ? JSON.parse(rawCategories) 
+            : [rawCategories];
+        } catch (e) {
+          catArray = [rawCategories];
+        }
       }
 
-      if (Array.isArray(catArray) && catArray.length > 0) {
+      if (catArray.length > 0) {
         const resolvedCategories = [];
         for (let item of catArray) {
           if (!item) continue;
           
-          // Handle object input from frontend
           let searchItem = item;
           if (typeof item === 'object' && item !== null) {
             searchItem = item.id || item._id || item.name || item.slug;
@@ -561,14 +567,12 @@ export const updateProduct = async (req, res) => {
           if (!searchItem) continue;
           if (typeof searchItem === 'string') searchItem = searchItem.trim();
 
-          // 1. Check if it's a UUID
-          const isId = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(searchItem);
+          const isId = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(searchItem);
           if (isId) {
             resolvedCategories.push({ id: searchItem });
             continue;
           }
 
-          // 2. Search for category by slug or name
           const slug = typeof searchItem === 'string' ? searchItem.toLowerCase().replace(/[^a-z0-9]+/g, '-') : '';
           const found = await prisma.category.findFirst({
             where: {
@@ -620,7 +624,16 @@ export const updateProduct = async (req, res) => {
       }
     });
 
-    res.json(product);
+    const updatedProduct = await prisma.product.findUnique({
+      where: { id: product.id },
+      include: {
+        categories: { select: { id: true, name: true } },
+        variations: true,
+        seller: { select: { id: true, name: true, storeName: true } }
+      }
+    });
+
+    res.json(updatedProduct);
   } catch (err) {
     console.error("Update Product Error:", err);
     res.status(400).json({ message: err.message });

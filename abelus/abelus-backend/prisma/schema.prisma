@@ -29,6 +29,7 @@ enum SellerStatus {
 
 enum OrderStatus {
   pending
+  quote_requested
   payment_pending
   payment_failed
   confirmed
@@ -114,6 +115,10 @@ model User {
   generatedReports  ReportLog[]    @relation("GeneratedReports")
   sellerReports     SellerReport[] @relation("SellerReports")
 
+  // Staff Management
+  managedById       String?
+  managedBy         User?        @relation("StaffManagement", fields: [managedById], references: [id])
+  staff             User[]       @relation("StaffManagement")
 }
 
 model Category {
@@ -180,6 +185,7 @@ model Product {
   reviews           Review[]
   cartItems         CartItem[]
   flashSaleProducts FlashSaleProduct[]
+  contractPrices    ContractPrice[]
 
   crossSells        Product[]          @relation("ProductCrossSells")
   crossSellOf       Product[]          @relation("ProductCrossSells")
@@ -362,6 +368,7 @@ model ClientAbonne {
   status      String   @default("active") // active, inactive
 
   transactions AbonneTransaction[]
+  contractPrices ContractPrice[]
 
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
@@ -389,6 +396,22 @@ model AbonneTransaction {
 
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
+}
+
+model ContractPrice {
+  id          String       @id @default(uuid())
+  price       Float
+  
+  clientId    String
+  client      ClientAbonne @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  
+  productId   String
+  product     Product      @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  @@unique([clientId, productId])
 }
 
 model Account {

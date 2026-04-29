@@ -98,7 +98,9 @@ export default function SellerDashboard() {
                         pendingPayouts: earningsData.pendingPayouts || 0
                     }));
                 }
-            } catch (err) { }
+            } catch (err) {
+                console.error('Failed to fetch earnings summary', err);
+            }
 
             // Get recent orders for this seller
             try {
@@ -111,7 +113,9 @@ export default function SellerDashboard() {
                         totalOrders: ordersRes.data.pagination?.total || allOrders.length || 0
                     }));
                 }
-            } catch (err) { }
+            } catch (err) {
+                console.error('Failed to fetch recent orders', err);
+            }
 
             // Get revenue data (Sales Chart) - Only fetch initially to save bandwidth
             if (!isPolling) {
@@ -299,10 +303,10 @@ export default function SellerDashboard() {
                                             </thead>
                                             <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
                                                 {recentOrders.map(order => (
-                                                    <tr key={order._id} className="hover:bg-gray-50/50 dark:hover:bg-gray-700/50 transition-colors">
+                                                    <tr key={order.id} className="hover:bg-gray-50/50 dark:hover:bg-gray-700/50 transition-colors">
                                                         <td className="px-6 py-4 font-mono text-xs text-gray-500 dark:text-gray-400">#{order.publicId}</td>
                                                         <td className="px-6 py-4 font-medium text-gray-900 dark:text-gray-100">{order.user?.name || order.guestInfo?.name || 'Customer'}</td>
-                                                        <td className="px-6 py-4 text-gray-600 dark:text-gray-300">{formatCurrency(order.totals?.grandTotal)}</td>
+                                                        <td className="px-6 py-4 text-gray-600 dark:text-gray-300">{formatCurrency(order.grandTotal)}</td>
                                                         <td className="px-6 py-4">{getStatusBadge(order.status)}</td>
                                                     </tr>
                                                 ))}
@@ -326,7 +330,7 @@ export default function SellerDashboard() {
                                     ) : (
                                         <div className="divide-y divide-gray-100 dark:divide-gray-700">
                                             {topProducts.map(product => (
-                                                <div key={product._id} className="p-4 flex items-center gap-4 hover:bg-gray-50/50 dark:hover:bg-gray-700/50 transition-colors">
+                                                <div key={product.id} className="p-4 flex items-center gap-4 hover:bg-gray-50/50 dark:hover:bg-gray-700/50 transition-colors">
                                                     <div className="h-12 w-12 rounded-lg bg-gray-100 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 overflow-hidden flex-shrink-0">
                                                         {product.image ? (
                                                             <img src={product.image} alt={product.name} className="h-full w-full object-cover" />

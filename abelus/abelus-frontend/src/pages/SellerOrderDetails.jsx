@@ -98,7 +98,16 @@ const SellerOrderDetails = () => {
                         {/* Order Header */}
                         <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
                             <div>
-                                <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Order #{order.publicId}</h1>
+                                <div className="flex items-center gap-3 mb-1">
+                                    <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Order #{order.publicId}</h1>
+                                    <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ${
+                                        order.orderType === 'pos' 
+                                        ? 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400 border border-orange-200 dark:border-orange-800' 
+                                        : 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400 border border-blue-200 dark:border-blue-800'
+                                    }`}>
+                                        {order.orderType === 'pos' ? 'POS' : 'Online'}
+                                    </span>
+                                </div>
                                 <p className="text-gray-500 dark:text-gray-400 mt-1">Placed on {new Date(order.createdAt).toLocaleString()}</p>
                             </div>
                             <div className="flex items-center gap-4 bg-white dark:bg-gray-800 p-4 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700">

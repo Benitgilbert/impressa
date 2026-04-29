@@ -1,10 +1,16 @@
 import express from "express";
 import * as orderController from "../controllers/orderController.js";
+import * as reportController from "../controllers/reportController.js";
 import { authMiddleware, optionalAuth } from "../middleware/authMiddleware.js";
 import { reportLimiter, analyticsLimiter } from "../middleware/rateLimiter.js";
 import upload from "../middleware/uploadMiddleware.js";
 
 const router = express.Router();
+
+// Generate business reports (PDF/CSV)
+router.get("/report", authMiddleware(["admin", "seller"]), reportLimiter, reportController.generateReport);
+
+
 
 // Get all orders (admin)
 router.get("/", authMiddleware(["admin"]), orderController.getOrders);
@@ -39,20 +45,20 @@ router.get("/track/:id", orderController.trackPublicOrder);
 router.post("/report/logs/:id/view", authMiddleware(["admin"]), orderController.markReportViewed);
 router.post("/report/logs/:id/download", authMiddleware(["admin"]), orderController.markReportDownloaded);
 
-// POS Order (Admin only - for Abelus's own products)
-router.post("/pos", authMiddleware(["admin"]), orderController.createPOSOrder);
+// POS Order (Unified)
+router.post("/pos", authMiddleware(["admin", "seller", "cashier"]), orderController.createPOSOrder);
 
-// POS Order (Seller - for seller's own products)
-router.post("/seller/pos", authMiddleware(["admin", "seller"]), orderController.createPOSOrder);
+// Service Inquiry (Print Portal)
+router.post("/inquiry", optionalAuth, upload.single("file"), orderController.createInquiry);
 
-// Get seller's POS products (only their inventory)
-router.get("/seller/pos-products", authMiddleware(["admin", "seller"]), orderController.getSellerPOSProducts);
+// Get seller's POS products (inventory for seller/cashier)
+router.get("/seller/pos-products", authMiddleware(["admin", "seller", "cashier"]), orderController.getSellerPOSProducts);
 
 // Get admin/Abelus's POS products (only company inventory)
 router.get("/admin/pos-products", authMiddleware(["admin"]), orderController.getAdminPOSProducts);
 
 // Get seller's orders
-router.get("/seller/my-orders", authMiddleware(["admin", "seller"]), orderController.getSellerOrders);
+router.get("/seller/my-orders", authMiddleware(["admin", "seller", "cashier"]), orderController.getSellerOrders);
 
 // Barcode lookup for POS scanning
 router.get("/pos/lookup", authMiddleware(["admin", "seller"]), orderController.lookupByBarcode);

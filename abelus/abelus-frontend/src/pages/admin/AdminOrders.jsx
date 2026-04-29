@@ -136,6 +136,7 @@ const AdminOrders = () => {
                                     <tr>
                                         <th className="px-6 py-4 text-left text-xs font-bold text-charcoal-500 dark:text-charcoal-400 uppercase tracking-wider">Order ID</th>
                                         <th className="px-6 py-4 text-left text-xs font-bold text-charcoal-500 dark:text-charcoal-400 uppercase tracking-wider">Date</th>
+                                        <th className="px-6 py-4 text-left text-xs font-bold text-charcoal-500 dark:text-charcoal-400 uppercase tracking-wider">Type</th>
                                         <th className="px-6 py-4 text-left text-xs font-bold text-charcoal-500 dark:text-charcoal-400 uppercase tracking-wider">Customer</th>
                                         <th className="px-6 py-4 text-left text-xs font-bold text-charcoal-500 dark:text-charcoal-400 uppercase tracking-wider">Total</th>
                                         <th className="px-6 py-4 text-left text-xs font-bold text-charcoal-500 dark:text-charcoal-400 uppercase tracking-wider">Payment</th>
@@ -146,7 +147,7 @@ const AdminOrders = () => {
                                 <tbody className="divide-y divide-cream-100 dark:divide-charcoal-700">
                                     {loading ? (
                                         <tr>
-                                            <td colSpan="7" className="px-6 py-12 text-center text-charcoal-500 dark:text-charcoal-400">
+                                            <td colSpan="8" className="px-6 py-12 text-center text-charcoal-500 dark:text-charcoal-400">
                                                 <div className="flex flex-col items-center gap-3">
                                                     <div className="w-8 h-8 border-2 border-terracotta-500 border-t-transparent rounded-full animate-spin"></div>
                                                     <span>Loading orders...</span>
@@ -155,7 +156,7 @@ const AdminOrders = () => {
                                         </tr>
                                     ) : orders.length === 0 ? (
                                         <tr>
-                                            <td colSpan="7" className="px-6 py-12 text-center">
+                                            <td colSpan="8" className="px-6 py-12 text-center">
                                                 <FaBox className="text-4xl text-charcoal-300 dark:text-charcoal-600 mx-auto mb-3" />
                                                 <p className="text-charcoal-500 dark:text-charcoal-400">No orders found</p>
                                             </td>
@@ -172,6 +173,15 @@ const AdminOrders = () => {
                                                     {new Date(order.createdAt).toLocaleDateString()}
                                                 </td>
                                                 <td className="px-6 py-4">
+                                                    <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ${
+                                                        order.orderType === 'pos' 
+                                                        ? 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400 border border-orange-200 dark:border-orange-800' 
+                                                        : 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400 border border-blue-200 dark:border-blue-800'
+                                                    }`}>
+                                                        {order.orderType === 'pos' ? 'POS' : 'Online'}
+                                                    </span>
+                                                </td>
+                                                <td className="px-6 py-4">
                                                     <div className="font-medium text-charcoal-800 dark:text-white">
                                                         {order.customer?.name || order.guestInfo?.name || "Guest"}
                                                     </div>
@@ -180,10 +190,10 @@ const AdminOrders = () => {
                                                     </div>
                                                 </td>
                                                 <td className="px-6 py-4 font-semibold text-charcoal-800 dark:text-white">
-                                                    {order.totals?.grandTotal?.toLocaleString()} Rwf
+                                                    {(order.grandTotal || order.totals?.grandTotal)?.toLocaleString()} Rwf
                                                 </td>
                                                 <td className="px-6 py-4 text-sm text-charcoal-500 dark:text-charcoal-400 capitalize">
-                                                    {order.payment?.method?.replace("_", " ")}
+                                                    {order.payment?.method?.replace("_", " ") || order.paymentMethod?.replace("_", " ")}
                                                 </td>
                                                 <td className="px-6 py-4">
                                                     <span className={getStatusBadge(order.status)}>
@@ -223,10 +233,19 @@ const AdminOrders = () => {
                                     <div key={order._id} className="p-4 hover:bg-cream-50 dark:hover:bg-charcoal-700/50 transition-colors">
                                         <div className="flex justify-between items-start mb-3">
                                             <div>
-                                                <span className="font-mono text-sm text-charcoal-600 dark:text-charcoal-300">
-                                                    #{order.publicId}
-                                                </span>
-                                                <p className="font-medium text-charcoal-800 dark:text-white mt-1">
+                                                <div className="flex items-center gap-2 mb-1">
+                                                    <span className="font-mono text-sm text-charcoal-600 dark:text-charcoal-300">
+                                                        #{order.publicId}
+                                                    </span>
+                                                    <span className={`px-1.5 py-0.5 rounded text-[8px] font-bold uppercase tracking-wider ${
+                                                        order.orderType === 'pos' 
+                                                        ? 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400 border border-orange-200 dark:border-orange-800' 
+                                                        : 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400 border border-blue-200 dark:border-blue-800'
+                                                    }`}>
+                                                        {order.orderType === 'pos' ? 'POS' : 'Online'}
+                                                    </span>
+                                                </div>
+                                                <p className="font-medium text-charcoal-800 dark:text-white">
                                                     {order.customer?.name || order.guestInfo?.name || "Guest"}
                                                 </p>
                                             </div>
@@ -241,7 +260,7 @@ const AdminOrders = () => {
                                                 </span>
                                                 <span className="mx-2 text-charcoal-300">•</span>
                                                 <span className="font-semibold text-charcoal-800 dark:text-white">
-                                                    {order.totals?.grandTotal?.toLocaleString()} Rwf
+                                                    {(order.grandTotal || order.totals?.grandTotal)?.toLocaleString()} Rwf
                                                 </span>
                                             </div>
                                             <Link

@@ -56,6 +56,9 @@ import AdminSellerReports from "./pages/AdminSellerReports";
 import SellerRegistration from "./pages/SellerRegistration";
 import SellerPOS from "./pages/SellerPOS";
 import SellerProducts from "./pages/SellerProducts";
+import SellerReports from "./pages/SellerReports";
+import SellerTeam from "./pages/SellerTeam";
+import PrintPortal from "./pages/PrintPortal";
 // SellerAddProduct removed
 
 import AdminCustomerQueries from "./pages/AdminCustomerQueries";
@@ -110,6 +113,7 @@ function App() {
                   <Route path="/privacy" element={<PrivacyPolicy />} />
                   <Route path="/terms" element={<TermsOfService />} />
                   <Route path="/faq" element={<FAQ />} />
+                  <Route path="/print-portal" element={<PrintPortal />} />
                   <Route path="/orders" element={
                     <ProtectedRoute allowedRoles={['customer']}>
                       <OrderHistory />
@@ -180,6 +184,16 @@ function App() {
                   <Route path="/seller/abonnes" element={
                     <ProtectedRoute allowedRoles={['seller', 'admin']}>
                       <SellerAbonne />
+                    </ProtectedRoute>
+                  } />
+                  <Route path="/seller/reports" element={
+                    <ProtectedRoute allowedRoles={['seller', 'admin']}>
+                      <SellerReports />
+                    </ProtectedRoute>
+                  } />
+                  <Route path="/seller/team" element={
+                    <ProtectedRoute allowedRoles={['seller', 'admin']}>
+                      <SellerTeam />
                     </ProtectedRoute>
                   } />
 

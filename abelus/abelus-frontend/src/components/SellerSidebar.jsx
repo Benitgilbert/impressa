@@ -1,4 +1,4 @@
-import { FaChartBar, FaBox, FaSignOutAlt, FaStore, FaList, FaShoppingCart, FaPlus, FaMoneyBillWave, FaTimes, FaUserFriends } from "react-icons/fa";
+import { FaChartBar, FaBox, FaSignOutAlt, FaStore, FaList, FaShoppingCart, FaPlus, FaMoneyBillWave, FaTimes, FaUserFriends, FaUserShield } from "react-icons/fa";
 import { Link, useLocation } from "react-router-dom";
 
 function SellerSidebar({ isOpen, onClose }) {
@@ -82,6 +82,14 @@ function SellerSidebar({ isOpen, onClose }) {
                         <Link to="/seller/payouts" className={getLinkClass('/seller/payouts')} onClick={onClose}>
                             <FaMoneyBillWave className="text-lg opacity-70 group-hover:opacity-100" />
                             <span>Payouts</span>
+                        </Link>
+                        <Link to="/seller/team" className={getLinkClass('/seller/team')} onClick={onClose}>
+                            <FaUserShield className="text-lg opacity-70 group-hover:opacity-100" />
+                            <span>My Team</span>
+                        </Link>
+                        <Link to="/seller/reports" className={getLinkClass('/seller/reports')} onClick={onClose}>
+                            <FaChartBar className="text-lg opacity-70 group-hover:opacity-100" />
+                            <span>Reports</span>
                         </Link>
                     </div>
                 </div>

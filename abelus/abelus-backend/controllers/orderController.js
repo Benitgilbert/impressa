@@ -336,6 +336,67 @@ export const createOrder = async (req, res) => {
 };
 
 /**
+ * 🖨️ Create Service Inquiry (Print Portal)
+ */
+export const createInquiry = async (req, res) => {
+  try {
+    const { serviceId, quantity, notes } = req.body;
+    const userId = req.user?.id;
+
+    if (!serviceId) {
+      return res.status(400).json({ message: "Service ID is required" });
+    }
+
+    const product = await prisma.product.findUnique({
+      where: { id: serviceId }
+    });
+
+    if (!product || product.type !== 'service') {
+      return res.status(404).json({ message: "Service not found" });
+    }
+
+    let filePath = "";
+    if (req.file) {
+      filePath = req.file.path;
+    } else if (req.files && req.files.length > 0) {
+      filePath = req.files[0].path;
+    }
+
+    const order = await prisma.order.create({
+      data: {
+        publicId: `INQ-${Math.random().toString(36).substr(2, 9).toUpperCase()}`,
+        orderType: "online",
+        channel: "website",
+        status: "quote_requested",
+        customerId: userId || null,
+        subtotal: 0,
+        grandTotal: 0,
+        paymentStatus: "pending",
+        items: {
+          create: [{
+            productId: product.id,
+            sellerId: product.sellerId,
+            productName: product.name,
+            quantity: Number(quantity) || 1,
+            price: product.price, // Base price for reference
+            subtotal: 0,
+            customizations: {
+              customFile: filePath,
+              customerNotes: notes
+            }
+          }]
+        }
+      }
+    });
+
+    res.status(201).json({ success: true, order });
+  } catch (err) {
+    console.error("Inquiry Error:", err);
+    res.status(500).json({ message: "Failed to send inquiry" });
+  }
+};
+
+/**
  * 🔄 Update Order Status
  */
 export const updateOrderStatus = async (req, res) => {
@@ -470,12 +531,20 @@ export const updateOrderStatus = async (req, res) => {
  */
 export const createPOSOrder = async (req, res) => {
   try {
-    const { items, paymentMethod, storeLocation } = req.body;
+    const { items, paymentMethod, storeLocation, clientId } = req.body;
     const userId = req.user.id;
     const userRole = req.user.role;
 
     if (!items || items.length === 0) {
       return res.status(400).json({ message: "Order must contain items" });
+    }
+
+    // Fetch contract prices if clientId is provided
+    let contractPrices = [];
+    if (clientId) {
+      contractPrices = await prisma.contractPrice.findMany({
+        where: { clientId }
+      });
     }
 
     let subtotal = 0;
@@ -488,32 +557,58 @@ export const createPOSOrder = async (req, res) => {
       });
 
       if (!product) throw new Error(`Product not found`);
+      
+      // Ownership check
+      const effectiveSellerId = userRole === 'cashier' ? req.user.managedById : userId;
       if (userRole === 'seller' && product.sellerId !== userId) {
         throw new Error(`You can only sell your own products: ${product.name}`);
       }
+      if (userRole === 'cashier' && product.sellerId !== effectiveSellerId) {
+        throw new Error(`Unauthorized: This product does not belong to your store.`);
+      }
 
-      let price = product.price;
+      // 💰 Price Logic
+      let price = item.price || product.price; // Allow price override from frontend (negotiated)
+      
+      // Apply Contract Price if available (and price wasn't manually overridden)
+      if (!item.price) {
+        const cp = contractPrices.find(p => p.productId === product.id);
+        if (cp) {
+          price = cp.price;
+        }
+      }
+
       let productName = product.name;
 
       if (item.variationId) {
         const variation = product.variations.find(v => v.sku === item.variationId);
         if (!variation) throw new Error(`Variation ${item.variationId} not found`);
-        if (variation.stock < item.quantity) throw new Error(`Insufficient stock for ${product.name}`);
-
-        await prisma.productVariation.update({
-          where: { id: variation.id },
-          data: { stock: { decrement: Number(item.quantity) } }
-        });
-        price = variation.price;
+        
+        // Only check/decrement stock for physical products
+        if (product.type !== 'service') {
+          if (variation.stock < item.quantity) throw new Error(`Insufficient stock for ${product.name}`);
+          await prisma.productVariation.update({
+            where: { id: variation.id },
+            data: { stock: { decrement: Number(item.quantity) } }
+          });
+        }
+        
+        if (!item.price) price = variation.price;
         const attrs = variation.attributes || {};
         productName = `${product.name} - ${Object.values(attrs).join(" / ")}`;
       } else {
-        if (product.stock < item.quantity) throw new Error(`Insufficient stock for ${product.name}`);
+        if (product.type !== 'service' && product.stock < item.quantity) {
+          throw new Error(`Insufficient stock for ${product.name}`);
+        }
       }
 
+      // Update product stock (if not service) and sales count
       await prisma.product.update({
         where: { id: product.id },
-        data: { stock: { decrement: Number(item.quantity) }, salesCount: { increment: Number(item.quantity) } }
+        data: { 
+          ...(product.type !== 'service' && { stock: { decrement: Number(item.quantity) } }),
+          salesCount: { increment: Number(item.quantity) } 
+        }
       });
 
       const itemSubtotal = price * Number(item.quantity);
@@ -550,6 +645,34 @@ export const createPOSOrder = async (req, res) => {
         }
       }
     });
+
+    // 👥 Abonne Debt Recording
+    if (clientId) {
+      try {
+        const transactions = orderItemsData.map(item => ({
+          clientId: clientId,
+          orderId: order.id,
+          responsibleId: userId,
+          designation: item.productName,
+          quantity: item.quantity,
+          pu: item.price,
+          pt: item.subtotal,
+          debtAmount: item.subtotal,
+          status: "unpaid"
+        }));
+
+        await prisma.abonneTransaction.createMany({
+          data: transactions
+        });
+
+        await prisma.clientAbonne.update({
+          where: { id: clientId },
+          data: { totalDebt: { increment: subtotal } }
+        });
+      } catch (abonneErr) {
+        console.error("Abonne debt recording failed:", abonneErr);
+      }
+    }
 
     // 🕒 Shift Update
     try {
@@ -598,7 +721,7 @@ export const createPOSOrder = async (req, res) => {
         });
 
         for (const item of orderItemsData) {
-          if (item.sellerId && item.sellerId !== userId) {
+          if (item.sellerId) {
             const gross = item.subtotal;
             const commAmt = gross * (appliedRate / 100);
             const net = gross - commAmt;
@@ -768,9 +891,13 @@ export const getMyOrders = async (req, res) => {
 
 export const getSellerOrders = async (req, res) => {
   try {
+    const effectiveSellerId = req.user.role === 'cashier' ? req.user.managedById : req.user.id;
     const orders = await prisma.order.findMany({
-      where: { items: { some: { sellerId: req.user.id } } },
-      include: { customer: { select: { id: true, name: true, email: true } } },
+      where: { items: { some: { sellerId: effectiveSellerId } } },
+      include: { 
+        customer: { select: { id: true, name: true, email: true } },
+        items: true
+      },
       orderBy: { createdAt: 'desc' }
     });
     res.json({ success: true, data: orders });
@@ -889,8 +1016,19 @@ export const lookupByBarcode = async (req, res) => {
 
 export const getSellerPOSProducts = async (req, res) => {
   try {
+    const effectiveSellerId = req.user.role === 'cashier' ? req.user.managedById : req.user.id;
+    if (!effectiveSellerId) return res.status(400).json({ message: "No seller association found for this account" });
+
     const products = await prisma.product.findMany({
-      where: { sellerId: req.user.id, stock: { gt: 0 }, visibility: 'public' },
+      where: { 
+        sellerId: effectiveSellerId, 
+        visibility: 'public',
+        OR: [
+          { stock: { gt: 0 } },
+          { type: 'service' },
+          { type: 'variable' }
+        ]
+      },
       select: { id: true, name: true, price: true, stock: true, image: true, sku: true, type: true, variations: true },
       orderBy: { name: 'asc' }
     });

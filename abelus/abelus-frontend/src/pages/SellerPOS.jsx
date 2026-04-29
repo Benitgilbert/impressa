@@ -63,18 +63,52 @@ export default function SellerPOS() {
     const [completedOrder, setCompletedOrder] = useState(null);
     const [scanError, setScanError] = useState("");
 
+    // Client Selection
+    const [clients, setClients] = useState([]);
+    const [selectedClient, setSelectedClient] = useState(null);
+    const [clientContractPrices, setClientContractPrices] = useState([]);
+    const [clientSearchTerm, setClientSearchTerm] = useState("");
+
+    const fetchClients = useCallback(async () => {
+        try {
+            const res = await api.get("/abonnes");
+            if (res.data.success) {
+                setClients(res.data.data);
+            }
+        } catch (err) {
+            console.error("Failed to fetch clients");
+        }
+    }, []);
+
+    const fetchContractPrices = useCallback(async (clientId) => {
+        try {
+            const res = await api.get(`/abonnes/${clientId}/prices`);
+            if (res.data.success) {
+                setClientContractPrices(res.data.data);
+            }
+        } catch (err) {
+            console.error("Failed to fetch contract prices");
+        }
+    }, []);
+
+    useEffect(() => {
+        if (selectedClient) {
+            fetchContractPrices(selectedClient.id || selectedClient._id);
+        } else {
+            setClientContractPrices([]);
+        }
+    }, [selectedClient, fetchContractPrices]);
+
     const addToCart = useCallback((product, isVariation = false) => {
         if (product.stock <= 0) return;
         setCart(prevCart => {
-            // Unique ID for cart item: ProductID + (VariationID or "")
-            const uniqueId = isVariation ? `${product._id}-${product.variationId}` : product._id;
-
-            const existing = prevCart.find((item) => (item.uniqueId || item._id) === uniqueId);
+            const uniqueId = isVariation ? `${product._id || product.id}-${product.variationId}` : (product._id || product.id);
+            const existing = prevCart.find((item) => (item.uniqueId || item._id || item.id) === uniqueId);
 
             if (existing) {
                 if (existing.quantity >= product.stock) return prevCart;
                 return prevCart.map((item) =>
-                    (item.uniqueId || item._id) === uniqueId ? { ...item, quantity: item.quantity + 1 } : item
+                    (item.uniqueId || item._id || item.id) === uniqueId ? { ...item, quantity: item.quantity + 1 } : item
                 );
             } else {
                 return [...prevCart, { ...product, quantity: 1, uniqueId, variationId: product.variationId }];
@@ -84,8 +118,6 @@ export default function SellerPOS() {
 
     const handleBarcodeScan = useCallback(async (barcode) => {
         setScanError("");
-
-        // First check if product is in local list
         const localProduct = products.find(
             p => p.barcode?.toUpperCase() === barcode.toUpperCase() ||
                 p.sku?.toUpperCase() === barcode.toUpperCase()
@@ -97,7 +129,6 @@ export default function SellerPOS() {
             return;
         }
 
-        // Fallback to API lookup
         try {
             const res = await api.get(`/orders/pos/lookup?barcode=${barcode}`);
             if (res.data.success && res.data.product) {
@@ -153,39 +184,31 @@ export default function SellerPOS() {
         fetchProducts();
         fetchSellerInfo();
         fetchActiveShift();
-    }, [fetchProducts, fetchSellerInfo, fetchActiveShift]);
+        fetchClients();
+    }, [fetchProducts, fetchSellerInfo, fetchActiveShift, fetchClients]);
 
-    // Barcode scanner detection - rapid keypresses
     useEffect(() => {
         const handleKeyDown = (e) => {
             const now = Date.now();
-
-            // If Enter is pressed, check if we have a barcode
             if (e.key === 'Enter' && scanBuffer.length >= 4) {
                 e.preventDefault();
                 handleBarcodeScan(scanBuffer);
                 setScanBuffer("");
                 return;
             }
-
-            // If keystroke is fast (< 50ms) and alphanumeric, it's likely a scanner
             if (now - lastKeyTime < 50) {
                 if (/^[a-zA-Z0-9-]$/.test(e.key)) {
                     setScanBuffer(prev => prev + e.key);
                 }
             } else {
-                // Too slow, reset buffer
                 setScanBuffer(e.key);
             }
-
             setLastKeyTime(now);
         };
-
         window.addEventListener('keydown', handleKeyDown);
         return () => window.removeEventListener('keydown', handleKeyDown);
     }, [scanBuffer, lastKeyTime, handleBarcodeScan]);
 
-    // Manual barcode entry via search
     const handleSearchKeyDown = (e) => {
         if (e.key === 'Enter' && searchTerm.length >= 4) {
             handleBarcodeScan(searchTerm);
@@ -193,7 +216,6 @@ export default function SellerPOS() {
         }
     };
 
-    // Variation Selection
     const [selectedProductForVariation, setSelectedProductForVariation] = useState(null);
 
     const handleProductClick = (product) => {
@@ -206,42 +228,54 @@ export default function SellerPOS() {
 
     const addVariationToCart = (variation) => {
         if (variation.stock <= 0) return;
-
-        // Flatten attributes map/object to string for display
         let attrString = "";
         if (variation.attributes) {
             const attrs = typeof variation.attributes === 'object' ? Object.values(variation.attributes) : [];
             attrString = attrs.join(" / ");
         }
-
         const productToAdd = {
             ...selectedProductForVariation,
-            _id: selectedProductForVariation._id, 
+            _id: selectedProductForVariation._id || selectedProductForVariation.id, 
             variationId: variation.sku, 
             name: `${selectedProductForVariation.name} - ${attrString}`,
             price: variation.price,
             stock: variation.stock,
             image: variation.image || selectedProductForVariation.image
         };
-
         addToCart(productToAdd, true); 
         setSelectedProductForVariation(null);
     };
 
+    const getItemPrice = (item) => {
+        if (item.manualPrice !== undefined) return item.manualPrice;
+        const cp = clientContractPrices.find(p => p.productId === (item._id || item.id));
+        return cp ? cp.price : (item.price || 0);
+    };
+
+    const updatePrice = (uniqueId, newPrice) => {
+        setCart(prev => prev.map(item => {
+            if ((item.uniqueId || item._id || item.id) === uniqueId) {
+                return { ...item, manualPrice: parseFloat(newPrice) || 0 };
+            }
+            return item;
+        }));
+    };
+
     const calculateTotal = () => {
-        return cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
+        return cart.reduce((sum, item) => sum + getItemPrice(item) * item.quantity, 0);
     };
 
     const removeFromCart = (uniqueId) => {
-        setCart(cart.filter((item) => (item.uniqueId || item._id) !== uniqueId));
+        setCart(cart.filter((item) => (item.uniqueId || item._id || item.id) !== uniqueId));
     };
 
     const updateQuantity = (uniqueId, delta) => {
         setCart(
             cart.map((item) => {
-                if ((item.uniqueId || item._id) === uniqueId) {
+                if ((item.uniqueId || item._id || item.id) === uniqueId) {
                     const newQty = Math.max(1, item.quantity + delta);
-                    if (newQty > (item.stock || 0)) return item;
+                    // Skip stock check for services
+                    if (item.type !== 'service' && newQty > (item.stock || 0)) return item;
                     return { ...item, quantity: newQty };
                 }
                 return item;
@@ -273,14 +307,17 @@ export default function SellerPOS() {
         if (cart.length === 0) return;
         setProcessing(true);
         try {
-            const res = await api.post("/orders/seller/pos", {
+            const res = await api.post("/orders/pos", {
                 items: cart.map((item) => ({
-                    product: item._id,
+                    product: item._id || item.id,
                     quantity: item.quantity,
-                    variationId: item.variationId 
+                    variationId: item.variationId,
+                    price: getItemPrice(item)
                 })),
                 paymentMethod: method,
-                phone: phone
+                phone: phone,
+                clientId: selectedClient?.id || selectedClient?._id,
+                receivedAmount
             });
 
             if (method === "mtn_momo" && res.data.status === "pending") {
@@ -288,7 +325,6 @@ export default function SellerPOS() {
                 return;
             }
 
-            // Payment confirmed - show receipt
             const order = {
                 ...res.data,
                 cashReceived: receivedAmount,
@@ -296,7 +332,7 @@ export default function SellerPOS() {
                 items: cart.map(item => ({
                     productName: item.name,
                     quantity: item.quantity,
-                    price: item.price
+                    price: getItemPrice(item)
                 }))
             };
 
@@ -321,14 +357,13 @@ export default function SellerPOS() {
                         clearInterval(interval);
                         setPendingOrder(null);
                         setProcessing(false);
-
                         setCompletedOrder({
                             ...res.data,
                             cashierName: seller?.name,
                             items: cart.map(item => ({
                                 productName: item.name,
                                 quantity: item.quantity,
-                                price: item.price
+                                price: getItemPrice(item)
                             }))
                         });
                         setShowReceipt(true);
@@ -450,9 +485,16 @@ export default function SellerPOS() {
 
                                     <button
                                         onClick={handleStartShift}
-                                        className="w-full py-4 bg-sage-600 hover:bg-sage-700 text-white rounded-2xl font-black text-lg shadow-xl shadow-sage-600/20 transition-all active:scale-[0.98] flex items-center justify-center gap-2"
+                                        className="w-full py-4 bg-sage-600 hover:bg-sage-700 text-white rounded-2xl font-black text-lg shadow-xl shadow-sage-600/20 transition-all active:scale-[0.98] flex items-center justify-center gap-2 mb-3"
                                     >
                                         Open Register & Start
+                                    </button>
+
+                                    <button
+                                        onClick={() => window.location.href = "/seller/dashboard"}
+                                        className="w-full py-3 bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400 rounded-2xl font-bold transition-all hover:bg-gray-200"
+                                    >
+                                        Cancel & Go Back
                                     </button>
                                 </div>
                             </div>
@@ -787,7 +829,7 @@ export default function SellerPOS() {
                                 <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
                                     {filteredProducts.map((product) => (
                                         <div
-                                            key={product._id}
+                                            key={product._id || product.id}
                                             onClick={() => handleProductClick(product)}
                                             className={`group bg-white dark:bg-gray-700 rounded-xl border border-gray-100 dark:border-gray-600 overflow-hidden cursor-pointer hover:shadow-lg transition-all transform hover:-translate-y-1 relative ${product.stock <= 0 && product.type !== 'variable' ? 'opacity-60 pointer-events-none grayscale' : ''
                                                 }`}
@@ -818,14 +860,11 @@ export default function SellerPOS() {
                                             <div className="p-3">
                                                 <h4 className="font-semibold text-gray-800 dark:text-gray-100 text-sm truncate mb-1" title={product.name}>{product.name}</h4>
                                                 <div className="flex justify-between items-center">
-                                                    <span className="text-indigo-600 dark:text-indigo-400 font-bold text-sm">RWF {product.price.toLocaleString()}</span>
+                                                    <span className="text-indigo-600 dark:text-indigo-400 font-bold text-sm">RWF {getItemPrice(product).toLocaleString()}</span>
                                                     <span className="text-xs text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-gray-600 px-1.5 py-0.5 rounded">
                                                         {product.type === 'variable' ? 'Var' : `${product.stock} left`}
                                                     </span>
                                                 </div>
-                                                {product.barcode && (
-                                                    <p className="text-[10px] text-gray-400 mt-1 font-mono truncate">{product.barcode}</p>
-                                                )}
                                             </div>
                                         </div>
                                     ))}
@@ -835,13 +874,75 @@ export default function SellerPOS() {
                     </div>
 
                     <div className="md:col-span-4 flex flex-col h-full bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 overflow-hidden">
-                        <div className="p-5 border-b border-gray-100 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-800/80 flex justify-between items-center">
-                            <h2 className="font-bold text-gray-800 dark:text-white flex items-center gap-2">
-                                <FaShoppingCart className="text-indigo-600" /> Current Sale
-                            </h2>
-                            <span className="bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 text-xs font-bold px-2.5 py-1 rounded-full">
-                                {cart.length} items
-                            </span>
+                        <div className="p-5 border-b border-gray-100 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-800/80">
+                            <div className="flex justify-between items-center mb-4">
+                                <h2 className="font-bold text-gray-800 dark:text-white flex items-center gap-2">
+                                    <FaShoppingCart className="text-indigo-600" /> Current Sale
+                                </h2>
+                                <span className="bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 text-xs font-bold px-2.5 py-1 rounded-full">
+                                    {cart.length} items
+                                </span>
+                            </div>
+
+                            <div className="space-y-3">
+                                <div className="flex gap-2 p-1 bg-gray-100 dark:bg-gray-900 rounded-xl">
+                                    <button
+                                        onClick={() => setSelectedClient(null)}
+                                        className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${!selectedClient ? 'bg-white dark:bg-gray-700 shadow-sm text-indigo-600' : 'text-gray-500'}`}
+                                    >
+                                        GUEST
+                                    </button>
+                                    <button
+                                        onClick={() => !selectedClient && setClientSearchTerm("")}
+                                        className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${selectedClient ? 'bg-white dark:bg-gray-700 shadow-sm text-indigo-600' : 'text-gray-500'}`}
+                                    >
+                                        ABONNÉ
+                                    </button>
+                                </div>
+
+                                {selectedClient ? (
+                                    <div className="flex items-center justify-between p-3 bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-100 dark:border-indigo-800 rounded-xl">
+                                        <div className="flex flex-col">
+                                            <span className="text-[10px] font-bold text-indigo-600 uppercase">Selected Client</span>
+                                            <span className="font-bold text-gray-900 dark:text-white text-sm">{selectedClient.name}</span>
+                                        </div>
+                                        <button 
+                                            onClick={() => setSelectedClient(null)}
+                                            className="p-1.5 hover:bg-indigo-100 dark:hover:bg-indigo-800 rounded-lg text-indigo-500"
+                                        >
+                                            <FaTrash size={12} />
+                                        </button>
+                                    </div>
+                                ) : (
+                                    <div className="relative">
+                                        <FaSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs" />
+                                        <input
+                                            type="text"
+                                            placeholder="Search client abonne..."
+                                            className="w-full pl-9 pr-4 py-2 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl text-xs outline-none focus:border-indigo-500 dark:text-white"
+                                            value={clientSearchTerm}
+                                            onChange={(e) => setClientSearchTerm(e.target.value)}
+                                        />
+                                        {clientSearchTerm && (
+                                            <div className="absolute left-0 right-0 top-full mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl shadow-xl z-30 max-h-48 overflow-y-auto">
+                                                {clients.filter(c => c.name.toLowerCase().includes(clientSearchTerm.toLowerCase())).map(client => (
+                                                    <div
+                                                        key={client.id || client._id}
+                                                        onClick={() => {
+                                                            setSelectedClient(client);
+                                                            setClientSearchTerm("");
+                                                        }}
+                                                        className="p-3 hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer border-b last:border-0 dark:border-gray-700"
+                                                    >
+                                                        <p className="font-bold text-sm text-gray-900 dark:text-white">{client.name}</p>
+                                                        <p className="text-[10px] text-gray-500">{client.phone || client.email || "No contact"}</p>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
+                            </div>
                         </div>
 
                         <div className="flex-1 overflow-y-auto p-4 space-y-3 scrollbar-thin dark:scrollbar-thumb-gray-600">
@@ -853,30 +954,37 @@ export default function SellerPOS() {
                                 </div>
                             ) : (
                                 cart.map((item) => (
-                                    <div key={item.uniqueId || item._id} className="bg-white dark:bg-gray-700 border border-gray-100 dark:border-gray-600 rounded-xl p-3 shadow-sm flex justify-between items-center group">
+                                    <div key={item.uniqueId || item._id || item.id} className="bg-white dark:bg-gray-700 border border-gray-100 dark:border-gray-600 rounded-xl p-3 shadow-sm flex justify-between items-center group">
                                         <div className="flex-1 min-w-0 mr-3">
                                             <h5 className="font-bold text-gray-800 dark:text-white text-sm truncate">{item.name}</h5>
-                                            <p className="text-indigo-600 dark:text-indigo-400 text-xs font-medium">
-                                                RWF {item.price.toLocaleString()} × {item.quantity}
-                                            </p>
+                                            <div className="flex items-center gap-1 mt-1">
+                                                <span className="text-xs font-bold text-gray-400">RWF</span>
+                                                <input 
+                                                    type="number"
+                                                    value={getItemPrice(item)}
+                                                    onChange={(e) => updatePrice(item.uniqueId || item._id || item.id, e.target.value)}
+                                                    className="w-20 bg-transparent border-b border-indigo-200 dark:border-indigo-800 focus:border-indigo-500 outline-none text-indigo-600 dark:text-indigo-400 text-sm font-bold p-0"
+                                                />
+                                                <span className="text-gray-400 text-[10px] ml-1">× {item.quantity}</span>
+                                            </div>
                                         </div>
                                         <div className="flex items-center gap-2 bg-gray-50 dark:bg-gray-800 p-1 rounded-lg border border-gray-200 dark:border-gray-600">
                                             <button
-                                                onClick={() => updateQuantity(item.uniqueId || item._id, -1)}
+                                                onClick={() => updateQuantity(item.uniqueId || item._id || item.id, -1)}
                                                 className="w-7 h-7 flex items-center justify-center rounded bg-white dark:bg-gray-700 text-gray-600 dark:text-gray-300 shadow-sm hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors"
                                             >
                                                 <FaMinus size={10} />
                                             </button>
                                             <span className="w-6 text-center text-sm font-bold text-gray-800 dark:text-white">{item.quantity}</span>
                                             <button
-                                                onClick={() => updateQuantity(item.uniqueId || item._id, 1)}
+                                                onClick={() => updateQuantity(item.uniqueId || item._id || item.id, 1)}
                                                 className="w-7 h-7 flex items-center justify-center rounded bg-white dark:bg-gray-700 text-gray-600 dark:text-gray-300 shadow-sm hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors"
                                             >
                                                 <FaPlus size={10} />
                                             </button>
                                         </div>
                                         <button
-                                            onClick={() => removeFromCart(item.uniqueId || item._id)}
+                                            onClick={() => removeFromCart(item.uniqueId || item._id || item.id)}
                                             className="ml-2 w-7 h-7 flex items-center justify-center text-red-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded transition-colors"
                                         >
                                             <FaTrash size={12} />
@@ -888,10 +996,6 @@ export default function SellerPOS() {
 
                         <div className="border-t border-gray-100 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-800 p-5 space-y-4">
                             <div className="space-y-2">
-                                <div className="flex justify-between text-gray-500 dark:text-gray-400 text-sm">
-                                    <span>Subtotal</span>
-                                    <span>RWF {calculateTotal().toLocaleString()}</span>
-                                </div>
                                 <div className="flex justify-between text-gray-900 dark:text-white text-xl font-bold pt-2 border-t border-dashed border-gray-200 dark:border-gray-600">
                                     <span>Total</span>
                                     <span>RWF {calculateTotal().toLocaleString()}</span>
@@ -900,11 +1004,11 @@ export default function SellerPOS() {
 
                             <div className="grid grid-cols-2 gap-3 pt-2">
                                 <button
-                                    onClick={initiateCashPayment}
+                                    onClick={selectedClient ? () => handleCheckout("cash") : initiateCashPayment}
                                     disabled={processing || cart.length === 0}
                                     className="flex items-center justify-center gap-2 py-3 px-4 bg-green-600 hover:bg-green-700 text-white rounded-xl font-bold shadow-lg shadow-green-600/20 transition-all disabled:opacity-50 disabled:grayscale"
                                 >
-                                    <FaMoneyBillWave /> Cash
+                                    <FaMoneyBillWave /> {selectedClient ? 'Record Debt' : 'Cash'}
                                 </button>
                                 <button
                                     onClick={initiateMomoPayment}

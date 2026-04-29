@@ -13,13 +13,18 @@ import sendReportEmail from "../utils/sendReportEmail.js";
 export const generateReport = async (req, res) => {
     try {
         const { type, format, ...filters } = req.query;
-        const validTypes = ["monthly", "daily", "custom-range", "customer", "status", "revenue"];
+        const validTypes = ["monthly", "daily", "custom-range", "customer", "status", "revenue", "weekly"];
         if (!validTypes.includes(type)) {
             return res.status(400).json({ message: `Invalid report type. Must be one of: ${validTypes.join(", ")}` });
         }
 
-        const admin = await prisma.user.findUnique({ where: { id: req.user.id } });
-        if (!admin) return res.status(404).json({ message: "Admin profile not found." });
+        const user = await prisma.user.findUnique({ where: { id: req.user.id } });
+        if (!user) return res.status(404).json({ message: "User profile not found." });
+
+        // Enforce sellerId for sellers
+        if (req.user.role === "seller") {
+            filters.sellerId = req.user.id;
+        }
 
         // Build report data
         let orders, summary;
@@ -39,7 +44,7 @@ export const generateReport = async (req, res) => {
             data: {
                 type,
                 filters: filters || {},
-                generatedById: admin.id,
+                generatedById: user.id,
                 format: format || 'pdf',
                 aiSummary,
             }
@@ -48,7 +53,7 @@ export const generateReport = async (req, res) => {
         // Async email sending
         try {
             await sendReportEmail({
-                to: admin.email,
+                to: user.email,
                 subject: `📊 ${type.charAt(0).toUpperCase() + type.slice(1)} Report Ready`,
                 text: `Your report has been generated.\n\nSummary:\n${aiSummary}`,
             });
@@ -79,10 +84,10 @@ export const generateReport = async (req, res) => {
             title: monthTitle,
             logoPath: finalLogoPath,
             signatory: {
-                name: admin.name,
-                title: "abelus Administrator",
-                signatureImage: admin.signatureImage,
-                stampImage: admin.stampImage,
+                name: user.name,
+                title: user.role === 'admin' ? "abelus Administrator" : "Store Manager / Seller",
+                signatureImage: user.signatureImage,
+                stampImage: user.stampImage,
             },
             contentBuilder: (doc, helpers) => {
                 // Executive Summary
@@ -125,6 +130,7 @@ export const generateReport = async (req, res) => {
                     id: o.publicId || o.id.slice(-6).toUpperCase(),
                     customer: (o.customer?.name || o.customer?.email || "N/A").substring(0, 18),
                     total: `${o.grandTotal.toLocaleString()} Rwf`,
+                    source: o.orderType === 'pos' ? "POS" : "Online",
                     status: o.status.charAt(0).toUpperCase() + o.status.slice(1),
                     date: new Date(o.createdAt).toLocaleDateString("en-US", { month: "short", day: "2-digit" })
                 }));
@@ -132,10 +138,11 @@ export const generateReport = async (req, res) => {
                 helpers.table({
                     columns: [
                         { key: "id", header: "ID", width: 60 },
-                        { key: "customer", header: "Customer", width: 150 },
-                        { key: "total", header: "Total", width: 100 },
-                        { key: "status", header: "Status", width: 80 },
-                        { key: "date", header: "Date", width: 70 }
+                        { key: "customer", header: "Customer", width: 130 },
+                        { key: "total", header: "Total", width: 90 },
+                        { key: "source", header: "Source", width: 60 },
+                        { key: "status", header: "Status", width: 70 },
+                        { key: "date", header: "Date", width: 50 }
                     ],
                     rows: tableData
                 });
@@ -159,3 +166,4 @@ export const generateReport = async (req, res) => {
         }
     }
 };
+

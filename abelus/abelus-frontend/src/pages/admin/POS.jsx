@@ -26,11 +26,10 @@ const POS = () => {
 
     const [shiftReport, setShiftReport] = useState(null);
 
-
-
-
-
-
+    const [clients, setClients] = useState([]);
+    const [selectedClient, setSelectedClient] = useState(null);
+    const [clientContractPrices, setClientContractPrices] = useState([]);
+    const [clientSearchTerm, setClientSearchTerm] = useState("");
 
     const fetchActiveShift = useCallback(async () => {
         try {
@@ -90,7 +89,6 @@ const POS = () => {
     const fetchProducts = useCallback(async () => {
         setLoading(true);
         try {
-            // Fetch only Abelus's own products (admin-owned)
             const res = await axios.get("/orders/admin/pos-products");
             if (res.data.success) {
                 setProducts(res.data.data);
@@ -105,9 +103,40 @@ const POS = () => {
         }
     }, []);
 
+    const fetchClients = useCallback(async () => {
+        try {
+            const res = await axios.get("/abonnes");
+            if (res.data.success) {
+                setClients(res.data.data);
+            }
+        } catch (err) {
+            console.error("Failed to fetch clients");
+        }
+    }, []);
+
+    const fetchContractPrices = useCallback(async (clientId) => {
+        try {
+            const res = await axios.get(`/abonnes/${clientId}/prices`);
+            if (res.data.success) {
+                setClientContractPrices(res.data.data);
+            }
+        } catch (err) {
+            console.error("Failed to fetch contract prices");
+        }
+    }, []);
+
     useEffect(() => {
         fetchProducts();
-    }, [fetchProducts]);
+        fetchClients();
+    }, [fetchProducts, fetchClients]);
+
+    useEffect(() => {
+        if (selectedClient) {
+            fetchContractPrices(selectedClient.id || selectedClient._id);
+        } else {
+            setClientContractPrices([]);
+        }
+    }, [selectedClient, fetchContractPrices]);
 
     // Polling for Payment Status
     useEffect(() => {
@@ -149,8 +178,6 @@ const POS = () => {
         setTimeout(() => successMsg.remove(), 3000);
     };
 
-
-
     const addToCart = (product) => {
         if (product.stock <= 0) return;
         const existing = cart.find((item) => item._id === product._id);
@@ -184,8 +211,13 @@ const POS = () => {
         );
     };
 
+    const getItemPrice = (item) => {
+        const cp = clientContractPrices.find(p => p.productId === item._id || p.productId === item.id);
+        return cp ? cp.price : item.price;
+    };
+
     const calculateTotal = () => {
-        return cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
+        return cart.reduce((sum, item) => sum + getItemPrice(item) * item.quantity, 0);
     };
 
     const initiateMomoPayment = () => {
@@ -204,11 +236,12 @@ const POS = () => {
         try {
             const res = await axios.post("/orders/pos", {
                 items: cart.map((item) => ({
-                    product: item._id,
+                    product: item._id || item.id,
                     quantity: item.quantity,
                 })),
                 paymentMethod: method,
-                phone: phone
+                phone: phone,
+                clientId: selectedClient?.id || selectedClient?._id
             });
 
             if (method === "mtn_momo" && res.data.status === "pending") {
@@ -241,7 +274,7 @@ const POS = () => {
             {/* Shift Modals */}
             {showStartShiftModal && (
                 <div className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
-                    <div className="bg-white dark:bg-charcoal-800 rounded-2xl shadow-2xl w-full max-w-md p-8 text-center">
+                    <div className="bg-white dark:bg-charcoal-800 rounded-2xl shadow-2xl w-full max-md p-8 text-center">
                         <h2 className="text-2xl font-black mb-2 text-charcoal-900 dark:text-white">Start New Shift</h2>
                         <p className="text-gray-500 dark:text-gray-400 mb-6">Please enter the starting cash amount in your drawer.</p>
                         <input
@@ -253,9 +286,15 @@ const POS = () => {
                         />
                         <button
                             onClick={handleStartShift}
-                            className="w-full py-3 bg-terracotta-500 hover:bg-terracotta-600 text-white rounded-xl font-bold transition-all"
+                            className="w-full py-3 bg-terracotta-500 hover:bg-terracotta-600 text-white rounded-xl font-bold transition-all mb-3"
                         >
                             Open Shift
+                        </button>
+                        <button
+                            onClick={() => window.location.href = "/admin/dashboard"}
+                            className="w-full py-3 bg-gray-100 dark:bg-charcoal-700 text-gray-600 dark:text-gray-300 rounded-xl font-bold transition-all hover:bg-gray-200"
+                        >
+                            Cancel & Go Back
                         </button>
                     </div>
                 </div>
@@ -351,7 +390,6 @@ const POS = () => {
                 </div>
             )}
     
-            {/* MoMo Modal */}
             {showMomoModal && (
                 <div className="fixed inset-0 z-[70] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
                     <div className="bg-white dark:bg-charcoal-800 rounded-2xl shadow-2xl w-full max-w-sm p-6 transform transition-all">
@@ -393,7 +431,6 @@ const POS = () => {
                 </div>
             )}
 
-            {/* Polling Overlay */}
             {pendingOrder && (
                 <div className="fixed inset-0 z-[80] bg-charcoal-900/90 backdrop-blur-md flex flex-col items-center justify-center text-white p-4">
                     <div className="relative mb-8">
@@ -406,16 +443,13 @@ const POS = () => {
                 </div>
             )}
 
-            {/* Fixed Sidebar */}
             <Sidebar />
 
             <div className="flex-1 flex flex-col lg:ml-64 transition-all duration-300">
                 <Topbar />
 
                 <div className="flex-1 flex overflow-hidden">
-                    {/* Left Side: Product Grid */}
                     <div className="flex-1 flex flex-col min-w-0">
-                        {/* Header Bar */}
                         <div className="px-6 py-4 bg-white dark:bg-charcoal-800 border-b border-cream-200 dark:border-charcoal-700 flex flex-col sm:flex-row gap-4 justify-between items-center z-10 shadow-sm">
                             <div className="relative w-full sm:w-72 md:w-96">
                                 <FaSearch className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" />
@@ -456,7 +490,6 @@ const POS = () => {
                             </div>
                         </div>
 
-                        {/* Grid Content */}
                         <div className="flex-1 overflow-y-auto p-6 bg-cream-50 dark:bg-charcoal-900">
                             {loading ? (
                                 <div className="flex flex-col items-center justify-center h-full text-gray-400">
@@ -500,7 +533,7 @@ const POS = () => {
                                                     <div className="flex flex-col">
                                                         <span className="text-[10px] uppercase text-gray-400 font-bold tracking-wider">Price</span>
                                                         <span className="text-lg font-black text-terracotta-500">
-                                                            <span className="text-xs align-top opacity-70">RWF</span> {product.price.toLocaleString()}
+                                                            <span className="text-xs align-top opacity-70">RWF</span> {getItemPrice(product).toLocaleString()}
                                                         </span>
                                                     </div>
                                                     <button className="w-8 h-8 rounded-full bg-cream-100 dark:bg-charcoal-700 text-terracotta-500 flex items-center justify-center hover:bg-terracotta-500 hover:text-white transition-colors">
@@ -515,15 +548,13 @@ const POS = () => {
                         </div>
                     </div>
 
-                    {/* Right Side: Cart Sidebar */}
                     <div className="w-96 bg-white dark:bg-charcoal-800 border-l border-cream-200 dark:border-charcoal-700 shadow-2xl z-20 flex flex-col">
                         <div className="p-6 border-b border-cream-100 dark:border-charcoal-700 bg-white dark:bg-charcoal-800">
-                            <div className="flex justify-between items-center mb-2">
+                            <div className="flex justify-between items-center mb-4">
                                 <h2 className="flex items-center gap-2.5 font-black text-xl text-charcoal-900 dark:text-white">
                                     <FaShoppingCart className="text-terracotta-500" />
                                     Current Sale
                                 </h2>
-                                
                                 <div className="flex items-center gap-4">
                                     {activeShift && (
                                         <button 
@@ -533,13 +564,68 @@ const POS = () => {
                                             Close Shift
                                         </button>
                                     )}
-                                    <span className="px-2.5 py-1 bg-terracotta-100 dark:bg-terracotta-900/30 text-terracotta-600 dark:text-terracotta-400 text-xs font-bold rounded-full">
-                                        {cart.length} Items
-                                    </span>
                                 </div>
-    
                             </div>
-                            <p className="text-xs font-mono text-gray-400 uppercase tracking-widest">Order #{Math.floor(Math.random() * 10000)}</p>
+
+                            <div className="space-y-3">
+                                <div className="flex gap-2 p-1 bg-cream-50 dark:bg-charcoal-900 rounded-xl">
+                                    <button
+                                        onClick={() => setSelectedClient(null)}
+                                        className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${!selectedClient ? 'bg-white dark:bg-charcoal-700 shadow-sm text-terracotta-500' : 'text-gray-500'}`}
+                                    >
+                                        GUEST
+                                    </button>
+                                    <button
+                                        onClick={() => !selectedClient && setClientSearchTerm("")}
+                                        className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${selectedClient ? 'bg-white dark:bg-charcoal-700 shadow-sm text-terracotta-500' : 'text-gray-500'}`}
+                                    >
+                                        ABONNÉ
+                                    </button>
+                                </div>
+
+                                {selectedClient ? (
+                                    <div className="flex items-center justify-between p-3 bg-terracotta-50 dark:bg-terracotta-900/20 border border-terracotta-100 dark:border-terracotta-800 rounded-xl">
+                                        <div className="flex flex-col">
+                                            <span className="text-xs font-bold text-terracotta-600 uppercase tracking-tighter">Selected Client</span>
+                                            <span className="font-bold text-charcoal-900 dark:text-white">{selectedClient.name}</span>
+                                        </div>
+                                        <button 
+                                            onClick={() => setSelectedClient(null)}
+                                            className="p-1.5 hover:bg-terracotta-100 dark:hover:bg-terracotta-800 rounded-lg text-terracotta-500 transition-colors"
+                                        >
+                                            <FaTrash size={12} />
+                                        </button>
+                                    </div>
+                                ) : (
+                                    <div className="relative">
+                                        <FaSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs" />
+                                        <input
+                                            type="text"
+                                            placeholder="Search client abonne..."
+                                            className="w-full pl-9 pr-4 py-2 bg-cream-50 dark:bg-charcoal-900 border border-cream-100 dark:border-charcoal-700 rounded-xl text-xs outline-none focus:border-terracotta-500 dark:text-white"
+                                            value={clientSearchTerm}
+                                            onChange={(e) => setClientSearchTerm(e.target.value)}
+                                        />
+                                        {clientSearchTerm && (
+                                            <div className="absolute left-0 right-0 top-full mt-1 bg-white dark:bg-charcoal-800 border border-cream-200 dark:border-charcoal-700 rounded-xl shadow-xl z-30 max-h-48 overflow-y-auto">
+                                                {clients.filter(c => c.name.toLowerCase().includes(clientSearchTerm.toLowerCase())).map(client => (
+                                                    <div
+                                                        key={client.id || client._id}
+                                                        onClick={() => {
+                                                            setSelectedClient(client);
+                                                            setClientSearchTerm("");
+                                                        }}
+                                                        className="p-3 hover:bg-cream-50 dark:hover:bg-charcoal-700 cursor-pointer border-b last:border-0 border-cream-100 dark:border-charcoal-700"
+                                                    >
+                                                        <p className="font-bold text-sm text-charcoal-900 dark:text-white">{client.name}</p>
+                                                        <p className="text-[10px] text-gray-500">{client.phone || client.email || "No contact"}</p>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
+                            </div>
                         </div>
 
                         <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-gray-50 dark:bg-charcoal-900/50">
@@ -558,11 +644,11 @@ const POS = () => {
                                             <div>
                                                 <h4 className="font-bold text-sm text-charcoal-800 dark:text-white line-clamp-1">{item.name}</h4>
                                                 <div className="text-xs text-gray-500 mt-0.5 font-mono">
-                                                    RWF {item.price.toLocaleString()} x {item.quantity}
+                                                    RWF {getItemPrice(item).toLocaleString()} x {item.quantity}
                                                 </div>
                                             </div>
                                             <div className="font-bold text-terracotta-600 dark:text-terracotta-400 text-sm">
-                                                {(item.price * item.quantity).toLocaleString()}
+                                                {(getItemPrice(item) * item.quantity).toLocaleString()}
                                             </div>
                                         </div>
 
@@ -595,17 +681,8 @@ const POS = () => {
                             )}
                         </div>
 
-                        {/* Footer / Checkout */}
                         <div className="p-6 bg-white dark:bg-charcoal-800 border-t border-cream-200 dark:border-charcoal-700 shadow-[0_-4px_20px_rgba(0,0,0,0.05)]">
                             <div className="space-y-3 mb-6">
-                                <div className="flex justify-between text-sm text-gray-500 dark:text-gray-400">
-                                    <span>Subtotal</span>
-                                    <span className="font-mono">RWF {calculateTotal().toLocaleString()}</span>
-                                </div>
-                                <div className="flex justify-between text-sm text-gray-500 dark:text-gray-400">
-                                    <span>Tax (0%)</span>
-                                    <span className="font-mono">RWF 0</span>
-                                </div>
                                 <div className="flex justify-between text-xl font-black text-charcoal-900 dark:text-white pt-4 border-t border-dashed border-gray-200 dark:border-charcoal-600">
                                     <span>Total</span>
                                     <span className="text-terracotta-500">RWF {calculateTotal().toLocaleString()}</span>
@@ -619,7 +696,7 @@ const POS = () => {
                                     className="flex flex-col items-center justify-center py-4 bg-green-50 dark:bg-green-900/20 text-green-600 dark:text-green-400 border border-green-200 dark:border-green-800 rounded-xl hover:bg-green-100 dark:hover:bg-green-900/40 hover:border-green-300 transition-all disabled:opacity-50 disabled:cursor-not-allowed group"
                                 >
                                     <FaMoneyBillWave className="text-2xl mb-1 group-hover:scale-110 transition-transform" />
-                                    <span className="text-xs font-black uppercase tracking-wider">Cash Pay</span>
+                                    <span className="text-xs font-black uppercase tracking-wider">{selectedClient ? 'Record Debt' : 'Cash Pay'}</span>
                                 </button>
                                 <button
                                     onClick={initiateMomoPayment}

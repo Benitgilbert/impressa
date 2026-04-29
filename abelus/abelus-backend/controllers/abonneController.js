@@ -43,6 +43,42 @@ export const createAbonne = async (req, res) => {
 };
 
 /**
+ * 👥 Update Client Abonne
+ * @route   PUT /api/abonnes/:id
+ * @access  Private (Admin/Seller)
+ */
+export const updateAbonne = async (req, res) => {
+    try {
+        const { name, phone, email, status } = req.body;
+        const updatedAbonne = await prisma.clientAbonne.update({
+            where: { id: req.params.id },
+            data: { name, phone, email, status }
+        });
+        res.status(200).json({ success: true, data: updatedAbonne });
+    } catch (error) {
+        logger.error({ err: error }, "Failed to update abonne");
+        res.status(500).json({ success: false, message: "Server Error" });
+    }
+};
+
+/**
+ * 👥 Delete Client Abonne
+ * @route   DELETE /api/abonnes/:id
+ * @access  Private (Admin/Seller)
+ */
+export const deleteAbonne = async (req, res) => {
+    try {
+        await prisma.clientAbonne.delete({
+            where: { id: req.params.id }
+        });
+        res.status(200).json({ success: true, message: "Abonne deleted successfully" });
+    } catch (error) {
+        logger.error({ err: error }, "Failed to delete abonne");
+        res.status(500).json({ success: false, message: "Server Error" });
+    }
+};
+
+/**
  * 📄 Get Fiche (Unpaid Transactions) for a Client
  * @route   GET /api/abonnes/:id/fiche
  * @access  Private (Admin/Seller)
@@ -156,6 +192,70 @@ export const payAbonneDebt = async (req, res) => {
         });
     } catch (error) {
         logger.error({ err: error }, "Failed to record abonne payment");
+        res.status(500).json({ success: false, message: "Server Error" });
+    }
+};
+
+/**
+ * 🏷️ Get Contract Prices for a Client
+ * @route   GET /api/abonnes/:id/prices
+ * @access  Private (Admin/Seller)
+ */
+export const getContractPrices = async (req, res) => {
+    try {
+        const prices = await prisma.contractPrice.findMany({
+            where: { clientId: req.params.id },
+            include: { product: { select: { name: true, sku: true, price: true } } }
+        });
+        res.status(200).json({ success: true, data: prices });
+    } catch (error) {
+        logger.error({ err: error }, "Failed to get contract prices");
+        res.status(500).json({ success: false, message: "Server Error" });
+    }
+};
+
+/**
+ * 🏷️ Update/Set Contract Price for a Product
+ * @route   POST /api/abonnes/:id/prices
+ * @access  Private (Admin/Seller)
+ */
+export const updateContractPrice = async (req, res) => {
+    try {
+        const { productId, price } = req.body;
+        const clientId = req.params.id;
+
+        if (!productId || price === undefined) {
+            return res.status(400).json({ success: false, message: "Product and price are required" });
+        }
+
+        const contractPrice = await prisma.contractPrice.upsert({
+            where: {
+                clientId_productId: { clientId, productId }
+            },
+            update: { price: Number(price) },
+            create: { clientId, productId, price: Number(price) }
+        });
+
+        res.status(200).json({ success: true, data: contractPrice });
+    } catch (error) {
+        logger.error({ err: error }, "Failed to update contract price");
+        res.status(500).json({ success: false, message: "Server Error" });
+    }
+};
+
+/**
+ * 🏷️ Remove Contract Price
+ * @route   DELETE /api/abonnes/:id/prices/:priceId
+ * @access  Private (Admin/Seller)
+ */
+export const deleteContractPrice = async (req, res) => {
+    try {
+        await prisma.contractPrice.delete({
+            where: { id: req.params.priceId }
+        });
+        res.status(200).json({ success: true, message: "Contract price removed" });
+    } catch (error) {
+        logger.error({ err: error }, "Failed to delete contract price");
         res.status(500).json({ success: false, message: "Server Error" });
     }
 };
