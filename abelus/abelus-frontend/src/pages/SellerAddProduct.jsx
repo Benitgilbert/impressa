@@ -15,6 +15,7 @@ const SellerAddProduct = () => {
         price: "",
         stock: "",
         category: "",
+        type: "simple",
         image: null,
         preview: null
     });
@@ -59,9 +60,10 @@ const SellerAddProduct = () => {
             const data = new FormData();
             data.append("name", formData.name);
             data.append("description", formData.description);
-            data.append("price", formData.price);
-            data.append("stock", formData.stock);
+            data.append("price", formData.price || 0);
+            data.append("stock", formData.stock || 0);
             data.append("category", formData.category);
+            data.append("type", formData.type);
             if (formData.image) {
                 data.append("image", formData.image);
             }
@@ -112,6 +114,20 @@ const SellerAddProduct = () => {
                                         Basic Information
                                     </h3>
                                     <div className="grid gap-4">
+                                        <div className="space-y-1.5">
+                                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Product Type</label>
+                                            <select
+                                                name="type"
+                                                value={formData.type}
+                                                onChange={handleChange}
+                                                className="w-full px-4 py-2.5 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all dark:text-white"
+                                            >
+                                                <option value="simple">Simple Product</option>
+                                                <option value="service">Service (Flexible Price)</option>
+                                                <option value="variable">Variable Product</option>
+                                            </select>
+                                        </div>
+
                                         <div className="space-y-1.5">
                                             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Product Name</label>
                                             <input

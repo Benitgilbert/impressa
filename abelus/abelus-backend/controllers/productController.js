@@ -245,6 +245,13 @@ export const createProduct = async (req, res) => {
         body.slug = body.name.toLowerCase().replace(/[^a-z0-9]+/g, '-') + '-' + Date.now();
     }
 
+    // Default price to 0 if missing (especially for services)
+    if (!body.price && body.type === 'service') {
+      body.price = 0;
+    } else if (body.price) {
+      body.price = Number(body.price);
+    }
+
     const product = await prisma.product.create({
       data: {
         ...body,
@@ -530,6 +537,14 @@ export const updateProduct = async (req, res) => {
     if (typeof body.isDigital === "string") body.isDigital = body.isDigital === "true";
     if (typeof body.price === "string") body.price = Number(body.price);
     if (typeof body.stock === "string") body.stock = Number(body.stock);
+
+    // Default price to 0 if it's a service and price is missing or null
+    if ((body.type === 'service' || existing.type === 'service') && (body.price === undefined || body.price === null)) {
+      if (body.price === undefined) {
+        // Keep existing if not provided, but if existing is null (shouldn't be), set to 0
+        if (existing.price === null) body.price = 0;
+      }
+    }
 
     if (req.files && req.files.length > 0) {
       req.files.forEach(file => {
