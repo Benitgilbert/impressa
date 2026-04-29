@@ -246,11 +246,11 @@ export default function SellerPOS() {
         setSelectedProductForVariation(null);
     };
 
-    const getItemPrice = (item) => {
+    const getItemPrice = useCallback((item) => {
         if (item.manualPrice !== undefined) return item.manualPrice;
         const cp = clientContractPrices.find(p => p.productId === (item._id || item.id));
         return cp ? cp.price : (item.price || 0);
-    };
+    }, [clientContractPrices]);
 
     const updatePrice = (uniqueId, newPrice) => {
         setCart(prev => prev.map(item => {
