@@ -13,6 +13,7 @@ export const authMiddleware = (requiredRoles = []) => {
       const { data: { user: sbUser }, error: sbError } = await supabase.auth.getUser(token);
       
       if (sbError || !sbUser) {
+        console.warn("Supabase Auth Error:", sbError?.message || "No user found for token");
         return res.status(401).json({ message: "Invalid or expired token" });
       }
 
@@ -22,6 +23,7 @@ export const authMiddleware = (requiredRoles = []) => {
       });
 
       if (!user) {
+        console.warn(`User ${sbUser.id} not found in application database`);
         return res.status(401).json({ message: "User not found in application database" });
       }
 
@@ -35,8 +37,11 @@ export const authMiddleware = (requiredRoles = []) => {
 
       next();
     } catch (err) {
-      console.error("Auth Middleware Error:", err);
-      res.status(500).json({ message: "Authentication server error" });
+      console.error("CRITICAL: Auth Middleware Crash:", err.message, err.stack);
+      res.status(500).json({ 
+        message: "Authentication server error",
+        debug: process.env.NODE_ENV === 'development' ? err.message : undefined 
+      });
     }
   };
 };
