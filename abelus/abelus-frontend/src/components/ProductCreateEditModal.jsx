@@ -35,7 +35,7 @@ function ProductCreateEditModal({ product, onClose, onSaved }) {
     description: product?.description || "",
     price: product?.price || "",
     stock: product?.stock || "",
-    category: product?.category || "",
+    selectedCategories: product?.categories?.map(c => c.id || c._id) || [],
     image: product?.image || "",
     type: product?.type || "simple",
     customizable: product?.customizable || false,
@@ -43,8 +43,8 @@ function ProductCreateEditModal({ product, onClose, onSaved }) {
     customizationOptions: product?.customizationOptions || [],
     isDigital: product?.isDigital || false,
     downloadLink: product?.downloadLink || "",
-    upSells: product?.upSells?.map((p) => (typeof p === "object" ? p._id : p)) || [],
-    crossSells: product?.crossSells?.map((p) => (typeof p === "object" ? p._id : p)) || [],
+    upSells: product?.upSells?.map((p) => (typeof p === "object" ? (p.id || p._id) : p)) || [],
+    crossSells: product?.crossSells?.map((p) => (typeof p === "object" ? (p.id || p._id) : p)) || [],
     shippingClass: product?.shippingClass || "",
     attributes: parseAttributes(product?.attributes),
     variations: parseVariations(product?.variations),
@@ -293,7 +293,9 @@ function ProductCreateEditModal({ product, onClose, onSaved }) {
       fd.append("crossSells", JSON.stringify(form.crossSells));
 
       if (form.shippingClass) fd.append("shippingClass", form.shippingClass);
-      if (form.category) fd.append("category", form.category);
+      if (form.selectedCategories && form.selectedCategories.length > 0) {
+        fd.append("categories", JSON.stringify(form.selectedCategories));
+      }
 
       if (form.image instanceof File) {
         fd.append("image", form.image);
@@ -301,7 +303,7 @@ function ProductCreateEditModal({ product, onClose, onSaved }) {
 
       const config = { headers: { "Content-Type": "multipart/form-data" } };
       const res = isEdit
-        ? await api.put(`/products/${product._id}`, fd, config)
+        ? await api.put(`/products/${product.id || product._id}`, fd, config)
         : await api.post("/products", fd, config);
       onSaved(res.data);
     } catch (err) {
@@ -375,21 +377,47 @@ function ProductCreateEditModal({ product, onClose, onSaved }) {
                 </select>
               </div>
 
-              <div className="md:col-span-1">
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">Category</label>
-                <select
-                  name="category"
-                  value={form.category}
-                  onChange={handleChange}
-                  className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-white dark:bg-gray-700 dark:text-white transition-all text-sm"
-                >
-                  <option value="">Select Category</option>
-                  {categories.map(cat => (
-                    <option key={cat._id || cat.name} value={cat.name || cat}>
-                      {cat.name || cat}
-                    </option>
-                  ))}
-                </select>
+              <div className="md:col-span-2">
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Categories</label>
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 p-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 max-h-48 overflow-y-auto">
+                  {categories.length === 0 ? (
+                    <p className="col-span-full text-sm text-gray-400 dark:text-gray-500 italic">No categories available</p>
+                  ) : (
+                    categories.map(cat => {
+                      const catId = cat.id || cat._id;
+                      const isChecked = form.selectedCategories.includes(catId);
+                      return (
+                        <label key={catId} className={`flex items-center gap-2 px-3 py-2 rounded-lg cursor-pointer transition-all text-sm ${
+                          isChecked
+                            ? 'bg-indigo-50 dark:bg-indigo-900/30 border border-indigo-200 dark:border-indigo-700'
+                            : 'hover:bg-gray-50 dark:hover:bg-gray-600 border border-transparent'
+                        }`}>
+                          <input
+                            type="checkbox"
+                            checked={isChecked}
+                            onChange={() => {
+                              setForm(prev => ({
+                                ...prev,
+                                selectedCategories: isChecked
+                                  ? prev.selectedCategories.filter(id => id !== catId)
+                                  : [...prev.selectedCategories, catId]
+                              }));
+                            }}
+                            className="w-4 h-4 text-indigo-600 border-gray-300 dark:border-gray-500 rounded focus:ring-indigo-500 dark:bg-gray-700"
+                          />
+                          <span className={`${isChecked ? 'text-indigo-700 dark:text-indigo-300 font-medium' : 'text-gray-700 dark:text-gray-300'}`}>
+                            {cat.parentId ? '↳ ' : ''}{cat.name}
+                          </span>
+                        </label>
+                      );
+                    })
+                  )}
+                </div>
+                {form.selectedCategories.length > 0 && (
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                    {form.selectedCategories.length} categor{form.selectedCategories.length === 1 ? 'y' : 'ies'} selected
+                  </p>
+                )}
               </div>
 
               <div className="md:col-span-1">
@@ -695,7 +723,7 @@ function ProductCreateEditModal({ product, onClose, onSaved }) {
                   onChange={(e) => setForm({ ...form, upSells: Array.from(e.target.selectedOptions, o => o.value) })}
                   className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-white dark:bg-gray-700 dark:text-white transition-all text-sm h-48"
                 >
-                  {allProducts.map(p => <option key={p._id} value={p._id}>{p.name}</option>)}
+                  {allProducts.map(p => <option key={p.id || p._id} value={p.id || p._id}>{p.name}</option>)}
                 </select>
                 <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Hold Ctrl (Windows) or cmd (Mac) to select multiple.</p>
               </div>
@@ -707,7 +735,7 @@ function ProductCreateEditModal({ product, onClose, onSaved }) {
                   onChange={(e) => setForm({ ...form, crossSells: Array.from(e.target.selectedOptions, o => o.value) })}
                   className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-white dark:bg-gray-700 dark:text-white transition-all text-sm h-48"
                 >
-                  {allProducts.map(p => <option key={p._id} value={p._id}>{p.name}</option>)}
+                  {allProducts.map(p => <option key={p.id || p._id} value={p.id || p._id}>{p.name}</option>)}
                 </select>
                 <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Products to promote in the cart.</p>
               </div>

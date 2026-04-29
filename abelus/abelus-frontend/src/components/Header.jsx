@@ -180,7 +180,7 @@ export default function Header() {
                     <div className="max-h-80 overflow-y-auto p-1">
                       {categories.map((cat) => (
                         <Link
-                          key={cat._id}
+                          key={cat.id}
                           to={`/shop?category=${encodeURIComponent(cat.name)}`}
                           onClick={() => setCategoryDropdownOpen(false)}
                           className="block px-4 py-2.5 text-sm text-cream-300 hover:text-white hover:bg-charcoal-700 rounded-lg transition-colors"
@@ -408,7 +408,7 @@ export default function Header() {
                 <div className="grid grid-cols-2 gap-2">
                   {categories.slice(0, 8).map(cat => (
                     <Link
-                      key={cat._id}
+                      key={cat.id}
                       to={`/shop?category=${encodeURIComponent(cat.name)}`}
                       onClick={() => setMobileMenuOpen(false)}
                       className="p-3 rounded-lg bg-charcoal-800/50 text-sm text-charcoal-300 hover:text-white hover:bg-charcoal-700 truncate"

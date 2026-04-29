@@ -328,7 +328,7 @@ export default function Home() {
                 {categories.slice(0, 6).map((cat, idx) => (
                   <Link
                     to={`/shop?category=${encodeURIComponent(cat.name || cat.slug)}`}
-                    key={cat._id || idx}
+                    key={cat.id || idx}
                     className="group relative aspect-square rounded-2xl overflow-hidden shadow-md"
                   >
                     <img src={cat.img} alt={cat.name} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" />

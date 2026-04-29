@@ -154,8 +154,8 @@ export default function Shop() {
         if (debouncedQ) params.append("search", debouncedQ);
 
         if (selectedCategory) {
-          const isObjectId = /^[a-f\d]{24}$/i.test(selectedCategory);
-          if (isObjectId) {
+          const isId = /^[a-f\d]{24}$/i.test(selectedCategory) || /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(selectedCategory);
+          if (isId) {
             params.append("category", selectedCategory);
           } else {
             const cat = categories.find(c =>
@@ -163,7 +163,7 @@ export default function Shop() {
               c.slug?.toLowerCase() === selectedCategory.toLowerCase()
             );
             if (cat) {
-              params.append("category", cat._id);
+              params.append("category", cat.id);
             } else {
               params.append("category", selectedCategory);
             }
@@ -235,7 +235,7 @@ export default function Shop() {
     if (sortBy === "featured") return "Featured Products";
     if (sortBy === "trending") return "Trending Now";
     if (selectedCategory) {
-      const cat = categories.find(c => c._id === selectedCategory || c.name === selectedCategory);
+      const cat = categories.find(c => c.id === selectedCategory || c.name === selectedCategory);
       return cat ? cat.name : "Shop";
     }
     return "All Products";
@@ -299,12 +299,12 @@ export default function Shop() {
           </button>
           {categories.map(c => (
             <button
-              key={c._id}
-              className={`w-full text-left px-4 py-2.5 rounded-xl text-sm font-medium transition-all ${selectedCategory === c._id || selectedCategory === c.name
+              key={c.id}
+              className={`w-full text-left px-4 py-2.5 rounded-xl text-sm font-medium transition-all ${selectedCategory === c.id || selectedCategory === c.name
                 ? "bg-gradient-to-r from-terracotta-500 to-terracotta-600 text-white shadow-lg shadow-terracotta-500/25"
                 : "text-charcoal-600 dark:text-charcoal-400 hover:bg-cream-100 dark:hover:bg-charcoal-800"
                 }`}
-              onClick={() => handleCategoryChange(c._id)}
+              onClick={() => handleCategoryChange(c.id)}
             >
               {c.name}
             </button>
@@ -426,7 +426,7 @@ export default function Shop() {
                     <>
                       {selectedCategory && (
                         <span className="inline-flex items-center gap-2 bg-terracotta-100 dark:bg-terracotta-900/30 text-terracotta-700 dark:text-terracotta-400 px-3 py-1.5 rounded-full text-sm font-medium">
-                          {categories.find(c => c._id === selectedCategory)?.name || selectedCategory}
+                          {categories.find(c => c.id === selectedCategory)?.name || selectedCategory}
                           <button onClick={() => handleCategoryChange("")} className="hover:text-terracotta-900 dark:hover:text-terracotta-200">
                             <FaTimes className="text-xs" />
                           </button>
