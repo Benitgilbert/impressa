@@ -62,6 +62,7 @@ const app = express();
 // ✅ Security Middleware
 app.use(helmet({
   crossOriginResourcePolicy: { policy: "cross-origin" },
+  contentSecurityPolicy: false, // Temporarily disable CSP to debug SW/Fetch issues
 }));
 
 // ✅ CORS Configuration
@@ -73,18 +74,22 @@ const allowedOrigins = [
 
 app.use(cors({
   origin: function (origin, callback) {
+    // Allow requests with no origin (like mobile apps or curl)
     if (!origin) return callback(null, true);
-    if (origin && (origin.includes('localhost') || origin.includes('127.0.0.1'))) {
+    
+    const isLocal = origin.includes('localhost') || origin.includes('127.0.0.1');
+    const isVercel = origin.endsWith('.vercel.app');
+    const isAllowed = allowedOrigins.includes(origin);
+
+    if (isLocal || isVercel || isAllowed) {
       return callback(null, true);
     }
-    if (allowedOrigins.some(allowed => origin === allowed || origin.endsWith('.replit.dev') || origin.endsWith('.vercel.app'))) {
-      return callback(null, true);
-    }
+    
     callback(new Error('Not allowed by CORS'));
   },
   credentials: true,
-  methods: ["GET", "POST", "PUT", "PATCH", "DELETE"],
-  allowedHeaders: ["Content-Type", "Authorization"],
+  methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With", "Accept"],
 }));
 
 app.use(express.json({ limit: "10mb" }));
