@@ -103,43 +103,56 @@ export const getProductRecommendations = async (req, res) => {
 };
 
 const attachFlashSaleInfo = async (products) => {
-  const isArray = Array.isArray(products);
-  const items = isArray ? products : [products];
-  if (items.length === 0) return products;
+  try {
+    const isArray = Array.isArray(products);
+    const items = isArray ? products : [products];
+    if (!items || items.length === 0 || !items[0]) return products;
 
-  const now = new Date();
-  const activeSales = await prisma.flashSale.findMany({
-    where: {
-      isActive: true,
-      startDate: { lte: now },
-      endDate: { gte: now }
-    },
-    include: { products: true }
-  });
-
-  const productSaleMap = new Map();
-  activeSales.forEach(sale => {
-    sale.products.forEach(sp => {
-      productSaleMap.set(sp.productId, {
-        flashSalePrice: sp.flashSalePrice,
-        stockLimit: sp.stockLimit,
-        soldCount: sp.soldCount,
-        saleId: sale.id,
-        saleName: sale.name,
-        endDate: sale.endDate
-      });
+    const now = new Date();
+    const activeSales = await prisma.flashSale.findMany({
+      where: {
+        isActive: true,
+        startDate: { lte: now },
+        endDate: { gte: now }
+      },
+      include: { products: true }
+    }).catch(err => {
+      console.error("FlashSale query failed:", err.message);
+      return [];
     });
-  });
 
-  const results = items.map(p => {
-    const saleInfo = productSaleMap.get(p.id);
-    if (saleInfo) {
-      return { ...p, flashSaleInfo: saleInfo };
-    }
-    return p;
-  });
+    if (!activeSales || activeSales.length === 0) return products;
 
-  return isArray ? results : results[0];
+    const productSaleMap = new Map();
+    activeSales.forEach(sale => {
+      if (sale.products) {
+        sale.products.forEach(sp => {
+          productSaleMap.set(sp.productId, {
+            flashSalePrice: sp.flashSalePrice,
+            stockLimit: sp.stockLimit,
+            soldCount: sp.soldCount,
+            saleId: sale.id,
+            saleName: sale.name,
+            endDate: sale.endDate
+          });
+        });
+      }
+    });
+
+    const results = items.map(p => {
+      if (!p || !p.id) return p;
+      const saleInfo = productSaleMap.get(p.id);
+      if (saleInfo) {
+        return { ...p, flashSaleInfo: saleInfo };
+      }
+      return p;
+    });
+
+    return isArray ? results : results[0];
+  } catch (err) {
+    console.error("attachFlashSaleInfo error:", err.message);
+    return products;
+  }
 };
 
 export const createProduct = async (req, res) => {
@@ -349,7 +362,7 @@ export const getAllProducts = async (req, res) => {
     }
 
     const limitValue = limit || 50;
-    const cursor = req.query.cursor || undefined;
+    const cursor = (req.query.cursor && req.query.cursor !== 'undefined') ? req.query.cursor : undefined;
 
     let products = await prisma.product.findMany({
       where,
