@@ -303,6 +303,7 @@ model Shift {
   totalCashSales            Float       @default(0)
   totalMomoSales            Float       @default(0)
   totalOtherSales           Float       @default(0)
+  totalDebtCollected        Float       @default(0)
   
   notes                     String?
 
@@ -310,6 +311,7 @@ model Shift {
   user                      User        @relation(fields: [userId], references: [id])
 
   orders                    Order[]     @relation("ShiftOrders")
+  abonneTransactions        AbonneTransaction[]
 
   createdAt                 DateTime    @default(now())
   updatedAt                 DateTime    @updatedAt
@@ -393,6 +395,9 @@ model AbonneTransaction {
 
   responsibleId String
   responsible   User     @relation(fields: [responsibleId], references: [id])
+
+  shiftId       String?
+  shift         Shift?   @relation(fields: [shiftId], references: [id])
 
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt

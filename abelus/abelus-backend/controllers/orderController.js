@@ -646,13 +646,19 @@ export const createPOSOrder = async (req, res) => {
       }
     });
 
+    const activeShift = await prisma.shift.findFirst({
+      where: { userId: userId, status: "open" }
+    });
+
     // 👥 Abonne Debt Recording
     if (clientId) {
       try {
+
         const transactions = orderItemsData.map(item => ({
           clientId: clientId,
           orderId: order.id,
           responsibleId: userId,
+          shiftId: activeShift?.id || null,
           designation: item.productName,
           quantity: item.quantity,
           pu: item.price,
@@ -676,9 +682,6 @@ export const createPOSOrder = async (req, res) => {
 
     // 🕒 Shift Update
     try {
-      const activeShift = await prisma.shift.findFirst({
-        where: { userId: userId, status: "open" }
-      });
       if (activeShift) {
         const updateData = {
           orders: { connect: { id: order.id } }

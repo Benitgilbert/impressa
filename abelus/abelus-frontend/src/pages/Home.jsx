@@ -2,7 +2,7 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import {
-  FaArrowRight, FaHeart, FaRegHeart, FaStar, FaShieldAlt, FaTruck, FaUndo, FaHeadset
+  FaArrowRight, FaHeart, FaRegHeart, FaStar, FaShieldAlt, FaTruck, FaUndo, FaHeadset, FaPrint
 } from "react-icons/fa";
 import { formatRwf } from "../utils/currency";
 import api from "../utils/axiosInstance";
@@ -283,22 +283,22 @@ export default function Home() {
           <div className="absolute inset-0 bg-gradient-to-br from-charcoal-700 via-charcoal-800 to-charcoal-900 dark:from-charcoal-900 dark:via-black dark:to-charcoal-900"></div>
           <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1557821552-17105176677c?w=1920')] bg-cover bg-center opacity-10"></div>
 
-          <div className="relative mx-auto max-w-7xl px-4 py-20 md:py-32">
-            <div className="max-w-3xl">
-              <span className="inline-block bg-terracotta-500/20 text-terracotta-200 px-4 py-2 rounded-full text-sm font-medium mb-6 backdrop-blur-sm border border-terracotta-500/30">
-                ✨ Welcome to the future of shopping
+          <div className="relative mx-auto max-w-7xl px-6 py-12 md:py-24">
+            <div className="max-w-2xl">
+              <span className="inline-block bg-terracotta-500/20 text-terracotta-200 px-3 py-1.5 rounded-full text-xs font-semibold mb-6 backdrop-blur-sm border border-terracotta-500/30 uppercase tracking-wider">
+                ✨ The future of shopping
               </span>
-              <h1 className="text-4xl md:text-6xl lg:text-7xl font-bold text-white mb-6 leading-tight">
+              <h1 className="text-3xl md:text-5xl lg:text-6xl font-bold text-white mb-5 leading-tight">
                 Discover <span className="text-transparent bg-clip-text bg-gradient-to-r from-terracotta-300 to-sand-300">Premium</span> Products
               </h1>
-              <p className="text-xl text-cream-300 dark:text-cream-400 mb-10 max-w-xl">
-                Curated collections, exclusive deals, and a seamless shopping experience. Find everything you need in one place.
+              <p className="text-lg text-cream-300 dark:text-cream-400 mb-8 max-w-lg opacity-90">
+                Curated collections and exclusive deals. Find everything you need in one seamless experience.
               </p>
               <div className="flex flex-wrap gap-4">
-                <Link to="/shop" className="bg-gradient-to-r from-terracotta-500 to-terracotta-600 hover:from-terracotta-600 hover:to-terracotta-700 text-white px-8 py-4 rounded-full font-semibold text-lg transition-all shadow-lg shadow-terracotta-500/25 hover:shadow-terracotta-500/40 flex items-center gap-2">
-                  Explore Now <FaArrowRight />
+                <Link to="/shop" className="bg-gradient-to-r from-terracotta-500 to-terracotta-600 hover:from-terracotta-600 hover:to-terracotta-700 text-white px-6 py-3 rounded-full font-bold text-base transition-all shadow-lg shadow-terracotta-500/25 hover:shadow-terracotta-500/40 flex items-center gap-2 active:scale-95">
+                  Explore Now <FaArrowRight className="text-sm" />
                 </Link>
-                <Link to="/daily-deals" className="bg-white/10 hover:bg-white/20 text-white px-8 py-4 rounded-full font-semibold text-lg transition backdrop-blur-sm border border-white/20">
+                <Link to="/daily-deals" className="bg-white/5 hover:bg-white/10 text-white px-6 py-3 rounded-full font-bold text-base transition backdrop-blur-md border border-white/10 active:scale-95">
                   View Deals
                 </Link>
               </div>
@@ -308,6 +308,38 @@ export default function Home() {
           {/* Decorative Elements */}
           <div className="absolute top-20 right-10 w-72 h-72 bg-terracotta-500 rounded-full blur-[128px] opacity-30"></div>
           <div className="absolute bottom-0 left-1/4 w-96 h-96 bg-sand-400 rounded-full blur-[128px] opacity-20"></div>
+        </section>
+
+        {/* Print Portal Promotion */}
+        <section className="py-10 bg-indigo-900/95 overflow-hidden relative">
+          <div className="absolute top-0 right-0 w-48 h-48 bg-blue-500/10 rounded-full -mr-24 -mt-24 blur-3xl"></div>
+          <div className="mx-auto max-w-7xl px-6 relative z-10">
+            <div className="flex flex-col md:flex-row items-center justify-between gap-10">
+              <div className="flex-1 text-center md:text-left">
+                <span className="inline-block bg-blue-500/20 text-blue-200 px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest mb-4 border border-blue-500/30">
+                  Business Services
+                </span>
+                <h2 className="text-2xl md:text-4xl font-bold text-white mb-4 leading-tight">
+                  Professional <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-300 to-emerald-300">Printing</span> Portal
+                </h2>
+                <p className="text-blue-100 text-base mb-6 opacity-75 max-w-lg font-medium">
+                  Upload your documents directly. Get custom quotes, binding options, and doorstep delivery.
+                </p>
+                <Link to="/print-portal" className="inline-flex items-center gap-2 bg-white text-indigo-950 px-6 py-3 rounded-xl font-bold text-base shadow-lg hover:bg-blue-50 transition-all active:scale-95">
+                  Start Printing <FaArrowRight className="text-sm" />
+                </Link>
+              </div>
+              <div className="w-full md:w-64 aspect-video md:aspect-square bg-white/5 backdrop-blur-md rounded-[2rem] border border-white/10 p-6 flex items-center justify-center relative group">
+                <div className="text-6xl text-white/10 group-hover:text-white/20 transition-colors">
+                  <FaPrint />
+                </div>
+                <div className="absolute -bottom-2 -right-2 bg-terracotta-500 text-white px-4 py-2 rounded-xl shadow-xl transform -rotate-3">
+                  <span className="block text-lg font-bold">24h</span>
+                  <span className="text-[10px] font-bold uppercase tracking-tighter opacity-80">Turnaround</span>
+                </div>
+              </div>
+            </div>
+          </div>
         </section>
 
         {/* Categories Section */}

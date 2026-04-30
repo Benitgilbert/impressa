@@ -101,6 +101,9 @@ export const getShiftReport = async (req, res) => {
                 orders: {
                     select: { publicId: true, grandTotal: true, paymentMethod: true, status: true, createdAt: true }
                 },
+                abonneTransactions: {
+                    include: { client: true }
+                },
                 user: { select: { id: true, name: true, email: true } }
             }
         });

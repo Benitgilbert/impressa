@@ -14,9 +14,29 @@ const getRangeReport = async (start, end, sellerId) => {
     include: { items: { include: { product: true } }, customer: true }
   });
 
+  // Fetch Abonne Debt Collections in the same range
+  const abonneWhere = { createdAt: { gte: start, lt: end } };
+  if (sellerId) {
+    // For sellers, we might only want to show debt collections relevant to them?
+    // But debt collection is usually a store-wide thing handled by the cashier.
+    // If the seller is managing the store, they see it.
+    // However, AbonneTransaction belongs to a "responsible" (the user who did it).
+    // Let's filter by responsibleId if it's a seller?
+    // Actually, let's keep it simple: if sellerId is provided, filter by responsibleId.
+    abonneWhere.responsibleId = sellerId;
+  }
+
+  const abonneTransactions = await prisma.abonneTransaction.findMany({
+    where: {
+        ...abonneWhere,
+        amountPaid: { gt: 0 } // Only payments
+    }
+  });
+
   const productCount = {};
   const customizationCount = { customText: 0, customFile: 0, cloudLink: 0 };
   let totalRevenue = 0;
+  let totalDebtCollected = 0;
 
   orders.forEach(order => {
     order.items.forEach(item => {
@@ -35,12 +55,19 @@ const getRangeReport = async (start, end, sellerId) => {
     });
   });
 
+  abonneTransactions.forEach(tx => {
+    totalDebtCollected += (tx.amountPaid || 0);
+  });
+
+  totalRevenue += totalDebtCollected;
+
   const topProduct = Object.entries(productCount).sort((a, b) => b[1] - a[1])[0]?.[0] || "N/A";
   const topCustomization = Object.entries(customizationCount).sort((a, b) => b[1] - a[1])[0]?.[0] || "N/A";
 
   const summary = {
     total: orders.length,
     totalRevenue,
+    totalDebtCollected,
     delivered: orders.filter(o => o.status === "delivered").length,
     pending: orders.filter(o => o.status === "pending").length,
     cancelled: orders.filter(o => o.status === "cancelled").length,

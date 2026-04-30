@@ -197,6 +197,7 @@ export default function Header() {
             </div>
 
             <Link to="/shop" className="px-3 py-2 text-sm font-medium text-cream-300 hover:text-white transition-colors">Shop</Link>
+            <Link to="/print-portal" className="px-3 py-2 text-sm font-medium text-blue-400 hover:text-blue-300 transition-colors">Print Portal</Link>
             <Link to="/daily-deals" className="px-3 py-2 text-sm font-medium text-sand-400 hover:text-sand-300 transition-colors">Deals</Link>
             <Link to="/gift-cards" className="px-3 py-2 text-sm font-medium text-terracotta-400 hover:text-terracotta-300 transition-colors">Gift Cards</Link>
             <Link to="/track" className="flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-cream-300 hover:text-white transition-colors">
@@ -396,6 +397,13 @@ export default function Header() {
                   className="p-4 rounded-xl bg-charcoal-800 text-cream-200 font-medium hover:bg-charcoal-700"
                 >
                   Shop All
+                </Link>
+                <Link
+                  to="/print-portal"
+                  onClick={() => setMobileMenuOpen(false)}
+                  className="p-4 rounded-xl bg-charcoal-800 text-blue-400 font-medium hover:bg-charcoal-700 flex items-center gap-2"
+                >
+                  <LuSearch className="w-4 h-4" /> Print Portal
                 </Link>
                 <Link
                   to="/daily-deals"

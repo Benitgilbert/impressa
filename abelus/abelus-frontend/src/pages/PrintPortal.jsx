@@ -92,16 +92,16 @@ const PrintPortal = () => {
                 <div className="absolute bottom-0 left-0 w-64 h-64 bg-indigo-500/20 rounded-full -ml-32 -mb-32 blur-3xl"></div>
                 
                 <div className="max-w-5xl mx-auto px-6 relative z-10">
-                    <div className="flex flex-col md:flex-row items-center gap-12">
+                    <div className="flex flex-col md:flex-row items-center gap-10">
                         <div className="flex-1 text-center md:text-left">
-                            <h1 className="text-5xl md:text-6xl font-black mb-6 leading-tight">
+                            <h1 className="text-4xl md:text-5xl font-bold mb-4 leading-tight">
                                 Online <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-300 to-emerald-300">Print Portal</span>
                             </h1>
-                            <p className="text-indigo-100 text-xl font-medium opacity-90 max-w-xl">
-                                Professional printing, binding, and document services at your fingertips. Upload your documents and get a custom quote today.
+                            <p className="text-indigo-100 text-lg font-medium opacity-80 max-w-lg">
+                                Professional printing and document services. Upload files and get a custom quote today.
                             </p>
                         </div>
-                        <div className="hidden md:block w-72 h-72 bg-white/5 backdrop-blur-sm rounded-[3rem] border border-white/10 p-8 transform rotate-6 animate-pulse">
+                        <div className="hidden md:block w-48 h-48 bg-white/5 backdrop-blur-sm rounded-[2.5rem] border border-white/10 p-6 transform rotate-3">
                             <FaPrint className="text-8xl text-white/20 absolute bottom-4 right-4" />
                             <FaFileAlt className="text-6xl text-white/40" />
                         </div>
@@ -109,16 +109,16 @@ const PrintPortal = () => {
                 </div>
             </div>
 
-            <main className="max-w-5xl mx-auto px-6 py-16 -mt-10">
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-10">
+            <main className="max-w-5xl mx-auto px-6 py-12 -mt-8">
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                     {/* Form Side */}
-                    <div className="lg:col-span-2 space-y-8">
-                        <div className="bg-white dark:bg-gray-800 rounded-[2.5rem] shadow-2xl p-10 border border-gray-100 dark:border-gray-700 transition-colors">
-                            <h2 className="text-2xl font-black text-gray-900 dark:text-white mb-8 flex items-center gap-3">
-                                <FaCalculator className="text-indigo-600" /> Service Details
+                    <div className="lg:col-span-2 space-y-6">
+                        <div className="bg-white dark:bg-gray-800 rounded-[2rem] shadow-xl p-8 border border-gray-100 dark:border-gray-700 transition-colors">
+                            <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-6 flex items-center gap-3">
+                                <FaCalculator className="text-indigo-600 text-lg" /> Service Details
                             </h2>
                             
-                            <form onSubmit={handleSubmit} className="space-y-8">
+                            <form onSubmit={handleSubmit} className="space-y-6">
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                                     <div className="space-y-3">
                                         <label className="text-sm font-bold text-gray-700 dark:text-gray-300 ml-1 uppercase tracking-wider">Select Service</label>
@@ -171,7 +171,7 @@ const PrintPortal = () => {
                                                 min="1"
                                                 value={quantity}
                                                 onChange={(e) => setQuantity(e.target.value)}
-                                                className="w-full px-6 py-4 bg-gray-50 dark:bg-gray-700/50 border-2 border-gray-100 dark:border-gray-600 rounded-2xl focus:ring-4 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all dark:text-white font-bold text-lg"
+                                                className="w-full px-5 py-3 bg-gray-50 dark:bg-gray-700/50 border-2 border-gray-100 dark:border-gray-600 rounded-xl focus:ring-4 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all dark:text-white font-bold text-base"
                                             />
                                         </div>
                                     </div>
@@ -191,11 +191,11 @@ const PrintPortal = () => {
                                 <button
                                     type="submit"
                                     disabled={submitting || !selectedService || !file}
-                                    className="w-full py-5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-[2rem] font-black text-xl shadow-2xl shadow-indigo-600/20 transition-all active:scale-[0.98] disabled:opacity-50 disabled:grayscale flex items-center justify-center gap-3"
+                                    className="w-full py-4 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold text-lg shadow-xl shadow-indigo-600/20 transition-all active:scale-[0.98] disabled:opacity-50 disabled:grayscale flex items-center justify-center gap-3"
                                 >
                                     {submitting ? (
                                         <>
-                                            <div className="w-6 h-6 border-3 border-white border-t-transparent rounded-full animate-spin"></div>
+                                            <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
                                             Processing...
                                         </>
                                     ) : (

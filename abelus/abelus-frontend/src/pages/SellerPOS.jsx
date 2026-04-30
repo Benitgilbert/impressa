@@ -585,7 +585,11 @@ export default function SellerPOS() {
                                             <p className="text-xs font-bold text-yellow-600 dark:text-yellow-400 uppercase tracking-wider mb-2">Total MoMo Sales</p>
                                             <p className="text-2xl font-black text-gray-900 dark:text-white">RWF {shiftReport.totalMomoSales.toLocaleString()}</p>
                                         </div>
-                                        <div className="p-6 bg-indigo-50 dark:bg-indigo-900/20 rounded-3xl border border-indigo-100 dark:border-indigo-800/30">
+                                        <div className="p-6 bg-purple-50 dark:bg-purple-900/20 rounded-3xl border border-purple-100 dark:border-purple-800/30">
+                                            <p className="text-xs font-bold text-purple-600 dark:text-purple-400 uppercase tracking-wider mb-2">Debt Collected</p>
+                                            <p className="text-2xl font-black text-gray-900 dark:text-white">RWF {shiftReport.totalDebtCollected?.toLocaleString() || 0}</p>
+                                        </div>
+                                        <div className="p-6 bg-indigo-50 dark:bg-indigo-900/20 rounded-3xl border border-indigo-100 dark:border-indigo-800/30 sm:col-span-3">
                                             <p className="text-xs font-bold text-indigo-600 dark:text-indigo-400 uppercase tracking-wider mb-2">Grand Total</p>
                                             <p className="text-2xl font-black text-gray-900 dark:text-white">RWF {(shiftReport.totalCashSales + shiftReport.totalMomoSales + shiftReport.totalOtherSales).toLocaleString()}</p>
                                         </div>

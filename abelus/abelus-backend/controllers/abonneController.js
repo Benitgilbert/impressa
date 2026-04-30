@@ -146,9 +146,20 @@ export const payAbonneDebt = async (req, res) => {
 
         // Use transaction to ensure consistency
         const updatedClient = await prisma.$transaction(async (tx) => {
+            const { paymentMethod = "cash" } = req.body;
+
+            // Find active shift for the user
+            const activeShift = await tx.shift.findFirst({
+                where: { userId: req.user.id, status: "open" }
+            });
+
             // Apply payment to oldest transactions first
             for (let t of transactions) {
                 if (remainingPayment <= 0) break;
+
+                const updateData = {
+                    shiftId: activeShift?.id || null
+                };
 
                 if (remainingPayment >= t.debtAmount) {
                     // Fully pay this transaction
@@ -158,6 +169,7 @@ export const payAbonneDebt = async (req, res) => {
                     await tx.abonneTransaction.update({
                         where: { id: t.id },
                         data: {
+                            ...updateData,
                             amountPaid: { increment: debtToPay },
                             debtAmount: 0,
                             status: "paid"
@@ -169,6 +181,7 @@ export const payAbonneDebt = async (req, res) => {
                     await tx.abonneTransaction.update({
                         where: { id: t.id },
                         data: {
+                            ...updateData,
                             amountPaid: { increment: applied },
                             debtAmount: { decrement: applied },
                             status: "partially_paid"
@@ -176,6 +189,27 @@ export const payAbonneDebt = async (req, res) => {
                     });
                     remainingPayment = 0;
                 }
+            }
+
+            // Update shift totals if shift is open
+            if (activeShift) {
+                const shiftUpdate = {
+                    totalDebtCollected: { increment: Number(amount) }
+                };
+
+                if (paymentMethod === "cash") {
+                    shiftUpdate.totalCashSales = { increment: Number(amount) };
+                    shiftUpdate.expectedEndingDrawerAmount = { increment: Number(amount) };
+                } else if (paymentMethod === "mtn_momo") {
+                    shiftUpdate.totalMomoSales = { increment: Number(amount) };
+                } else {
+                    shiftUpdate.totalOtherSales = { increment: Number(amount) };
+                }
+
+                await tx.shift.update({
+                    where: { id: activeShift.id },
+                    data: shiftUpdate
+                });
             }
 
             // Update total debt

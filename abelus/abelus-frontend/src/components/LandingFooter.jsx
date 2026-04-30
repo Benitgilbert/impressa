@@ -102,6 +102,7 @@ export default function LandingFooter() {
             <ul className="space-y-3 p-0 list-none">
               {[
                 { label: 'All Products', to: '/shop' },
+                { label: 'Print Portal', to: '/print-portal' },
                 { label: 'New Arrivals', to: '/shop?category=new' },
                 { label: 'Best Sellers', to: '/shop?sort=popular' },
                 { label: 'Deals', to: '/daily-deals' },

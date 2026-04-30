@@ -362,6 +362,10 @@ const POS = () => {
                                 <span>MoMo Sales</span>
                                 <span className="font-bold text-yellow-500">+ RWF {shiftReport.totalMomoSales.toLocaleString()}</span>
                             </div>
+                            <div className="flex justify-between border-b border-gray-100 dark:border-charcoal-700 pb-2">
+                                <span>Debt Collected</span>
+                                <span className="font-bold text-purple-500">+ RWF {shiftReport.totalDebtCollected?.toLocaleString() || 0}</span>
+                            </div>
                             <div className="flex justify-between border-b border-gray-100 dark:border-charcoal-700 pb-2 bg-gray-50 dark:bg-charcoal-700/50 p-2 rounded">
                                 <span className="font-bold">Expected Drawer</span>
                                 <span className="font-black">RWF {shiftReport.expectedEndingDrawerAmount.toLocaleString()}</span>
