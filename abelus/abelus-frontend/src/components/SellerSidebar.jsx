@@ -75,6 +75,10 @@ function SellerSidebar({ isOpen, onClose }) {
                             <FaList className="text-lg opacity-70 group-hover:opacity-100" />
                             <span>My Orders</span>
                         </Link>
+                        <Link to="/seller/print-orders" className={getLinkClass('/seller/print-orders')} onClick={onClose}>
+                            <FaPrint className="text-lg opacity-70 group-hover:opacity-100 text-blue-400" />
+                            <span className="text-blue-400">Print Orders</span>
+                        </Link>
                         <Link to="/seller/abonnes" className={getLinkClass('/seller/abonnes')} onClick={onClose}>
                             <FaUserFriends className="text-lg opacity-70 group-hover:opacity-100" />
                             <span>Client Abonnés</span>

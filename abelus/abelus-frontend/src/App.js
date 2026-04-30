@@ -65,6 +65,7 @@ import AdminCustomerQueries from "./pages/AdminCustomerQueries";
 import AdminBlogs from "./pages/admin/AdminBlogs";
 import AdminBlogEditor from "./pages/admin/AdminBlogEditor";
 import SellerOrders from "./pages/SellerOrders";
+import SellerPrintOrders from "./pages/SellerPrintOrders";
 import SellerPayouts from "./pages/SellerPayouts";
 import SellerProfile from "./pages/SellerProfile";
 import SellerOrderDetails from "./pages/SellerOrderDetails";
@@ -164,6 +165,11 @@ function App() {
                   <Route path="/seller/orders" element={
                     <ProtectedRoute allowedRoles={['seller', 'admin']}>
                       <SellerOrders />
+                    </ProtectedRoute>
+                  } />
+                  <Route path="/seller/print-orders" element={
+                    <ProtectedRoute allowedRoles={['seller', 'admin']}>
+                      <SellerPrintOrders />
                     </ProtectedRoute>
                   } />
                   <Route path="/seller/orders/:id" element={

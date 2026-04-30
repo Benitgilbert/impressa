@@ -50,6 +50,7 @@ router.post("/pos", authMiddleware(["admin", "seller", "cashier"]), orderControl
 
 // Service Inquiry (Print Portal)
 router.post("/inquiry", optionalAuth, upload.single("file"), orderController.createInquiry);
+router.post("/submit-quote", authMiddleware(["admin", "seller", "cashier"]), orderController.submitPrintQuote);
 
 // Get seller's POS products (inventory for seller/cashier)
 router.get("/seller/pos-products", authMiddleware(["admin", "seller", "cashier"]), orderController.getSellerPOSProducts);

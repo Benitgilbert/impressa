@@ -397,6 +397,51 @@ export const createInquiry = async (req, res) => {
 };
 
 /**
+ * 🖨️ Submit Print Quote
+ * Moves an inquiry from 'quote_requested' to 'awaiting_payment' with a specific price.
+ */
+export const submitPrintQuote = async (req, res) => {
+  try {
+    const { orderId, quoteAmount } = req.body;
+    const sellerId = req.user.role === 'cashier' ? req.user.managedById : req.user.id;
+
+    if (!orderId || !quoteAmount) {
+      return res.status(400).json({ message: "Order ID and Quote Amount are required" });
+    }
+
+    const order = await prisma.order.findUnique({
+      where: { id: orderId },
+      include: { items: true }
+    });
+
+    if (!order) return res.status(404).json({ message: "Order not found" });
+
+    // Verify seller owns at least one item in the order
+    const ownsItem = order.items.some(item => item.sellerId === sellerId);
+    if (!ownsItem && req.user.role !== 'admin') {
+      return res.status(403).json({ message: "Not authorized to quote for this order" });
+    }
+
+    const updatedOrder = await prisma.order.update({
+      where: { id: orderId },
+      data: {
+        subtotal: Number(quoteAmount),
+        grandTotal: Number(quoteAmount), // Simplification: assuming no tax/shipping for basic quote
+        status: "awaiting_payment",
+        paymentStatus: "pending"
+      }
+    });
+
+    // Notify customer (Add notification logic here if needed)
+    
+    res.json({ success: true, message: "Quote submitted successfully", order: updatedOrder });
+  } catch (err) {
+    console.error("Submit Quote Error:", err);
+    res.status(500).json({ message: "Failed to submit quote" });
+  }
+};
+
+/**
  * 🔄 Update Order Status
  */
 export const updateOrderStatus = async (req, res) => {
