@@ -15,6 +15,7 @@ const SellerAbonne = () => {
 
     const [newClient, setNewClient] = useState({ name: "", phone: "", email: "" });
     const [selectedClient, setSelectedClient] = useState(null);
+    const [clientSearchTerm, setClientSearchTerm] = useState("");
     const [clientFiche, setClientFiche] = useState([]);
     const [payAmount, setPayAmount] = useState("");
 
@@ -24,6 +25,7 @@ const SellerAbonne = () => {
     const [allProducts, setAllProducts] = useState([]);
     const [newPrice, setNewPrice] = useState({ productId: "", price: "" });
     const [savingPrice, setSavingPrice] = useState(false);
+    const [productSearchTerm, setProductSearchTerm] = useState("");
 
     useEffect(() => {
         fetchClients();
@@ -173,6 +175,18 @@ const SellerAbonne = () => {
                         </button>
                     </div>
 
+                    {/* Client Search Bar */}
+                    <div className="relative mb-6">
+                        <FaSearch className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" />
+                        <input 
+                            type="text"
+                            placeholder="Search client by name or phone..."
+                            className="w-full pl-12 pr-4 py-3 bg-white dark:bg-charcoal-800 border border-gray-100 dark:border-charcoal-700 rounded-2xl outline-none focus:border-terracotta-500 dark:text-white shadow-sm"
+                            value={clientSearchTerm}
+                            onChange={(e) => setClientSearchTerm(e.target.value)}
+                        />
+                    </div>
+
                     {loading ? (
                         <div className="text-center py-20 text-gray-500 font-bold">Loading clients...</div>
                     ) : (
@@ -187,7 +201,12 @@ const SellerAbonne = () => {
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-gray-100 dark:divide-charcoal-700">
-                                    {clients.map(client => (
+                                    {clients
+                                        .filter(c => 
+                                            c.name.toLowerCase().includes(clientSearchTerm.toLowerCase()) || 
+                                            (c.phone && c.phone.includes(clientSearchTerm))
+                                        )
+                                        .map(client => (
                                         <tr key={client._id} className="hover:bg-gray-50 dark:hover:bg-charcoal-700/30 transition-colors">
                                             <td className="p-4 font-bold text-charcoal-900 dark:text-white">{client.name}</td>
                                             <td className="p-4 text-gray-600 dark:text-gray-400 text-sm">
@@ -431,12 +450,27 @@ const SellerAbonne = () => {
                                     required
                                 >
                                     <option value="">Choose a product...</option>
-                                    {allProducts.map(p => (
-                                        <option key={p._id || p.id} value={p._id || p.id}>
-                                            {p.name} (Normal: {p.price.toLocaleString()})
-                                        </option>
-                                    ))}
+                                    {allProducts
+                                        .filter(p => p.name.toLowerCase().includes(productSearchTerm.toLowerCase()))
+                                        .map(p => (
+                                            <option key={p._id || p.id} value={p._id || p.id}>
+                                                {p.name} (Normal: {p.price.toLocaleString()})
+                                            </option>
+                                        ))}
                                 </select>
+                            </div>
+                            <div className="w-full sm:w-48">
+                                <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Search/Filter Products</label>
+                                <div className="relative">
+                                    <FaSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs" />
+                                    <input 
+                                        type="text"
+                                        placeholder="Type to filter list..."
+                                        className="w-full pl-9 pr-3 py-2 bg-white dark:bg-charcoal-800 border border-gray-200 dark:border-charcoal-600 rounded-lg text-sm outline-none focus:border-terracotta-500"
+                                        value={productSearchTerm}
+                                        onChange={(e) => setProductSearchTerm(e.target.value)}
+                                    />
+                                </div>
                             </div>
                             <div className="w-full sm:w-32">
                                 <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Contract Price</label>
