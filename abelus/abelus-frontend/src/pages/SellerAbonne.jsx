@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import axios from "../utils/axiosInstance";
-import { FaUserPlus, FaFileInvoiceDollar, FaTimes, FaMoneyBillWave, FaPrint } from "react-icons/fa";
+import { FaUserPlus, FaFileInvoiceDollar, FaTimes, FaMoneyBillWave, FaPrint, FaTag, FaPlus, FaTrash } from "react-icons/fa";
 
 import SellerSidebar from "../components/SellerSidebar";
 import Topbar from "../components/Topbar";
@@ -18,9 +18,28 @@ const SellerAbonne = () => {
     const [clientFiche, setClientFiche] = useState([]);
     const [payAmount, setPayAmount] = useState("");
 
+    // Contract Prices State
+    const [showPriceModal, setShowPriceModal] = useState(false);
+    const [contractPrices, setContractPrices] = useState([]);
+    const [allProducts, setAllProducts] = useState([]);
+    const [newPrice, setNewPrice] = useState({ productId: "", price: "" });
+    const [savingPrice, setSavingPrice] = useState(false);
+
     useEffect(() => {
         fetchClients();
+        fetchProducts();
     }, []);
+
+    const fetchProducts = async () => {
+        try {
+            const res = await axios.get("/orders/seller/pos-products");
+            if (res.data.success) {
+                setAllProducts(res.data.data);
+            }
+        } catch (err) {
+            console.error("Failed to fetch products");
+        }
+    };
 
     const fetchClients = async () => {
         try {
@@ -77,6 +96,51 @@ const SellerAbonne = () => {
             }
         } catch (err) {
             alert(err.response?.data?.message || "Failed to record payment");
+        }
+    };
+
+    const handleViewPrices = async (client) => {
+        setSelectedClient(client);
+        try {
+            const res = await axios.get(`/abonnes/${client._id}/prices`);
+            if (res.data.success) {
+                setContractPrices(res.data.data);
+                setShowPriceModal(true);
+            }
+        } catch (err) {
+            alert("Failed to load contract prices");
+        }
+    };
+
+    const handleAddContractPrice = async (e) => {
+        e.preventDefault();
+        if (!newPrice.productId || !newPrice.price) return alert("Select product and enter price");
+        
+        try {
+            setSavingPrice(true);
+            const res = await axios.post(`/abonnes/${selectedClient._id}/prices`, newPrice);
+            if (res.data.success) {
+                // Refresh prices
+                const freshRes = await axios.get(`/abonnes/${selectedClient._id}/prices`);
+                setContractPrices(freshRes.data.data);
+                setNewPrice({ productId: "", price: "" });
+            }
+        } catch (err) {
+            alert(err.response?.data?.message || "Failed to set price");
+        } finally {
+            setSavingPrice(false);
+        }
+    };
+
+    const handleDeletePrice = async (priceId) => {
+        if (!window.confirm("Remove this contract price?")) return;
+        try {
+            const res = await axios.delete(`/abonnes/${selectedClient._id}/prices/${priceId}`);
+            if (res.data.success) {
+                setContractPrices(contractPrices.filter(p => p.id !== priceId));
+            }
+        } catch (err) {
+            alert("Failed to remove price");
         }
     };
 
@@ -152,6 +216,13 @@ const SellerAbonne = () => {
                                                     title="View Fiche"
                                                 >
                                                     <FaFileInvoiceDollar /> Fiche
+                                                </button>
+                                                <button
+                                                    onClick={() => handleViewPrices(client)}
+                                                    className="flex items-center gap-2 px-3 py-1.5 bg-purple-100 text-purple-700 rounded-lg text-sm font-bold hover:bg-purple-200 transition-colors"
+                                                    title="Contract Prices"
+                                                >
+                                                    <FaTag /> Prices
                                                 </button>
                                             </td>
                                         </tr>
@@ -332,6 +403,94 @@ const SellerAbonne = () => {
                                     )}
                                 </table>
                             </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Contract Prices Modal */}
+            {showPriceModal && selectedClient && (
+                <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+                    <div className="bg-white dark:bg-charcoal-800 rounded-2xl w-full max-w-2xl p-6 flex flex-col max-h-[85vh]">
+                        <div className="flex justify-between items-center mb-6">
+                            <div>
+                                <h2 className="text-2xl font-black text-charcoal-900 dark:text-white">Contract Prices</h2>
+                                <p className="text-sm text-gray-500">Custom pricing for <span className="font-bold text-charcoal-800 dark:text-white">{selectedClient.name}</span></p>
+                            </div>
+                            <button onClick={() => setShowPriceModal(false)} className="p-2 hover:bg-gray-100 dark:hover:bg-charcoal-700 rounded-full transition-colors"><FaTimes /></button>
+                        </div>
+
+                        {/* Add New Price Form */}
+                        <form onSubmit={handleAddContractPrice} className="bg-gray-50 dark:bg-charcoal-700/50 p-4 rounded-xl mb-6 border border-gray-100 dark:border-charcoal-600 flex flex-col sm:flex-row gap-3 items-end">
+                            <div className="flex-1 w-full">
+                                <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Select Product</label>
+                                <select 
+                                    className="w-full p-2 bg-white dark:bg-charcoal-800 border border-gray-200 dark:border-charcoal-600 rounded-lg text-sm outline-none focus:border-terracotta-500"
+                                    value={newPrice.productId}
+                                    onChange={e => setNewPrice({ ...newPrice, productId: e.target.value })}
+                                    required
+                                >
+                                    <option value="">Choose a product...</option>
+                                    {allProducts.map(p => (
+                                        <option key={p._id || p.id} value={p._id || p.id}>
+                                            {p.name} (Normal: {p.price.toLocaleString()})
+                                        </option>
+                                    ))}
+                                </select>
+                            </div>
+                            <div className="w-full sm:w-32">
+                                <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Contract Price</label>
+                                <input 
+                                    type="number"
+                                    placeholder="0"
+                                    className="w-full p-2 bg-white dark:bg-charcoal-800 border border-gray-200 dark:border-charcoal-600 rounded-lg text-sm outline-none focus:border-terracotta-500"
+                                    value={newPrice.price}
+                                    onChange={e => setNewPrice({ ...newPrice, price: e.target.value })}
+                                    required
+                                />
+                            </div>
+                            <button 
+                                type="submit"
+                                disabled={savingPrice}
+                                className="bg-terracotta-500 hover:bg-terracotta-600 text-white px-4 py-2 rounded-lg font-bold transition-all disabled:opacity-50 flex items-center gap-2"
+                            >
+                                <FaPlus /> {savingPrice ? '...' : 'Add'}
+                            </button>
+                        </form>
+
+                        <div className="overflow-y-auto flex-1">
+                            <table className="w-full text-left border-collapse">
+                                <thead className="sticky top-0 bg-white dark:bg-charcoal-800 z-10 border-b-2 border-gray-100 dark:border-charcoal-700">
+                                    <tr className="text-[10px] font-bold text-gray-400 uppercase">
+                                        <th className="p-3">Product</th>
+                                        <th className="p-3">Standard</th>
+                                        <th className="p-3">Contract</th>
+                                        <th className="p-3 text-right">Action</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-gray-50 dark:divide-charcoal-700">
+                                    {contractPrices.map(cp => (
+                                        <tr key={cp.id} className="text-sm">
+                                            <td className="p-3 font-bold text-charcoal-800 dark:text-white">{cp.product?.name}</td>
+                                            <td className="p-3 text-gray-500">{cp.product?.price?.toLocaleString()}</td>
+                                            <td className="p-3 text-terracotta-500 font-black">{cp.price.toLocaleString()}</td>
+                                            <td className="p-3 text-right">
+                                                <button 
+                                                    onClick={() => handleDeletePrice(cp.id)}
+                                                    className="p-2 text-red-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"
+                                                >
+                                                    <FaTrash />
+                                                </button>
+                                            </td>
+                                        </tr>
+                                    ))}
+                                    {contractPrices.length === 0 && (
+                                        <tr>
+                                            <td colSpan="4" className="p-12 text-center text-gray-400 italic">No special prices set for this client.</td>
+                                        </tr>
+                                    )}
+                                </tbody>
+                            </table>
                         </div>
                     </div>
                 </div>
