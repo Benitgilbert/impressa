@@ -50,14 +50,25 @@ export default function Receipt({ order, seller, onClose, onPrint }) {
     };
 
     const formatDate = (date) => {
-        return new Date(date).toLocaleString('en-RW', {
-            day: '2-digit',
-            month: '2-digit',
-            year: 'numeric',
-            hour: '2-digit',
-            minute: '2-digit'
-        });
+        try {
+            const d = new Date(date);
+            if (isNaN(d.getTime())) return new Date().toLocaleString('en-RW');
+            return d.toLocaleString('en-RW', {
+                day: '2-digit',
+                month: '2-digit',
+                year: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit'
+            });
+        } catch (e) {
+            return new Date().toLocaleString('en-RW');
+        }
     };
+
+    const subtotal = order.subtotal || order.totals?.subtotal || 0;
+    const grandTotal = order.grandTotal || order.totals?.grandTotal || 0;
+    const tax = order.tax || order.totals?.tax || 0;
+    const paymentMethod = order.paymentMethod || order.payment?.method || 'CASH';
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
@@ -76,7 +87,7 @@ export default function Receipt({ order, seller, onClose, onPrint }) {
 
                     {/* Meta */}
                     <div className="text-xs text-gray-600 space-y-0.5 font-mono">
-                        <div>Date: {formatDate(order.createdAt || new Date())}</div>
+                        <div>Date: {formatDate(order.createdAt)}</div>
                         <div>Receipt: {order.publicId}</div>
                         <div>Cashier: {order.cashierName || 'Staff'}</div>
                     </div>
@@ -102,17 +113,17 @@ export default function Receipt({ order, seller, onClose, onPrint }) {
                     <div className="space-y-1 font-mono text-xs">
                         <div className="flex justify-between">
                             <span>Subtotal:</span>
-                            <span>RWF {order.totals?.subtotal?.toLocaleString() || '0'}</span>
+                            <span>RWF {subtotal.toLocaleString()}</span>
                         </div>
-                        {order.totals?.tax > 0 && (
+                        {tax > 0 && (
                             <div className="flex justify-between">
                                 <span>Tax:</span>
-                                <span>RWF {order.totals.tax.toLocaleString()}</span>
+                                <span>RWF {tax.toLocaleString()}</span>
                             </div>
                         )}
                         <div className="flex justify-between text-sm font-bold text-gray-900 mt-2">
                             <span>TOTAL:</span>
-                            <span>RWF {order.totals?.grandTotal?.toLocaleString() || '0'}</span>
+                            <span>RWF {grandTotal.toLocaleString()}</span>
                         </div>
                     </div>
 
@@ -120,11 +131,11 @@ export default function Receipt({ order, seller, onClose, onPrint }) {
 
                     {/* Payment */}
                     <div className="text-xs text-gray-600 font-mono space-y-0.5">
-                        <div>Payment: {order.payment?.method?.toUpperCase() || 'CASH'}</div>
-                        {order.payment?.method === 'cash' && order.cashReceived && (
+                        <div>Payment: {paymentMethod.toUpperCase()}</div>
+                        {paymentMethod.toLowerCase() === 'cash' && order.cashReceived && (
                             <>
                                 <div>Cash Received: RWF {order.cashReceived.toLocaleString()}</div>
-                                <div>Change: RWF {(order.cashReceived - order.totals?.grandTotal).toLocaleString()}</div>
+                                <div>Change: RWF {(order.cashReceived - grandTotal).toLocaleString()}</div>
                             </>
                         )}
                     </div>
