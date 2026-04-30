@@ -333,23 +333,10 @@ export const getAllProducts = async (req, res) => {
     }
 
     if (req.query.search) {
-      const searchQuery = req.query.search.split(' ').join(' & ');
-      if (where.OR) {
-        // If category is also set, we need to wrap them
-        where.AND = [
-          { OR: where.OR },
-          { OR: [
-            { name: { search: searchQuery } },
-            { description: { search: searchQuery } }
-          ]}
-        ];
-        delete where.OR;
-      } else {
-        where.OR = [
-          { name: { search: searchQuery } },
-          { description: { search: searchQuery } }
-        ];
-      }
+      where.OR = [
+        { name: { contains: req.query.search, mode: 'insensitive' } },
+        { description: { contains: req.query.search, mode: 'insensitive' } }
+      ];
     }
 
     const limit = Math.min(parseInt(req.query.limit) || 0, 100) || undefined;
@@ -456,18 +443,25 @@ export const getTrendingProducts = async (req, res) => {
     const days = Math.min(parseInt(req.query.days) || 30, 180);
     const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
     
-    // Prisma aggregation alternative for popular items
-    const topItems = await prisma.orderItem.groupBy({
-      by: ['productId'],
+    // Fixed: Relation filters are not supported in groupBy. 
+    // Fetch relevant order items first, then group in memory.
+    const items = await prisma.orderItem.findMany({
       where: {
         order: { createdAt: { gte: since } }
       },
-      _count: { productId: true },
-      orderBy: { _count: { productId: 'desc' } },
-      take: Math.min(parseInt(req.query.limit) || 8, 50)
+      select: { productId: true }
     });
 
-    const ids = topItems.map(t => t.productId).filter(Boolean);
+    const counts = items.reduce((acc, item) => {
+      acc[item.productId] = (acc[item.productId] || 0) + 1;
+      return acc;
+    }, {});
+
+    const sortedIds = Object.keys(counts)
+      .sort((a, b) => counts[b] - counts[a])
+      .slice(0, Math.min(parseInt(req.query.limit) || 8, 50));
+
+    const ids = sortedIds.filter(Boolean);
     
     let products = await prisma.product.findMany({
       where: {
