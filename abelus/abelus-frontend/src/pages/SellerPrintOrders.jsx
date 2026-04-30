@@ -1,13 +1,12 @@
 import { useState, useEffect, useCallback } from "react";
 import { 
     FaPrint, FaFileDownload, FaClock, FaCheckCircle, 
-    FaExternalLinkAlt, FaCalculator, FaChevronRight 
+    FaCalculator, FaChevronRight 
 } from "react-icons/fa";
 import api from "../utils/axiosInstance";
 import SellerSidebar from "../components/SellerSidebar";
 import Header from "../components/Header";
 import assetUrl from "../utils/assetUrl";
-import { formatRwf } from "../utils/currency";
 import { toast } from "react-hot-toast";
 
 const SellerPrintOrders = () => {
