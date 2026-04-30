@@ -25,7 +25,7 @@ router.post("/create", optionalAuth, orderController.createOrder); // Guests or 
 router.post("/public", upload.single("customFile"), orderController.placeOrderGuest);
 
 // Get my orders
-router.get("/my-orders", authMiddleware(["customer", "admin"]), orderController.getMyOrders);
+router.get("/my-orders", authMiddleware(), orderController.getMyOrders);
 
 // Get Seller Orders
 router.get("/seller", authMiddleware(["seller", "admin"]), orderController.getSellerOrders);

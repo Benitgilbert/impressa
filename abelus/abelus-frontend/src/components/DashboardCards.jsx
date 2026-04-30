@@ -2,16 +2,19 @@ import { useEffect, useState } from "react";
 import api from "../utils/axiosInstance";
 import { FaShoppingCart, FaBox, FaCheckCircle, FaTimesCircle, FaDollarSign, FaPalette, FaStar, FaUserPlus, FaUsers, FaClock, FaBuilding, FaArrowUp, FaArrowDown } from "react-icons/fa";
 
-function DashboardCards({ refreshKey }) {
+function DashboardCards({ refreshKey, setRefreshKey }) {
   const [data, setData] = useState(null);
+  const [error, setError] = useState(false);
 
   useEffect(() => {
     const fetchAnalytics = async () => {
       try {
+        setError(false);
         const res = await api.get("/dashboard/analytics");
         setData(res.data);
       } catch (err) {
         console.error("Failed to load dashboard analytics:", err);
+        setError(true);
       }
     };
 
@@ -144,10 +147,24 @@ function DashboardCards({ refreshKey }) {
     return `+${change}`;
   };
 
+  if (error) {
+    return (
+      <div className="bg-red-50 dark:bg-red-900/10 border border-red-200 dark:border-red-900/50 rounded-2xl p-8 text-center">
+        <p className="text-red-600 dark:text-red-400 font-medium">Failed to load dashboard analytics.</p>
+        <button 
+          onClick={() => setRefreshKey(prev => prev + 1)}
+          className="mt-4 text-sm font-bold text-red-700 dark:text-red-300 hover:underline"
+        >
+          Try Again
+        </button>
+      </div>
+    );
+  }
+
   if (!data) {
     return (
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-        {[...Array(8)].map((_, i) => (
+        {[...Array(12)].map((_, i) => (
           <div key={i} className="bg-white dark:bg-charcoal-800 rounded-2xl p-5 border border-cream-200 dark:border-charcoal-700 animate-pulse">
             <div className="flex items-center justify-between mb-4">
               <div className="w-12 h-12 bg-cream-200 dark:bg-charcoal-700 rounded-xl"></div>

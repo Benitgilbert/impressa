@@ -142,7 +142,7 @@ export const getRevenueData = async (req, res) => {
 
     const orders = await prisma.order.findMany({
       where: { status: "delivered", createdAt: { gte: startDate } },
-      include: { items: true }
+      select: { grandTotal: true, createdAt: true, items: { select: { quantity: true } } }
     });
 
     const stats = {};

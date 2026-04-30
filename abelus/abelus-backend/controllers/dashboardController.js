@@ -104,10 +104,20 @@ export const getDashboardAnalytics = async (req, res) => {
 
     // Customization demand & Item counts
     const itemsThisWeekRaw = await prisma.orderItem.findMany({
-      where: { order: { createdAt: { gte: startOfThisWeek } }, order: { status: { not: 'cancelled' } } }
+      where: { 
+        order: { 
+          createdAt: { gte: startOfThisWeek },
+          status: { not: 'cancelled' }
+        } 
+      }
     });
     const itemsLastWeekRaw = await prisma.orderItem.findMany({
-      where: { order: { createdAt: { gte: startOfLastWeek, lt: endOfLastWeek } }, order: { status: { not: 'cancelled' } } }
+      where: { 
+        order: { 
+          createdAt: { gte: startOfLastWeek, lt: endOfLastWeek },
+          status: { not: 'cancelled' }
+        } 
+      }
     });
 
     const countCustom = (items) => items.filter(item => {
@@ -155,8 +165,8 @@ export const getDashboardAnalytics = async (req, res) => {
     twelveMonthsAgo.setDate(1);
 
     const monthlyOrders = await prisma.order.findMany({
-      where: { status: "delivered", createdAt: { gte: twelveMonthsAgo } },
-      include: { items: true }
+      where: { ...orderFilter, status: "delivered", createdAt: { gte: twelveMonthsAgo } },
+      select: { grandTotal: true, createdAt: true, items: { select: { quantity: true } } }
     });
 
     const monthlyStats = {};

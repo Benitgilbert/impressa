@@ -39,7 +39,7 @@ function AdminDashboard() {
 
           {/* Metrics Cards */}
           <section className="mb-8">
-            <DashboardCards refreshKey={refreshKey} />
+            <DashboardCards refreshKey={refreshKey} setRefreshKey={setRefreshKey} />
           </section>
 
           {/* Performance Analytics */}
