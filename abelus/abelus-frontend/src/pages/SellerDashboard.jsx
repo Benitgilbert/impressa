@@ -4,9 +4,6 @@ import {
     FaChartLine, FaDollarSign, FaBox, FaShoppingCart, FaMoneyBillWave
 } from 'react-icons/fa';
 import api from '../utils/axiosInstance';
-import Topbar from '../components/Topbar';
-import SellerSidebar from '../components/SellerSidebar';
-import AdminChatBot from '../components/AdminChatBot';
 
 import {
     Chart as ChartJS,

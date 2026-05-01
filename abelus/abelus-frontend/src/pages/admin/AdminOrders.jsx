@@ -4,8 +4,8 @@ import api from "../../utils/axiosInstance";
 import {
     FaSearch, FaFilter, FaEye, FaChevronLeft, FaChevronRight, FaBox
 } from "react-icons/fa";
-import Sidebar from "../../components/Sidebar";
-import Topbar from "../../components/Topbar";
+
+
 
 const AdminOrders = () => {
     const [orders, setOrders] = useState([]);

@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { FaHistory, FaCalendarAlt, FaMoneyBillWave, FaArrowRight, FaTimes, FaUser, FaClock, FaClipboardList } from "react-icons/fa";
+import { FaHistory, FaCalendarAlt, FaArrowRight, FaTimes, FaClock, FaClipboardList } from "react-icons/fa";
 import api from "../utils/axiosInstance";
 
 const SellerShifts = () => {

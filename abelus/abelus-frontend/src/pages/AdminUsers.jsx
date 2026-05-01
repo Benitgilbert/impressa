@@ -1,8 +1,6 @@
 import { useState } from "react";
 import UserTable from "../components/UserTable";
 import UserCreateModal from "../components/UserCreateModal";
-import Sidebar from "../components/Sidebar";
-import Topbar from "../components/Topbar";
 
 function AdminUsers() {
   const [showModal, setShowModal] = useState(false);

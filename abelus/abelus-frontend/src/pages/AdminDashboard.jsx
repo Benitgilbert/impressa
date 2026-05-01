@@ -1,6 +1,4 @@
 import { useState, useEffect } from "react";
-import Sidebar from "../components/Sidebar";
-import Topbar from "../components/Topbar";
 import DashboardCards from "../components/DashboardCards";
 import RevenueChart from "../components/RevenueChart";
 import WeeklyProfitChart from "../components/WeeklyProfitChart";
