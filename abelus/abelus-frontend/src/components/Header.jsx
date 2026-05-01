@@ -132,7 +132,7 @@ export default function Header() {
 
         {/* Mobile Menu Button - Left */}
         <button
-          className="md:hidden p-2 text-white"
+          className="lg:hidden p-2 text-white"
           onClick={() => setMobileMenuOpen(true)}
         >
           <LuMenu className="w-6 h-6" />
@@ -157,7 +157,7 @@ export default function Header() {
 
         {/* Navigation - DESKTOP ONLY */}
         {!isSellerOrAdminView && (
-          <nav className="hidden md:flex items-center gap-2">
+          <nav className="hidden lg:flex items-center gap-1 xl:gap-2">
             {/* Categories Dropdown */}
             <div className="relative">
               <button
@@ -209,7 +209,7 @@ export default function Header() {
 
         {/* Search Bar - DESKTOP ONLY */}
         {!isSellerOrAdminView && (
-          <div className="hidden md:block flex-1 max-w-md px-4">
+          <div className="hidden lg:block flex-1 max-w-md px-2 xl:px-4">
             <div className="relative w-full group">
               <form onSubmit={handleSearchSubmit}>
                 <input
@@ -369,7 +369,7 @@ export default function Header() {
       {/* Mobile Menu Overlay */}
       {
         mobileMenuOpen && (
-          <div className="fixed inset-0 z-50 bg-charcoal-900/95 backdrop-blur-sm md:hidden overflow-y-auto">
+          <div className="fixed inset-0 z-50 bg-charcoal-900/95 backdrop-blur-sm lg:hidden overflow-y-auto">
             <div className="p-6 flex flex-col gap-6">
               <div className="flex items-center justify-between">
                 <span className="text-xl font-bold text-white">Menu</span>
