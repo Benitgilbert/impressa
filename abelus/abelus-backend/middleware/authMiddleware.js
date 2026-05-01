@@ -47,7 +47,11 @@ export const authMiddleware = (requiredRoles = []) => {
 
       // 4. Role-based access control
       if (requiredRoles.length && !requiredRoles.includes(user.role)) {
-        return res.status(403).json({ message: "Access denied: insufficient permissions" });
+        console.warn(`[AUTH] Access denied for user ${user.email}. Role: ${user.role}, Required: ${requiredRoles.join(', ')}`);
+        return res.status(403).json({ 
+          message: "Access denied: insufficient permissions",
+          debug: process.env.NODE_ENV === 'development' ? { currentRole: user.role, requiredRoles } : undefined
+        });
       }
 
       next();
