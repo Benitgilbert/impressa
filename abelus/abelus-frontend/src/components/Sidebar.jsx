@@ -1,4 +1,4 @@
-import { FaChartBar, FaUser, FaBox, FaFileAlt, FaSignOutAlt, FaTags, FaTicketAlt, FaTruck, FaPercentage, FaCog, FaMoneyBillWave, FaFolder, FaFire, FaDesktop, FaQuoteLeft, FaHandshake, FaGlobe, FaEnvelope, FaStore, FaPercent, FaDollarSign, FaClipboardCheck, FaStar, FaHeadset, FaExclamationTriangle, FaChartLine, FaTimes, FaGift, FaRobot, FaNewspaper, FaUserFriends, FaClock, FaQuestionCircle, FaUniversity, FaHistory } from "react-icons/fa";
+import { FaChartBar, FaUser, FaBox, FaFileAlt, FaSignOutAlt, FaTags, FaTicketAlt, FaTruck, FaPercentage, FaCog, FaMoneyBillWave, FaFolder, FaFire, FaDesktop, FaQuoteLeft, FaHandshake, FaGlobe, FaEnvelope, FaStore, FaPercent, FaDollarSign, FaClipboardCheck, FaStar, FaHeadset, FaExclamationTriangle, FaChartLine, FaTimes, FaGift, FaRobot, FaNewspaper, FaUserFriends, FaQuestionCircle, FaHistory } from "react-icons/fa";
 
 import { Link, useLocation } from "react-router-dom";
 import { useRef, useLayoutEffect } from "react";
