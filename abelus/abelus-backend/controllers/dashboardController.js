@@ -55,7 +55,7 @@ export const getDashboardAnalytics = async (req, res) => {
     ] = await Promise.all([
       prisma.order.count({ where: orderFilter }),
       prisma.order.count({ where: { ...orderFilter, status: "delivered" } }),
-      prisma.order.count({ where: { ...orderFilter, status: "in-production" } }),
+      prisma.order.count({ where: { ...orderFilter, status: "in_production" } }),
       prisma.order.count({ where: { ...orderFilter, status: "cancelled" } }),
       prisma.product.count({ where: productFilter }),
       prisma.product.aggregate({ _sum: { stock: true }, where: { ...productFilter, isDigital: false } }),

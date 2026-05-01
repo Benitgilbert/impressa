@@ -81,7 +81,7 @@ function OrderTable({ readOnly = false }) {
                         }
                         className="border px-2 py-1 rounded text-sm"
                       >
-                        {["pending", "approved", "in-production", "ready", "delivered", "cancelled"].map(
+                        {["pending", "confirmed", "processing", "in_production", "ready", "shipped", "delivered", "cancelled", "refunded"].map(
                           (status) => (
                             <option key={status} value={status}>
                               {status}
