@@ -230,6 +230,53 @@ export const getDashboardAnalytics = async (req, res) => {
       prisma.user.count({ where: { role: 'seller', sellerStatus: 'rejected' } })
     ]) : [0, 0, 0, 0];
 
+    // Low Stock & Out of Stock
+    const lowStockProducts = await prisma.product.findMany({
+      where: { ...productFilter, stock: { gt: 0, lte: 5 }, isDigital: false },
+      take: 10,
+      select: { id: true, name: true, stock: true, image: true, seller: { select: { name: true, storeName: true } } }
+    });
+    const outOfStockCount = await prisma.product.count({
+      where: { ...productFilter, stock: 0, isDigital: false }
+    });
+
+    // Pending Seller Approvals (Admin only)
+    const pendingSellerApprovals = !isStaff ? await prisma.user.findMany({
+      where: { role: 'seller', sellerStatus: 'pending' },
+      take: 10,
+      select: { id: true, name: true, storeName: true, createdAt: true }
+    }) : [];
+
+    // Top Sellers (Admin only, 30 days)
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(now.getDate() - 30);
+
+    const topSellersRaw = !isStaff ? await prisma.orderItem.groupBy({
+      by: ['sellerId'],
+      _sum: { subtotal: true },
+      _count: { orderId: true },
+      where: {
+          order: { status: 'delivered', createdAt: { gte: thirtyDaysAgo } }
+      },
+      orderBy: { _sum: { subtotal: 'desc' } },
+      take: 5
+    }) : [];
+
+    const sellerIds = topSellersRaw.map(ts => ts.sellerId).filter(Boolean);
+    const sellers = !isStaff ? await prisma.user.findMany({
+        where: { id: { in: sellerIds } },
+        select: { id: true, name: true, storeName: true }
+    }) : [];
+    const sellerMap = Object.fromEntries(sellers.map(s => [s.id, s]));
+
+    const topSellers = topSellersRaw.map(ts => ({
+        sellerId: ts.sellerId,
+        name: sellerMap[ts.sellerId]?.name || 'Unknown',
+        storeName: sellerMap[ts.sellerId]?.storeName,
+        revenue: ts._sum.subtotal || 0,
+        orders: ts._count.orderId
+    }));
+
     res.json({
       totalOrders,
       deliveredOrders,
@@ -253,7 +300,11 @@ export const getDashboardAnalytics = async (req, res) => {
       },
       recentOrders,
       monthlyRevenue,
-      statusCounts
+      statusCounts,
+      lowStockProducts,
+      outOfStockCount,
+      pendingSellerApprovals,
+      topSellers
     });
   } catch (err) {
     console.error("Dashboard analytics failed:", err);
