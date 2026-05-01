@@ -5,8 +5,7 @@ import {
     FaToggleOn, FaToggleOff, FaArrowUp, FaArrowDown, FaRedo,
     FaEnvelope, FaPhone, FaMapMarkerAlt, FaFacebookF, FaTwitter, FaInstagram, FaLinkedinIn
 } from 'react-icons/fa';
-import Sidebar from '../components/Sidebar';
-import Topbar from '../components/Topbar';
+import api from '../utils/axiosInstance';
 
 const iconOptions = [
     { value: 'truck', label: 'Truck (Shipping)', icon: <FaTruck /> },
@@ -20,7 +19,6 @@ const iconOptions = [
 ];
 
 export default function AdminSiteSettings() {
-    const [sidebarOpen, setSidebarOpen] = useState(false);
     const [settings, setSettings] = useState(null);
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
@@ -42,7 +40,6 @@ export default function AdminSiteSettings() {
     });
     const [logoPreview, setLogoPreview] = useState(null);
 
-    const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
 
 
 
@@ -66,27 +63,20 @@ export default function AdminSiteSettings() {
 
     const fetchSettings = useCallback(async () => {
         try {
-            const token = localStorage.getItem('authToken');
-            const res = await fetch(`${API_URL}/site-settings`, { headers: { Authorization: `Bearer ${token}` } });
-            const data = await res.json();
-            if (data.success) setSettings(data.data);
+            const res = await api.get('/site-settings');
+            if (res.data.success) setSettings(res.data.data);
         } catch (err) { setError('Failed to fetch settings'); }
         finally { setLoading(false); }
-    }, [API_URL]);
+    }, []);
 
     useEffect(() => { fetchSettings(); }, [fetchSettings]);
 
     const saveTrustBadges = async (badges) => {
         setSaving(true); setError('');
         try {
-            const token = localStorage.getItem('authToken');
-            const res = await fetch(`${API_URL}/site-settings/trust-badges`, {
-                method: 'PUT', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-                body: JSON.stringify({ trustBadges: badges })
-            });
-            const data = await res.json();
-            if (data.success) { setSuccess('Trust badges saved!'); fetchSettings(); }
-            else setError(data.message || 'Failed to save');
+            const res = await api.put('/site-settings/trust-badges', { trustBadges: badges });
+            if (res.data.success) { setSuccess('Trust badges saved!'); fetchSettings(); }
+            else setError(res.data.message || 'Failed to save');
         } catch (err) { setError('Failed to save trust badges'); }
         finally { setSaving(false); }
     };
@@ -95,14 +85,9 @@ export default function AdminSiteSettings() {
         e.preventDefault();
         setSaving(true); setError('');
         try {
-            const token = localStorage.getItem('authToken');
-            const res = await fetch(`${API_URL}/site-settings/footer`, {
-                method: 'PUT', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-                body: JSON.stringify(footerForm)
-            });
-            const data = await res.json();
-            if (data.success) { setSuccess('Footer settings saved!'); fetchSettings(); }
-            else setError(data.message || 'Failed to save footer settings');
+            const res = await api.put('/site-settings/footer', footerForm);
+            if (res.data.success) { setSuccess('Footer settings saved!'); fetchSettings(); }
+            else setError(res.data.message || 'Failed to save footer settings');
         } catch (err) { setError('Failed to save footer settings'); }
         finally { setSaving(false); }
     };
@@ -111,7 +96,6 @@ export default function AdminSiteSettings() {
         e.preventDefault();
         setSaving(true); setError('');
         try {
-            const token = localStorage.getItem('authToken');
             const formData = new FormData();
             formData.append('siteName', generalForm.siteName);
             formData.append('tagline', generalForm.tagline);
@@ -119,17 +103,14 @@ export default function AdminSiteSettings() {
                 formData.append('logo', generalForm.logo);
             }
 
-            const res = await fetch(`${API_URL}/site-settings/general`, {
-                method: 'PUT',
-                headers: { Authorization: `Bearer ${token}` },
-                body: formData
+            const res = await api.put('/site-settings/general', formData, {
+                headers: { 'Content-Type': 'multipart/form-data' }
             });
-            const data = await res.json();
-            if (data.success) {
+            if (res.data.success) {
                 setSuccess('General settings saved!');
                 fetchSettings();
             } else {
-                setError(data.message || 'Failed to save general settings');
+                setError(res.data.message || 'Failed to save general settings');
             }
         } catch (err) {
             setError('Failed to save general settings');
@@ -154,10 +135,8 @@ export default function AdminSiteSettings() {
     const handleResetDefaults = async () => {
         if (!window.confirm('Reset trust badges to defaults? This will remove all custom badges.')) return;
         try {
-            const token = localStorage.getItem('authToken');
-            const res = await fetch(`${API_URL}/site-settings/trust-badges/reset`, { method: 'POST', headers: { Authorization: `Bearer ${token}` } });
-            const data = await res.json();
-            if (data.success) { setSuccess('Trust badges reset to defaults!'); fetchSettings(); }
+            const res = await api.post('/site-settings/trust-badges/reset');
+            if (res.data.success) { setSuccess('Trust badges reset to defaults!'); fetchSettings(); }
         } catch (err) { setError('Failed to reset'); }
     };
 
@@ -174,9 +153,7 @@ export default function AdminSiteSettings() {
 
     return (
         <div className="min-h-screen bg-cream-100 dark:bg-charcoal-900 transition-colors duration-300">
-            <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
-            <div className="lg:ml-64 min-h-screen flex flex-col transition-all duration-300">
-                <Topbar onMenuClick={() => setSidebarOpen(true)} title="Site Settings" />
+            <div className="min-h-screen flex flex-col transition-all duration-300">
                 <main className="flex-1 p-4 lg:p-6 max-w-[1600px] w-full mx-auto">
                     {/* Header */}
                     <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">

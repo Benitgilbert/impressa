@@ -4,11 +4,9 @@ import {
     FaClock, FaUserSlash, FaBan, FaChartLine,
     FaExclamationCircle, FaCheckCircle
 } from 'react-icons/fa';
-import Sidebar from '../components/Sidebar';
-import Topbar from '../components/Topbar';
+import api from '../utils/axiosInstance';
 
 export default function AdminViolations() {
-    const [sidebarOpen, setSidebarOpen] = useState(false);
     const [violations, setViolations] = useState([]);
     const [stats, setStats] = useState({ total: 0, active: 0, warning: 0, review: 0, suspension: 0 });
     const [loading, setLoading] = useState(true);
@@ -21,27 +19,22 @@ export default function AdminViolations() {
     const [selectedViolation, setSelectedViolation] = useState(null);
     const [showModal, setShowModal] = useState(false);
 
-    const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
 
     const fetchViolations = useCallback(async () => {
         setLoading(true);
         try {
-            const token = localStorage.getItem('authToken');
-            const res = await fetch(`${API_URL}/violations?status=${statusFilter}&type=${typeFilter}&page=${currentPage}`, {
-                headers: { 'Authorization': `Bearer ${token}` }
-            });
-            const data = await res.json();
+            const res = await api.get(`/violations?status=${statusFilter}&type=${typeFilter}&page=${currentPage}`);
+            const data = res.data;
 
             setViolations(data.violations || []);
             setStats(data.stats || { total: 0, active: 0, warning: 0, review: 0, suspension: 0 });
-            // setTotalPages(data.totalPages || 1); // Unused
         } catch (err) {
             console.error(err);
             setError('Failed to fetch violations');
         } finally {
             setLoading(false);
         }
-    }, [statusFilter, typeFilter, currentPage, API_URL]);
+    }, [statusFilter, typeFilter, currentPage]);
 
     useEffect(() => {
         fetchViolations();
@@ -50,17 +43,9 @@ export default function AdminViolations() {
     const handleDismiss = async (id) => {
         if (!window.confirm('Dismiss this violation? This will remove penalty points from the seller.')) return;
         try {
-            const token = localStorage.getItem('authToken');
-            const res = await fetch(`${API_URL}/violations/${id}/status`, {
-                method: 'PUT',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${token}`
-                },
-                body: JSON.stringify({ status: 'dismissed' })
-            });
+            const res = await api.put(`/violations/${id}/status`, { status: 'dismissed' });
 
-            if (res.ok) {
+            if (res.data) {
                 setSuccess('Violation dismissed');
                 fetchViolations();
             } else {
@@ -74,17 +59,9 @@ export default function AdminViolations() {
     const handleEscalate = async (id) => {
         if (!window.confirm('Escalate this violation? This may lead to seller suspension.')) return;
         try {
-            const token = localStorage.getItem('authToken');
-            const res = await fetch(`${API_URL}/violations/${id}/status`, {
-                method: 'PUT',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${token}`
-                },
-                body: JSON.stringify({ status: 'suspension' })
-            });
+            const res = await api.put(`/violations/${id}/status`, { status: 'suspension' });
 
-            if (res.ok) {
+            if (res.data) {
                 setSuccess('Violation escalated');
                 fetchViolations();
             } else {
@@ -155,10 +132,7 @@ export default function AdminViolations() {
 
     return (
         <div className="min-h-screen bg-cream-100 dark:bg-charcoal-900 transition-colors duration-300">
-            <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
-
-            <div className="lg:ml-64 min-h-screen flex flex-col transition-all duration-300">
-                <Topbar onMenuClick={() => setSidebarOpen(true)} title="Seller Violations" />
+            <div className="min-h-screen flex flex-col transition-all duration-300">
 
                 <main className="flex-1 p-4 lg:p-6 max-w-[1600px] w-full mx-auto">
                     {/* Page Header */}
