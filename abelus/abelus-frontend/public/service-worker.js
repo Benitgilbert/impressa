@@ -23,8 +23,11 @@ self.addEventListener('fetch', event => {
     // Basic fetch handler (network first)
     // This makes the app installable
     event.respondWith(
-        fetch(event.request).catch(function () {
-            return caches.match(event.request);
+        fetch(event.request).catch(async () => {
+            const cachedResponse = await caches.match(event.request);
+            if (cachedResponse) return cachedResponse;
+            // Return a dummy response to prevent service worker crash
+            return new Response('Network error', { status: 408, statusText: 'Network Error' });
         })
     );
 });
