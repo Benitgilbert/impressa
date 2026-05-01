@@ -269,9 +269,8 @@ const POS = () => {
     const categories = ["All", ...new Set(products.flatMap(p => p.categories?.map(c => c.name) || []))];
 
     return (
-        <div className="flex h-screen bg-cream-50 dark:bg-charcoal-900 overflow-hidden font-sans">
-
-            {/* Shift Modals */}
+        <>
+            <div className="flex-1 flex flex-col transition-all duration-300">
             {showStartShiftModal && (
                 <div className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
                     <div className="bg-white dark:bg-charcoal-800 rounded-2xl shadow-2xl w-full max-md p-8 text-center">
@@ -446,11 +445,6 @@ const POS = () => {
                     <p className="text-gray-400 text-lg max-w-md text-center">Please ask the customer to approve the transaction on their mobile phone.</p>
                 </div>
             )}
-
-            <Sidebar />
-
-            <div className="flex-1 flex flex-col lg:ml-64 transition-all duration-300">
-                <Topbar />
 
                 <div className="flex-1 flex overflow-hidden">
                     <div className="flex-1 flex flex-col min-w-0">
@@ -714,8 +708,7 @@ const POS = () => {
                         </div>
                     </div>
                 </div>
-            </div>
-        </div>
+        </>
     );
 };
 

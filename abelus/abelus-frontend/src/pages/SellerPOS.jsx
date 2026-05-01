@@ -431,11 +431,8 @@ export default function SellerPOS() {
     const changeAmount = parseFloat(cashReceived || 0) - calculateTotal();
 
     return (
-        <div className="flex h-screen bg-gray-50 dark:bg-gray-900 transition-colors duration-200 overflow-hidden">
-            <SellerSidebar />
-            <div className="flex-1 flex flex-col min-w-0 h-full overflow-hidden">
-                <Header />
-                <main className="flex-1 p-4 md:p-6 overflow-hidden grid grid-cols-1 md:grid-cols-12 gap-6 relative">
+        <div className="flex flex-col min-w-0 h-full overflow-hidden">
+            <main className="flex-1 p-4 md:p-6 overflow-hidden grid grid-cols-1 md:grid-cols-12 gap-6 relative">
 
                     <div className="absolute top-4 right-4 z-20 flex gap-2">
                         {activeShift ? (
@@ -1030,6 +1027,5 @@ export default function SellerPOS() {
                     </div>
                 </main>
             </div>
-        </div>
     );
 }

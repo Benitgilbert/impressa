@@ -69,12 +69,7 @@ const SellerNotifications = () => {
     };
 
     return (
-        <div className="min-h-screen bg-cream-100 dark:bg-charcoal-900 transition-colors duration-300">
-            <SellerSidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
-            <div className="flex-1 min-h-screen flex flex-col transition-all duration-300">
-
-                <Topbar onMenuClick={() => setSidebarOpen(true)} title="Notifications" />
-                <main className="flex-1 p-4 lg:p-6 max-w-[1200px] w-full mx-auto">
+        <main className="flex-1 p-4 lg:p-6 max-w-[1200px] w-full mx-auto">
                     {/* Header with Filters & Actions */}
                     <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
                         <div>
@@ -156,9 +151,7 @@ const SellerNotifications = () => {
                             </div>
                         )}
                     </div>
-                </main>
-            </div>
-        </div>
+        </main>
     );
 };
 

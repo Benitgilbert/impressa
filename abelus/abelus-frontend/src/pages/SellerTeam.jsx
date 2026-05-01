@@ -69,11 +69,8 @@ const SellerTeam = () => {
     };
 
     return (
-        <div className="flex h-screen bg-gray-50 dark:bg-gray-900 transition-colors duration-200 overflow-hidden">
-            <SellerSidebar />
-            <div className="flex-1 flex flex-col min-w-0 h-full overflow-hidden">
-                <Header />
-                <main className="flex-1 overflow-y-auto p-8">
+        <>
+            <main className="flex-1 overflow-y-auto p-8">
                     <div className="max-w-6xl mx-auto">
                         <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-10 gap-4">
                             <div>
@@ -146,7 +143,7 @@ const SellerTeam = () => {
                         )}
                     </div>
                 </main>
-            </div>
+
 
             {/* Create Staff Modal */}
             {showModal && (
@@ -237,7 +234,7 @@ const SellerTeam = () => {
                     </div>
                 </div>
             )}
-        </div>
+        </>
     );
 };
 

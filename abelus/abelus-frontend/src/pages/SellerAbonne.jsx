@@ -169,12 +169,7 @@ const SellerAbonne = () => {
     };
 
     return (
-        <div className="flex h-screen bg-cream-50 dark:bg-charcoal-900 font-sans">
-            <SellerSidebar />
-            <div className="flex-1 flex flex-col overflow-hidden">
-
-                <Topbar />
-                <div className="flex-1 overflow-y-auto p-6">
+        <div className="flex-1 overflow-y-auto p-6">
                     <div className="flex justify-between items-center mb-8">
                         <div>
                             <h1 className="text-3xl font-black text-charcoal-900 dark:text-white">Clients Abonnés</h1>

@@ -110,11 +110,7 @@ function AdminReports() {
     }
   };
 
-  return (
-    <div className="min-h-screen bg-cream-100 dark:bg-charcoal-900 transition-colors duration-300">
-      <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
-      <div className="lg:ml-64 min-h-screen flex flex-col transition-all duration-300">
-        <Topbar onMenuClick={() => setSidebarOpen(true)} title="Reports" />
+    return (
         <main className="flex-1 p-4 lg:p-6 max-w-[1600px] w-full mx-auto">
           {/* Header */}
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
@@ -270,9 +266,7 @@ function AdminReports() {
             </div>
           </div>
         </main>
-      </div>
-    </div>
-  );
+    );
 }
 
 export default AdminReports;

@@ -81,11 +81,7 @@ const SellerPayouts = () => {
     };
 
     return (
-        <div className="flex h-screen bg-gray-50 dark:bg-gray-900 transition-colors duration-200 overflow-hidden">
-            <SellerSidebar />
-            <div className="flex-1 flex flex-col min-w-0 h-full overflow-hidden">
-                <Header />
-                <main className="flex-1 overflow-y-auto p-8 relative">
+        <main className="flex-1 overflow-y-auto p-8 relative">
                     <div className="max-w-7xl mx-auto">
                         {/* Header */}
                         <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
@@ -234,9 +230,7 @@ const SellerPayouts = () => {
                             </div>
                         </div>
                     )}
-                </main>
-            </div>
-        </div>
+        </main>
     );
 };
 

@@ -122,13 +122,7 @@ function SellerReports() {
     }
   };
 
-  return (
-    <div className="flex h-screen bg-[#0f172a] text-white">
-      <SellerSidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
-      
-      <div className="flex-1 flex flex-col overflow-hidden">
-        <Topbar onMenuClick={() => setSidebarOpen(true)} title="Business Reports" />
-        
+    return (
         <main className="flex-1 overflow-y-auto p-4 md:p-8">
           <div className="max-w-4xl mx-auto">
             {/* Header section */}
@@ -336,8 +330,8 @@ function SellerReports() {
           </div>
         </div>
       )}
-    </div>
-  );
+        </main>
+    );
 }
 
 export default SellerReports;
