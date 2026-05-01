@@ -699,6 +699,48 @@ export const createPOSOrder = async (req, res) => {
         }
       });
 
+      // 👥 Abonne Debt Recording (Inside Transaction)
+      if (clientId) {
+        const cashCollected = Number(req.body.upfrontCashPaid) || 0;
+        let remainingUpfront = cashCollected;
+
+        const transactions = txOrderItemsData.map(item => {
+          let paidForItem = 0;
+          if (remainingUpfront >= item.subtotal) {
+            paidForItem = item.subtotal;
+            remainingUpfront -= item.subtotal;
+          } else if (remainingUpfront > 0) {
+            paidForItem = remainingUpfront;
+            remainingUpfront = 0;
+          }
+
+          const debtAmount = item.subtotal - paidForItem;
+
+          return {
+            clientId: clientId,
+            orderId: txOrder.id,
+            responsibleId: userId,
+            // shiftId will be linked later or we can fetch it here if needed
+            designation: item.productName,
+            quantity: item.quantity,
+            pu: item.price,
+            pt: item.subtotal,
+            amountPaid: paidForItem,
+            debtAmount: debtAmount,
+            status: debtAmount === 0 ? "paid" : (paidForItem > 0 ? "partially_paid" : "unpaid")
+          };
+        });
+
+        await tx.abonneTransaction.createMany({
+          data: transactions
+        });
+
+        await tx.clientAbonne.update({
+          where: { id: clientId },
+          data: { totalDebt: { increment: txSubtotal - cashCollected } }
+        });
+      }
+
       return { order: txOrder, orderItemsData: txOrderItemsData, subtotal: txSubtotal };
     }); // End $transaction
 
@@ -706,53 +748,30 @@ export const createPOSOrder = async (req, res) => {
       where: { userId: userId, status: "open" }
     });
 
-    // 👥 Abonne Debt Recording
-    if (clientId) {
-      try {
-
-        const transactions = orderItemsData.map(item => ({
-          clientId: clientId,
-          orderId: order.id,
-          responsibleId: userId,
-          shiftId: activeShift?.id || null,
-          designation: item.productName,
-          quantity: item.quantity,
-          pu: item.price,
-          pt: item.subtotal,
-          debtAmount: item.subtotal,
-          status: "unpaid"
-        }));
-
-        await prisma.abonneTransaction.createMany({
-          data: transactions
-        });
-
-        await prisma.clientAbonne.update({
-          where: { id: clientId },
-          data: { totalDebt: { increment: subtotal } }
-        });
-      } catch (abonneErr) {
-        console.error("Abonne debt recording failed:", abonneErr);
-      }
+    // Link transactions to shift if active
+    if (activeShift && clientId) {
+      await prisma.abonneTransaction.updateMany({
+        where: { orderId: order.id },
+        data: { shiftId: activeShift.id }
+      });
     }
 
     // 🕒 Shift Update
     try {
       if (activeShift) {
-        const updateData = {
-          orders: { connect: { id: order.id } }
-        };
-        if (paymentMethod === "mtn_momo") {
-          updateData.totalMomoSales = { increment: subtotal };
-        } else if (paymentMethod === "cash" || !paymentMethod) {
-          updateData.totalCashSales = { increment: subtotal };
-          updateData.expectedEndingDrawerAmount = { increment: subtotal };
-        } else {
-          updateData.totalOtherSales = { increment: subtotal };
-        }
+        const cashCollected = paymentMethod === "client_abonne" ? (Number(req.body.upfrontCashPaid) || 0) : (paymentMethod === "cash" || !paymentMethod ? subtotal : 0);
+        const momoCollected = paymentMethod === "mtn_momo" ? subtotal : 0;
+        const otherCollected = (paymentMethod !== "cash" && paymentMethod !== "mtn_momo" && paymentMethod !== "client_abonne") ? subtotal : 0;
+
         await prisma.shift.update({
           where: { id: activeShift.id },
-          data: updateData
+          data: {
+            orders: { connect: { id: order.id } },
+            totalCashSales: { increment: cashCollected },
+            expectedEndingDrawerAmount: { increment: cashCollected },
+            totalMomoSales: { increment: momoCollected },
+            totalOtherSales: { increment: otherCollected }
+          }
         });
       }
     } catch (shiftErr) {

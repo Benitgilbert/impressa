@@ -43,8 +43,15 @@ function ProductTable() {
   const fetchProducts = async () => {
     try {
       const res = await api.get("/products");
-      setProducts(res.data);
-      setFiltered(res.data);
+      if (res.data.success) {
+        setProducts(res.data.data);
+        setFiltered(res.data.data);
+      } else {
+        // Fallback for older API or direct array response
+        const data = Array.isArray(res.data) ? res.data : (res.data.data || []);
+        setProducts(data);
+        setFiltered(data);
+      }
     } catch (err) {
       console.error("Failed to fetch products:", err);
       setMessage("error:Failed to load products");

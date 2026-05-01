@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import api from "../utils/axiosInstance";
 import assetUrl from "../utils/assetUrl";
-import { FaSearch, FaShoppingCart, FaTrash, FaPlus, FaMinus, FaMoneyBillWave, FaMobileAlt, FaBoxOpen, FaStore, FaBarcode, FaTimes } from "react-icons/fa";
+import { FaSearch, FaShoppingCart, FaTrash, FaPlus, FaMinus, FaMoneyBillWave, FaMobileAlt, FaBoxOpen, FaStore, FaBarcode, FaTimes, FaCheckCircle } from "react-icons/fa";
 import Receipt from "../components/Receipt";
 
 // Beep sound for successful scan
@@ -47,6 +47,50 @@ export default function SellerPOS() {
     const [actualAmount, setActualAmount] = useState("");
     const [shiftNotes, setShiftNotes] = useState("");
     const [shiftReport, setShiftReport] = useState(null);
+    const [showAbonneSplitModal, setShowAbonneSplitModal] = useState(false);
+    const [abonneUpfrontCash, setAbonneUpfrontCash] = useState("");
+
+    const handleAbonneCheckout = async () => {
+        if (!selectedClient) return alert("Select a Client first");
+        if (cart.length === 0) return;
+        
+        setProcessing(true);
+        try {
+            const res = await api.post("/orders/pos", {
+                items: cart.map((item) => ({
+                    product: item.id,
+                    quantity: item.quantity,
+                    variationId: item.variationId,
+                    price: getItemPrice(item)
+                })),
+                paymentMethod: "client_abonne",
+                clientId: selectedClient.id,
+                upfrontCashPaid: Number(abonneUpfrontCash) || 0
+            });
+
+            const order = {
+                ...res.data,
+                cashierName: seller?.name,
+                items: cart.map(item => ({
+                    productName: item.name,
+                    quantity: item.quantity,
+                    price: getItemPrice(item)
+                }))
+            };
+
+            setCompletedOrder(order);
+            setShowReceipt(true);
+            setShowAbonneSplitModal(false);
+            setAbonneUpfrontCash("");
+            setCart([]);
+            fetchProducts();
+        } catch (err) {
+            alert(err.response?.data?.message || "Failed to process sale");
+        } finally {
+            setProcessing(false);
+        }
+    };
+
 
     // Modals
     const [showMomoModal, setShowMomoModal] = useState(false);
@@ -1006,22 +1050,90 @@ export default function SellerPOS() {
                             </div>
 
                             <div className="grid grid-cols-2 gap-3 pt-2">
-                                <button
-                                    onClick={selectedClient ? () => handleCheckout("cash") : initiateCashPayment}
-                                    disabled={processing || cart.length === 0}
-                                    className="flex items-center justify-center gap-2 py-3 px-4 bg-green-600 hover:bg-green-700 text-white rounded-xl font-bold shadow-lg shadow-green-600/20 transition-all disabled:opacity-50 disabled:grayscale"
-                                >
-                                    <FaMoneyBillWave /> {selectedClient ? 'Record Debt' : 'Cash'}
-                                </button>
-                                <button
-                                    onClick={initiateMomoPayment}
-                                    disabled={processing || cart.length === 0}
-                                    className="flex items-center justify-center gap-2 py-3 px-4 bg-yellow-500 hover:bg-yellow-600 text-white rounded-xl font-bold shadow-lg shadow-yellow-500/20 transition-all disabled:opacity-50 disabled:grayscale"
-                                >
-                                    <FaMobileAlt /> MoMo
-                                </button>
+                                {clientMode === "abonne" && selectedClient ? (
+                                    <button
+                                        onClick={() => setShowAbonneSplitModal(true)}
+                                        disabled={processing || cart.length === 0}
+                                        className="col-span-2 flex items-center justify-center gap-2 py-4 px-4 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-black uppercase tracking-widest shadow-lg shadow-indigo-600/20 transition-all disabled:opacity-50"
+                                    >
+                                        <FaCheckCircle /> Process Abonné Sale
+                                    </button>
+                                ) : (
+                                    <>
+                                        <button
+                                            onClick={initiateCashPayment}
+                                            disabled={processing || cart.length === 0}
+                                            className="flex items-center justify-center gap-2 py-3 px-4 bg-green-600 hover:bg-green-700 text-white rounded-xl font-bold shadow-lg shadow-green-600/20 transition-all disabled:opacity-50 disabled:grayscale"
+                                        >
+                                            <FaMoneyBillWave /> Cash
+                                        </button>
+                                        <button
+                                            onClick={initiateMomoPayment}
+                                            disabled={processing || cart.length === 0}
+                                            className="flex items-center justify-center gap-2 py-3 px-4 bg-yellow-500 hover:bg-yellow-600 text-white rounded-xl font-bold shadow-lg shadow-yellow-500/20 transition-all disabled:opacity-50 disabled:grayscale"
+                                        >
+                                            <FaMobileAlt /> MoMo
+                                        </button>
+                                    </>
+                                )}
                             </div>
                         </div>
+
+                        {showAbonneSplitModal && (
+                            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-md p-4">
+                                <div className="bg-white dark:bg-gray-800 p-8 rounded-3xl shadow-2xl max-w-md w-full animate-in fade-in zoom-in duration-300 border border-white/10">
+                                    <div className="text-center mb-8">
+                                        <div className="w-20 h-20 bg-indigo-100 dark:bg-indigo-900/30 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                                            <FaMoneyBillWave className="text-3xl text-indigo-600" />
+                                        </div>
+                                        <h2 className="text-3xl font-black text-gray-900 dark:text-white">Abonné Checkout</h2>
+                                        <p className="text-gray-500 dark:text-gray-400 mt-2 font-medium">Record sale for <span className="font-bold text-indigo-600">{selectedClient?.name}</span></p>
+                                    </div>
+
+                                    <div className="space-y-6">
+                                        <div className="p-4 bg-gray-50 dark:bg-gray-900/50 rounded-2xl border border-gray-100 dark:border-gray-700">
+                                            <div className="flex justify-between items-center text-sm mb-2">
+                                                <span className="text-gray-500 font-medium">Total Amount:</span>
+                                                <span className="font-bold dark:text-white">RWF {calculateTotal().toLocaleString()}</span>
+                                            </div>
+                                        </div>
+
+                                        <div className="space-y-2">
+                                            <label className="text-sm font-bold text-gray-700 dark:text-gray-300 ml-1">Upfront Cash Paid (Optional)</label>
+                                            <div className="relative">
+                                                <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                                                    <span className="text-gray-400 font-bold text-xs">RWF</span>
+                                                </div>
+                                                <input
+                                                    type="number"
+                                                    className="w-full pl-12 pr-4 py-4 bg-gray-50 dark:bg-gray-700/50 border-2 border-gray-100 dark:border-gray-600 rounded-2xl focus:ring-4 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all text-xl font-bold dark:text-white"
+                                                    placeholder="0.00"
+                                                    value={abonneUpfrontCash}
+                                                    onChange={(e) => setAbonneUpfrontCash(e.target.value)}
+                                                />
+                                            </div>
+                                            <p className="text-[10px] text-gray-400 font-medium ml-1">Remaining RWF {(calculateTotal() - (Number(abonneUpfrontCash) || 0)).toLocaleString()} will be added to debt.</p>
+                                        </div>
+
+                                        <div className="flex gap-4">
+                                            <button
+                                                onClick={() => setShowAbonneSplitModal(false)}
+                                                className="flex-1 py-4 bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 rounded-2xl font-bold transition-all"
+                                            >
+                                                Cancel
+                                            </button>
+                                            <button
+                                                onClick={handleAbonneCheckout}
+                                                disabled={processing}
+                                                className="flex-1 py-4 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl font-black shadow-xl shadow-indigo-600/20 transition-all active:scale-[0.98] disabled:opacity-50"
+                                            >
+                                                {processing ? 'Processing...' : 'Confirm Sale'}
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
                     </div>
                 </main>
             </div>

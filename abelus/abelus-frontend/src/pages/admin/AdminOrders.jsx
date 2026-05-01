@@ -18,7 +18,16 @@ const AdminOrders = () => {
     const fetchOrders = async () => {
         try {
             const { data } = await api.get("/orders");
-            setOrders(data);
+            // Handle both structured {success, orders} and legacy array responses
+            const ordersList = data.orders || (Array.isArray(data) ? data : (data.data || []));
+            
+            // Map grandTotal to totalAmount if missing for UI compatibility
+            const normalizedOrders = ordersList.map(o => ({
+                ...o,
+                totalAmount: o.totalAmount ?? o.grandTotal ?? 0
+            }));
+
+            setOrders(normalizedOrders);
         } catch (error) {
             console.error("Failed to fetch orders:", error);
             toast.error("Failed to load orders");

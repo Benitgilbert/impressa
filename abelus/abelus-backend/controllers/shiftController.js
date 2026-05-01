@@ -167,10 +167,12 @@ export const getActiveShiftStats = async (req, res) => {
  */
 export const getMyShifts = async (req, res) => {
     try {
+        const isAdminAll = req.user.role === 'admin' && req.path === '/all';
         const shifts = await prisma.shift.findMany({
-            where: { userId: req.user.id },
+            where: isAdminAll ? {} : { userId: req.user.id },
             orderBy: { startTime: 'desc' },
-            take: 50 // Limit to last 50 shifts
+            include: isAdminAll ? { user: { select: { name: true } } } : undefined,
+            take: 100 // Limit to last 100 shifts
         });
 
         res.status(200).json({ success: true, data: shifts });

@@ -15,6 +15,6 @@ router.post("/:id/pay", authMiddleware(["admin", "seller"]), abonneController.pa
 // Contract Prices
 router.get("/:id/prices", authMiddleware(["admin", "seller"]), abonneController.getContractPrices);
 router.post("/:id/prices", authMiddleware(["admin", "seller"]), abonneController.updateContractPrice);
-router.delete("/:id/prices/:priceId", authMiddleware(["admin", "seller"]), abonneController.deleteContractPrice);
+router.delete("/:id/prices/:productId", authMiddleware(["admin", "seller"]), abonneController.deleteContractPrice);
 
 export default router;

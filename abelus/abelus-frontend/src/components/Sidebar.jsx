@@ -1,12 +1,17 @@
-import { FaChartBar, FaUser, FaBox, FaFileAlt, FaSignOutAlt, FaTags, FaTicketAlt, FaTruck, FaPercentage, FaCog, FaMoneyBillWave, FaFolder, FaFire, FaDesktop, FaQuoteLeft, FaHandshake, FaGlobe, FaEnvelope, FaStore, FaPercent, FaDollarSign, FaClipboardCheck, FaStar, FaHeadset, FaExclamationTriangle, FaChartLine, FaTimes, FaGift, FaRobot, FaNewspaper, FaUserFriends } from "react-icons/fa";
+import { FaChartBar, FaUser, FaBox, FaFileAlt, FaSignOutAlt, FaTags, FaTicketAlt, FaTruck, FaPercentage, FaCog, FaMoneyBillWave, FaFolder, FaFire, FaDesktop, FaQuoteLeft, FaHandshake, FaGlobe, FaEnvelope, FaStore, FaPercent, FaDollarSign, FaClipboardCheck, FaStar, FaHeadset, FaExclamationTriangle, FaChartLine, FaTimes, FaGift, FaRobot, FaNewspaper, FaUserFriends, FaClock, FaQuestionCircle, FaUniversity, FaHistory } from "react-icons/fa";
 
 import { Link, useLocation } from "react-router-dom";
 import { useRef, useLayoutEffect } from "react";
 import AdminChatbot from "./AdminChatBot";
+import { useAuth } from "../context/AuthContext";
 
 function Sidebar({ isOpen, onClose }) {
   const location = useLocation();
   const sidebarRef = useRef(null);
+  const { user } = useAuth();
+  const role = user?.role || 'customer';
+  const isAdmin = role === 'admin';
+  const isStaff = role === 'admin' || role === 'cashier' || role === 'inventory';
 
   // Restore scroll position immediately after DOM updates
   useLayoutEffect(() => {
@@ -117,19 +122,21 @@ function Sidebar({ isOpen, onClose }) {
           </NavSection>
 
           <NavSection label="Management">
-            <NavLink to="/admin/users" icon={FaUser}>Users</NavLink>
-            <NavLink to="/admin/sellers" icon={FaStore} iconColor="text-amber-400">Sellers</NavLink>
-            <NavLink to="/admin/violations" icon={FaExclamationTriangle} iconColor="text-red-400">Violations</NavLink>
-            <NavLink to="/admin/seller-reports" icon={FaChartLine} iconColor="text-indigo-400">Seller Reports</NavLink>
-            <NavLink to="/admin/orders" icon={FaBox} iconColor="text-blue-400">Orders</NavLink>
-            <NavLink to="/admin/products" icon={FaBox} iconColor="text-sage-400">Products</NavLink>
-            <NavLink to="/admin/product-approval" icon={FaClipboardCheck} iconColor="text-orange-400">Product Approval</NavLink>
-            <NavLink to="/admin/categories" icon={FaFolder} iconColor="text-sand-400">Categories</NavLink>
-            <NavLink to="/admin/attributes" icon={FaTags} iconColor="text-purple-400">Attributes</NavLink>
-            <NavLink to="/admin/reviews" icon={FaStar} iconColor="text-yellow-400">Reviews</NavLink>
-            <NavLink to="/admin/tickets" icon={FaHeadset} iconColor="text-indigo-400">Support Tickets</NavLink>
-            <NavLink to="/admin/customer-queries" icon={FaRobot} iconColor="text-teal-400">AI Customer Queries</NavLink>
-            <NavLink to="/admin/abonnes" icon={FaUserFriends} iconColor="text-emerald-400">Abonnés</NavLink>
+            {isAdmin && <NavLink to="/admin/users" icon={FaUser}>Users</NavLink>}
+            {isAdmin && <NavLink to="/admin/sellers" icon={FaStore} iconColor="text-amber-400">Sellers</NavLink>}
+            {isAdmin && <NavLink to="/admin/violations" icon={FaExclamationTriangle} iconColor="text-red-400">Violations</NavLink>}
+            {isAdmin && <NavLink to="/admin/seller-reports" icon={FaChartLine} iconColor="text-indigo-400">Seller Reports</NavLink>}
+            {isStaff && <NavLink to="/admin/orders" icon={FaBox} iconColor="text-blue-400">Orders</NavLink>}
+            {isAdmin && <NavLink to="/admin/orders?status=quote_requested" icon={FaQuestionCircle} iconColor="text-teal-400">Inquiries</NavLink>}
+            {isStaff && <NavLink to="/admin/products" icon={FaBox} iconColor="text-sage-400">Products</NavLink>}
+            {isAdmin && <NavLink to="/admin/product-approval" icon={FaClipboardCheck} iconColor="text-orange-400">Product Approval</NavLink>}
+            {isAdmin && <NavLink to="/admin/shifts" icon={FaHistory} iconColor="text-terracotta-400">Shifts</NavLink>}
+            {isAdmin && <NavLink to="/admin/categories" icon={FaFolder} iconColor="text-sand-400">Categories</NavLink>}
+            {isAdmin && <NavLink to="/admin/attributes" icon={FaTags} iconColor="text-purple-400">Attributes</NavLink>}
+            {isAdmin && <NavLink to="/admin/reviews" icon={FaStar} iconColor="text-yellow-400">Reviews</NavLink>}
+            {isAdmin && <NavLink to="/admin/tickets" icon={FaHeadset} iconColor="text-indigo-400">Support Tickets</NavLink>}
+            {isAdmin && <NavLink to="/admin/customer-queries" icon={FaRobot} iconColor="text-teal-400">AI Customer Queries</NavLink>}
+            {isAdmin && <NavLink to="/admin/abonnes" icon={FaUserFriends} iconColor="text-emerald-400">Abonnés</NavLink>}
           </NavSection>
 
 
@@ -145,9 +152,9 @@ function Sidebar({ isOpen, onClose }) {
           </NavSection>
 
           <NavSection label="Finance">
-            <NavLink to="/admin/finance" icon={FaMoneyBillWave} iconColor="text-sage-400">Finance</NavLink>
-            <NavLink to="/admin/commissions" icon={FaPercent} iconColor="text-emerald-400">Commissions</NavLink>
-            <NavLink to="/admin/payouts" icon={FaDollarSign} iconColor="text-violet-400">Payouts</NavLink>
+            {isAdmin && <NavLink to="/admin/finance" icon={FaMoneyBillWave} iconColor="text-sage-400">Finance</NavLink>}
+            {isAdmin && <NavLink to="/admin/commissions" icon={FaPercent} iconColor="text-emerald-400">Commissions</NavLink>}
+            {isAdmin && <NavLink to="/admin/payouts" icon={FaDollarSign} iconColor="text-violet-400">Payouts</NavLink>}
           </NavSection>
 
           <NavSection label="Configuration">

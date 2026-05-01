@@ -77,6 +77,7 @@ import Unsubscribe from "./pages/Unsubscribe";
 import SellerAbonne from "./pages/SellerAbonne";
 import AdminAbonne from "./pages/admin/AdminAbonne";
 import SellerShifts from "./pages/SellerShifts";
+import AdminShifts from "./pages/admin/AdminShifts";
 
 
 import { CartProvider } from "./context/CartContext";
@@ -173,6 +174,7 @@ function App() {
                     <Route path="/admin/pos" element={<POS />} />
                     <Route path="/admin/notifications" element={<AdminNotifications />} />
                     <Route path="/admin/abonnes" element={<AdminAbonne />} />
+                    <Route path="/admin/shifts" element={<AdminShifts />} />
                   </Route>
 
                   {/* Seller Routes with Shared Layout */}

@@ -284,8 +284,14 @@ export const updateContractPrice = async (req, res) => {
  */
 export const deleteContractPrice = async (req, res) => {
     try {
+        const { id, productId } = req.params;
         await prisma.contractPrice.delete({
-            where: { id: req.params.priceId }
+            where: {
+                clientId_productId: { 
+                    clientId: id, 
+                    productId: productId 
+                }
+            }
         });
         res.status(200).json({ success: true, message: "Contract price removed" });
     } catch (error) {
