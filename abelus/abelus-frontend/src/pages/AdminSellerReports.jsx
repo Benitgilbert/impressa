@@ -3,12 +3,9 @@ import {
     FaFileAlt, FaDownload, FaStore, FaCalendarAlt,
     FaArrowUp, FaArrowDown, FaShoppingCart, FaStar, FaDollarSign
 } from 'react-icons/fa';
-import Sidebar from '../components/Sidebar';
-import Topbar from '../components/Topbar';
 import api from '../utils/axiosInstance';
 
 export default function AdminSellerReports() {
-    const [sidebarOpen, setSidebarOpen] = useState(false);
     const [reports, setReports] = useState([]);
     const [loading, setLoading] = useState(true);
     const [selectedMonth, setSelectedMonth] = useState(() => {
@@ -107,10 +104,7 @@ Metrics:
 
     return (
         <div className="min-h-screen bg-cream-100 dark:bg-charcoal-900 transition-colors duration-300">
-            <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
-
-            <div className="lg:ml-64 min-h-screen flex flex-col transition-all duration-300">
-                <Topbar onMenuClick={() => setSidebarOpen(true)} title="Seller Reports" />
+            <div className="min-h-screen flex flex-col transition-all duration-300">
 
                 <main className="flex-1 p-4 lg:p-6 max-w-[1600px] w-full mx-auto">
                     {/* Page Header */}

@@ -189,8 +189,9 @@ const AdminAbonne = () => {
     };
 
     return (
-        <>
-            <div className="flex-1 overflow-y-auto p-8">
+        <div className="min-h-screen bg-cream-100 dark:bg-charcoal-900 transition-colors duration-300">
+            <div className="min-h-screen flex flex-col transition-all duration-300">
+                <main className="flex-1 p-4 lg:p-6 max-w-[1600px] w-full mx-auto">
                     <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
                         <div>
                             <h1 className="text-3xl font-black text-charcoal-900 dark:text-white">Clients Abonnés</h1>
@@ -301,334 +302,330 @@ const AdminAbonne = () => {
                             </table>
                         </div>
                     )}
-                </div>
-            
 
-            {/* Add Modal */}
-            {showAddModal && (
-                <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
-                    <div className="bg-white dark:bg-charcoal-800 rounded-2xl w-full max-w-md p-6 transform transition-all animate-in zoom-in duration-200">
-                        <div className="flex justify-between items-center mb-6">
-                            <h2 className="text-2xl font-black text-charcoal-900 dark:text-white">New Client Abonné</h2>
-                            <button onClick={() => setShowAddModal(false)} className="text-gray-400 hover:text-gray-600"><FaTimes /></button>
-                        </div>
-                        <form onSubmit={handleAddClient} className="space-y-4">
-                            <div>
-                                <label className="block text-xs font-black text-gray-500 uppercase mb-1.5">Full Name</label>
-                                <input
-                                    type="text"
-                                    required
-                                    className="w-full px-4 py-3 bg-gray-50 dark:bg-charcoal-700 border border-gray-200 dark:border-charcoal-600 rounded-xl outline-none focus:ring-2 focus:ring-terracotta-500/20 focus:border-terracotta-500 dark:text-white"
-                                    placeholder="Enter client name"
-                                    value={newClient.name}
-                                    onChange={e => setNewClient({ ...newClient, name: e.target.value })}
-                                />
-                            </div>
-                            <div>
-                                <label className="block text-xs font-black text-gray-500 uppercase mb-1.5">Phone Number</label>
-                                <input
-                                    type="text"
-                                    className="w-full px-4 py-3 bg-gray-50 dark:bg-charcoal-700 border border-gray-200 dark:border-charcoal-600 rounded-xl outline-none focus:ring-2 focus:ring-terracotta-500/20 focus:border-terracotta-500 dark:text-white"
-                                    placeholder="078..."
-                                    value={newClient.phone}
-                                    onChange={e => setNewClient({ ...newClient, phone: e.target.value })}
-                                />
-                            </div>
-                            <div className="flex gap-3 pt-4">
-                                <button
-                                    type="button"
-                                    onClick={() => setShowAddModal(false)}
-                                    className="flex-1 py-3 bg-gray-100 dark:bg-charcoal-700 text-charcoal-800 dark:text-white rounded-xl font-bold hover:bg-gray-200 transition-all"
-                                >
-                                    Cancel
-                                </button>
-                                <button
-                                    type="submit"
-                                    className="flex-1 py-3 bg-terracotta-500 text-white rounded-xl font-bold hover:bg-terracotta-600 shadow-lg shadow-terracotta-500/20 transition-all"
-                                >
-                                    Create Client
-                                </button>
-                            </div>
-                        </form>
-                    </div>
-                </div>
-            )}
-
-            {/* Edit Modal */}
-            {showEditModal && selectedClient && (
-                <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
-                    <div className="bg-white dark:bg-charcoal-800 rounded-2xl w-full max-w-md p-6 animate-in zoom-in duration-200">
-                        <div className="flex justify-between items-center mb-6">
-                            <h2 className="text-2xl font-black text-charcoal-900 dark:text-white">Edit Client Info</h2>
-                            <button onClick={() => setShowEditModal(false)} className="text-gray-400 hover:text-gray-600"><FaTimes /></button>
-                        </div>
-                        <form onSubmit={handleUpdateClient} className="space-y-4">
-                            <div>
-                                <label className="block text-xs font-black text-gray-500 uppercase mb-1.5">Full Name</label>
-                                <input
-                                    type="text"
-                                    required
-                                    className="w-full px-4 py-3 bg-gray-50 dark:bg-charcoal-700 border border-gray-200 dark:border-charcoal-600 rounded-xl outline-none focus:border-terracotta-500 dark:text-white"
-                                    value={selectedClient.name}
-                                    onChange={e => setSelectedClient({ ...selectedClient, name: e.target.value })}
-                                />
-                            </div>
-                            <div>
-                                <label className="block text-xs font-black text-gray-500 uppercase mb-1.5">Phone Number</label>
-                                <input
-                                    type="text"
-                                    className="w-full px-4 py-3 bg-gray-50 dark:bg-charcoal-700 border border-gray-200 dark:border-charcoal-600 rounded-xl outline-none focus:border-terracotta-500 dark:text-white"
-                                    value={selectedClient.phone || ""}
-                                    onChange={e => setSelectedClient({ ...selectedClient, phone: e.target.value })}
-                                />
-                            </div>
-                            <div className="flex gap-3 pt-4">
-                                <button
-                                    type="button"
-                                    onClick={() => setShowEditModal(false)}
-                                    className="flex-1 py-3 bg-gray-100 dark:bg-charcoal-700 text-charcoal-800 dark:text-white rounded-xl font-bold hover:bg-gray-200 transition-all"
-                                >
-                                    Cancel
-                                </button>
-                                <button
-                                    type="submit"
-                                    className="flex-1 py-3 bg-terracotta-500 text-white rounded-xl font-bold hover:bg-terracotta-600 shadow-lg shadow-terracotta-500/20 transition-all"
-                                >
-                                    Update Info
-                                </button>
-                            </div>
-                        </form>
-                    </div>
-                </div>
-            )}
-
-            {/* Price Management Modal */}
-            {showPriceModal && selectedClient && (
-                <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
-                    <div className="bg-white dark:bg-charcoal-800 rounded-3xl w-full max-w-4xl p-8 flex flex-col max-h-[85vh] animate-in slide-in-from-bottom duration-300">
-                        <div className="flex justify-between items-center mb-6">
-                            <div>
-                                <h2 className="text-3xl font-black text-charcoal-900 dark:text-white">Contract Prices</h2>
-                                <p className="text-gray-500 text-sm">Special product rates for <span className="font-bold text-terracotta-500">{selectedClient.name}</span></p>
-                            </div>
-                            <button onClick={() => setShowPriceModal(false)} className="w-10 h-10 rounded-full bg-gray-100 dark:bg-charcoal-700 flex items-center justify-center text-gray-500 hover:text-red-500 transition-colors"><FaTimes /></button>
-                        </div>
-
-                        <div className="relative mb-6">
-                            <FaSearch className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" />
-                            <input
-                                type="text"
-                                placeholder="Search products to override price..."
-                                className="w-full pl-12 pr-4 py-3.5 bg-gray-50 dark:bg-charcoal-700 border-2 border-transparent focus:border-terracotta-500 dark:text-white rounded-2xl outline-none shadow-sm transition-all"
-                                value={priceSearch}
-                                onChange={e => setPriceSearch(e.target.value)}
-                            />
-                        </div>
-
-                        <div className="flex-1 overflow-y-auto space-y-3 pr-2 scrollbar-hide">
-                            {loadingPrices ? (
-                                <div className="text-center py-20 text-gray-400"><FaSpinner className="animate-spin text-3xl mx-auto mb-2" /> Loading data...</div>
-                            ) : (
-                                products.filter(p => p.name.toLowerCase().includes(priceSearch.toLowerCase())).map(product => {
-                                    const customPrice = getCustomPrice(product.id);
-                                    return (
-                                        <div key={product.id} className="flex items-center justify-between p-4 bg-gray-50 dark:bg-charcoal-700/40 rounded-2xl border border-gray-100 dark:border-charcoal-600 hover:border-terracotta-200 transition-colors group">
-                                            <div className="flex items-center gap-4">
-                                                <div className="w-12 h-12 rounded-xl bg-white dark:bg-charcoal-600 flex items-center justify-center overflow-hidden border border-gray-100 dark:border-charcoal-500">
-                                                    {product.image ? (
-                                                        <img src={`${process.env.REACT_APP_API_URL?.replace(/\/api$/, '') || 'http://localhost:5000'}${product.image}`} alt="" className="w-full h-full object-cover" />
-                                                    ) : (
-                                                        <FaTags className="text-gray-300" />
-                                                    )}
-                                                </div>
-                                                <div>
-                                                    <p className="font-bold text-charcoal-900 dark:text-white text-sm">{product.name}</p>
-                                                    <p className="text-xs text-gray-500">Normal Price: <span className="font-bold">RWF {product.price.toLocaleString()}</span></p>
-                                                </div>
-                                            </div>
-
-                                            <div className="flex items-center gap-4">
-                                                <div className="relative">
-                                                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[10px] font-black text-gray-400">RWF</span>
-                                                    <input
-                                                        type="number"
-                                                        placeholder={product.price}
-                                                        className={`w-32 pl-10 pr-3 py-2 bg-white dark:bg-charcoal-800 border-2 rounded-xl text-sm font-bold outline-none transition-all ${customPrice ? 'border-terracotta-500 text-terracotta-600' : 'border-gray-200 dark:border-charcoal-600 text-gray-400 focus:border-terracotta-500'}`}
-                                                        value={customPrice || ""}
-                                                        onChange={(e) => updatePrice(product.id, e.target.value)}
-                                                    />
-                                                </div>
-                                                {customPrice && (
-                                                    <button
-                                                        onClick={() => removePrice(product.id)}
-                                                        className="p-2 text-gray-300 hover:text-red-500 transition-colors"
-                                                        title="Remove override"
-                                                    >
-                                                        <FaTrash size={12} />
-                                                    </button>
-                                                )}
-                                            </div>
-                                        </div>
-                                    );
-                                })
-                            )}
-                        </div>
-                    </div>
-                </div>
-            )}
-
-            {/* Pay Debt Modal */}
-            {showPayModal && selectedClient && (
-                <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
-                    <div className="bg-white dark:bg-charcoal-800 rounded-2xl w-full max-w-md p-6">
-                        <div className="text-center mb-6">
-                            <div className="w-16 h-16 bg-green-100 dark:bg-green-900/30 rounded-full flex items-center justify-center mx-auto mb-4 text-green-500">
-                                <FaMoneyBillWave size={32} />
-                            </div>
-                            <h2 className="text-2xl font-black text-charcoal-900 dark:text-white">Record Payment</h2>
-                            <p className="text-gray-500 text-sm mt-1">{selectedClient.name} owes RWF {selectedClient.totalDebt.toLocaleString()}</p>
-                        </div>
-                        <form onSubmit={handlePayDebt} className="space-y-4">
-                            <div>
-                                <label className="block text-xs font-black text-gray-500 uppercase mb-1.5">Amount Paid (RWF)</label>
-                                <input
-                                    type="number"
-                                    required
-                                    max={selectedClient.totalDebt}
-                                    className="w-full px-4 py-4 bg-gray-50 dark:bg-charcoal-700 border-2 border-gray-200 dark:border-charcoal-600 rounded-2xl outline-none focus:border-green-500 text-2xl font-black text-center dark:text-white"
-                                    value={payAmount}
-                                    onChange={e => setPayAmount(e.target.value)}
-                                    autoFocus
-                                />
-                            </div>
-                            <div className="flex gap-3 pt-4">
-                                <button
-                                    type="button"
-                                    onClick={() => setShowPayModal(false)}
-                                    className="flex-1 py-3 bg-gray-100 dark:bg-charcoal-700 text-gray-600 dark:text-white rounded-xl font-bold hover:bg-gray-200 transition-all"
-                                >
-                                    Cancel
-                                </button>
-                                <button
-                                    type="submit"
-                                    className="flex-1 py-3 bg-green-500 text-white rounded-xl font-bold hover:bg-green-600 shadow-lg shadow-green-500/20 transition-all"
-                                >
-                                    Confirm Pay
-                                </button>
-                            </div>
-                        </form>
-                    </div>
-                </div>
-            )}
-
-            {/* Fiche Modal */}
-            {showFicheModal && selectedClient && (
-                <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
-                    <div className="bg-white dark:bg-charcoal-800 rounded-2xl w-full max-w-5xl p-6 flex flex-col max-h-[90vh]">
-                        <div className="flex justify-between items-center mb-6">
-                            <h2 className="text-2xl font-black text-charcoal-900 dark:text-white">Fiche de Client Abonné</h2>
-                            <div className="flex gap-3">
-                                <button onClick={printFiche} className="flex items-center gap-2 px-5 py-2.5 bg-charcoal-900 text-white rounded-xl font-bold hover:bg-charcoal-800 transition-all shadow-lg"><FaPrint /> Print Fiche</button>
-                                <button onClick={() => setShowFicheModal(false)} className="w-10 h-10 flex items-center justify-center bg-gray-100 dark:bg-charcoal-700 rounded-full hover:bg-gray-200 transition-all"><FaTimes /></button>
-                            </div>
-                        </div>
-
-                        <div className="overflow-y-auto flex-1 bg-white" id="fiche-print-area">
-                            <style>
-                                {`
-                                @media print {
-                                    @page { margin: 15mm; }
-                                    body { font-family: 'Inter', sans-serif; background: white; color: black; -webkit-print-color-adjust: exact; }
-                                    .print-table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 11px; }
-                                    .print-table th, .print-table td { border: 1px solid #000; padding: 6px 8px; text-align: left; }
-                                    .print-table th { background-color: #f3f4f6 !important; font-weight: 800; text-transform: uppercase; }
-                                    .print-header { display: flex; justify-content: justify-between; align-items: center; border-bottom: 3px solid #000; padding-bottom: 20px; margin-bottom: 30px; }
-                                    .print-logo { height: 60px; width: auto; object-contain: contain; }
-                                    .no-print { display: none; }
-                                    .text-red-600 { color: #dc2626 !important; }
-                                }
-                                `}
-                            </style>
-                            <div className="p-8">
-                                <div className="print-header flex justify-between items-center mb-8 border-b-[3px] border-black pb-6">
-                                    <div className="flex items-center gap-4">
-                                        {siteSettings.logo ? (
-                                            <img src={siteSettings.logo} alt="Logo" className="print-logo h-16 w-auto" />
-                                        ) : (
-                                            <div className="w-16 h-16 bg-black text-white flex items-center justify-center font-black text-3xl rounded-xl">
-                                                {siteSettings.siteName.charAt(0)}
-                                            </div>
-                                        )}
-                                        <div>
-                                            <h1 className="text-2xl font-black uppercase leading-tight">{siteSettings.siteName}</h1>
-                                            <p className="text-xs font-bold tracking-widest text-gray-500 uppercase">Fiche de Suivi Client</p>
-                                        </div>
+                    {/* Modals */}
+                    {showAddModal && (
+                        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => setShowAddModal(false)}>
+                            <div className="bg-white dark:bg-charcoal-800 rounded-2xl w-full max-w-md p-6 transform transition-all animate-in zoom-in duration-200 shadow-2xl" onClick={e => e.stopPropagation()}>
+                                <div className="flex justify-between items-center mb-6">
+                                    <h2 className="text-2xl font-black text-charcoal-900 dark:text-white">New Client Abonné</h2>
+                                    <button onClick={() => setShowAddModal(false)} className="text-gray-400 hover:text-gray-600"><FaTimes /></button>
+                                </div>
+                                <form onSubmit={handleAddClient} className="space-y-4">
+                                    <div>
+                                        <label className="block text-xs font-black text-gray-500 uppercase mb-1.5">Full Name</label>
+                                        <input
+                                            type="text"
+                                            required
+                                            className="w-full px-4 py-3 bg-gray-50 dark:bg-charcoal-700 border border-gray-200 dark:border-charcoal-600 rounded-xl outline-none focus:ring-2 focus:ring-terracotta-500/20 focus:border-terracotta-500 dark:text-white"
+                                            placeholder="Enter client name"
+                                            value={newClient.name}
+                                            onChange={e => setNewClient({ ...newClient, name: e.target.value })}
+                                        />
                                     </div>
-                                    <div className="text-right">
-                                        <h2 className="text-xl font-black uppercase mb-1">FICHE DE CLIENT</h2>
-                                        <p className="text-sm font-bold">CLIENT: <span className="underline decoration-black">{selectedClient.name}</span></p>
-                                        <p className="text-xs font-mono mt-1 opacity-50">DATE: {new Date().toLocaleDateString()}</p>
+                                    <div>
+                                        <label className="block text-xs font-black text-gray-500 uppercase mb-1.5">Phone Number</label>
+                                        <input
+                                            type="text"
+                                            className="w-full px-4 py-3 bg-gray-50 dark:bg-charcoal-700 border border-gray-200 dark:border-charcoal-600 rounded-xl outline-none focus:ring-2 focus:ring-terracotta-500/20 focus:border-terracotta-500 dark:text-white"
+                                            placeholder="078..."
+                                            value={newClient.phone}
+                                            onChange={e => setNewClient({ ...newClient, phone: e.target.value })}
+                                        />
                                     </div>
+                                    <div className="flex gap-3 pt-4">
+                                        <button
+                                            type="button"
+                                            onClick={() => setShowAddModal(false)}
+                                            className="flex-1 py-3 bg-gray-100 dark:bg-charcoal-700 text-charcoal-800 dark:text-white rounded-xl font-bold hover:bg-gray-200 transition-all"
+                                        >
+                                            Cancel
+                                        </button>
+                                        <button
+                                            type="submit"
+                                            className="flex-1 py-3 bg-terracotta-500 text-white rounded-xl font-bold hover:bg-terracotta-600 shadow-lg shadow-terracotta-500/20 transition-all"
+                                        >
+                                            Create Client
+                                        </button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                    )}
+
+                    {showEditModal && selectedClient && (
+                        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => setShowEditModal(false)}>
+                            <div className="bg-white dark:bg-charcoal-800 rounded-2xl w-full max-w-md p-6 animate-in zoom-in duration-200 shadow-2xl" onClick={e => e.stopPropagation()}>
+                                <div className="flex justify-between items-center mb-6">
+                                    <h2 className="text-2xl font-black text-charcoal-900 dark:text-white">Edit Client Info</h2>
+                                    <button onClick={() => setShowEditModal(false)} className="text-gray-400 hover:text-gray-600"><FaTimes /></button>
+                                </div>
+                                <form onSubmit={handleUpdateClient} className="space-y-4">
+                                    <div>
+                                        <label className="block text-xs font-black text-gray-500 uppercase mb-1.5">Full Name</label>
+                                        <input
+                                            type="text"
+                                            required
+                                            className="w-full px-4 py-3 bg-gray-50 dark:bg-charcoal-700 border border-gray-200 dark:border-charcoal-600 rounded-xl outline-none focus:border-terracotta-500 dark:text-white"
+                                            value={selectedClient.name}
+                                            onChange={e => setSelectedClient({ ...selectedClient, name: e.target.value })}
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-black text-gray-500 uppercase mb-1.5">Phone Number</label>
+                                        <input
+                                            type="text"
+                                            className="w-full px-4 py-3 bg-gray-50 dark:bg-charcoal-700 border border-gray-200 dark:border-charcoal-600 rounded-xl outline-none focus:border-terracotta-500 dark:text-white"
+                                            value={selectedClient.phone || ""}
+                                            onChange={e => setSelectedClient({ ...selectedClient, phone: e.target.value })}
+                                        />
+                                    </div>
+                                    <div className="flex gap-3 pt-4">
+                                        <button
+                                            type="button"
+                                            onClick={() => setShowEditModal(false)}
+                                            className="flex-1 py-3 bg-gray-100 dark:bg-charcoal-700 text-charcoal-800 dark:text-white rounded-xl font-bold hover:bg-gray-200 transition-all"
+                                        >
+                                            Cancel
+                                        </button>
+                                        <button
+                                            type="submit"
+                                            className="flex-1 py-3 bg-terracotta-500 text-white rounded-xl font-bold hover:bg-terracotta-600 shadow-lg shadow-terracotta-500/20 transition-all"
+                                        >
+                                            Update Info
+                                        </button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                    )}
+
+                    {showPriceModal && selectedClient && (
+                        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => setShowPriceModal(false)}>
+                            <div className="bg-white dark:bg-charcoal-800 rounded-3xl w-full max-w-4xl p-8 flex flex-col max-h-[85vh] animate-in slide-in-from-bottom duration-300 shadow-2xl" onClick={e => e.stopPropagation()}>
+                                <div className="flex justify-between items-center mb-6">
+                                    <div>
+                                        <h2 className="text-3xl font-black text-charcoal-900 dark:text-white">Contract Prices</h2>
+                                        <p className="text-gray-500 text-sm">Special product rates for <span className="font-bold text-terracotta-500">{selectedClient.name}</span></p>
+                                    </div>
+                                    <button onClick={() => setShowPriceModal(false)} className="w-10 h-10 rounded-full bg-gray-100 dark:bg-charcoal-700 flex items-center justify-center text-gray-500 hover:text-red-500 transition-colors"><FaTimes /></button>
                                 </div>
 
-                                <table className="print-table w-full border border-black text-sm">
-                                    <thead>
-                                        <tr className="bg-gray-100">
-                                            <th className="border border-black p-2">DATE</th>
-                                            <th className="border border-black p-2">DESIGNATION / PRODUCT</th>
-                                            <th className="border border-black p-2 text-center">QTY</th>
-                                            <th className="border border-black p-2 text-right">PU (RWF)</th>
-                                            <th className="border border-black p-2 text-right">PT (RWF)</th>
-                                            <th className="border border-black p-2 text-right text-red-600">DEBT (RWF)</th>
-                                            <th className="border border-black p-2">RESPONSIBLE</th>
-                                            <th className="border border-black p-2">SIGNATURE</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {clientFiche.map((tx, idx) => (
-                                            <tr key={idx}>
-                                                <td className="border border-black p-2">{new Date(tx.date).toLocaleDateString()}</td>
-                                                <td className="border border-black p-2 font-bold">{tx.designation}</td>
-                                                <td className="border border-black p-2 text-center">{tx.quantity}</td>
-                                                <td className="border border-black p-2 text-right">{tx.pu.toLocaleString()}</td>
-                                                <td className="border border-black p-2 text-right">{tx.pt.toLocaleString()}</td>
-                                                <td className="border border-black p-2 text-right font-bold text-red-600">{tx.debtAmount.toLocaleString()}</td>
-                                                <td className="border border-black p-2 text-xs">{tx.responsible?.name || "System"}</td>
-                                                <td className="border border-black p-2"></td>
-                                            </tr>
-                                        ))}
-                                        {clientFiche.length === 0 && (
-                                            <tr>
-                                                <td colSpan="8" className="p-8 text-center text-gray-500 italic">No unpaid transactions recorded.</td>
-                                            </tr>
-                                        )}
-                                    </tbody>
-                                    {clientFiche.length > 0 && (
-                                        <tfoot>
-                                            <tr className="bg-gray-50 font-black">
-                                                <td colSpan="4" className="border border-black p-3 text-right text-xs">TOTAL GLOBAL (TG):</td>
-                                                <td className="border border-black p-3 text-right">{clientFiche.reduce((sum, tx) => sum + tx.pt, 0).toLocaleString()}</td>
-                                                <td className="border border-black p-3 text-right text-red-600">RWF {selectedClient.totalDebt.toLocaleString()}</td>
-                                                <td colSpan="2" className="border border-black p-3 bg-white"></td>
-                                            </tr>
-                                        </tfoot>
+                                <div className="relative mb-6">
+                                    <FaSearch className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" />
+                                    <input
+                                        type="text"
+                                        placeholder="Search products to override price..."
+                                        className="w-full pl-12 pr-4 py-3.5 bg-gray-50 dark:bg-charcoal-700 border-2 border-transparent focus:border-terracotta-500 dark:text-white rounded-2xl outline-none shadow-sm transition-all"
+                                        value={priceSearch}
+                                        onChange={e => setPriceSearch(e.target.value)}
+                                    />
+                                </div>
+
+                                <div className="flex-1 overflow-y-auto space-y-3 pr-2 scrollbar-hide">
+                                    {loadingPrices ? (
+                                        <div className="text-center py-20 text-gray-400"><FaSpinner className="animate-spin text-3xl mx-auto mb-2" /> Loading data...</div>
+                                    ) : (
+                                        products.filter(p => p.name.toLowerCase().includes(priceSearch.toLowerCase())).map(product => {
+                                            const customPrice = getCustomPrice(product.id);
+                                            return (
+                                                <div key={product.id} className="flex items-center justify-between p-4 bg-gray-50 dark:bg-charcoal-700/40 rounded-2xl border border-gray-100 dark:border-charcoal-600 hover:border-terracotta-200 transition-colors group">
+                                                    <div className="flex items-center gap-4">
+                                                        <div className="w-12 h-12 rounded-xl bg-white dark:bg-charcoal-600 flex items-center justify-center overflow-hidden border border-gray-100 dark:border-charcoal-500">
+                                                            {product.image ? (
+                                                                <img src={`${process.env.REACT_APP_API_URL?.replace(/\/api$/, '') || 'http://localhost:5000'}${product.image}`} alt="" className="w-full h-full object-cover" />
+                                                            ) : (
+                                                                <FaTags className="text-gray-300" />
+                                                            )}
+                                                        </div>
+                                                        <div>
+                                                            <p className="font-bold text-charcoal-900 dark:text-white text-sm">{product.name}</p>
+                                                            <p className="text-xs text-gray-500">Normal Price: <span className="font-bold">RWF {product.price.toLocaleString()}</span></p>
+                                                        </div>
+                                                    </div>
+
+                                                    <div className="flex items-center gap-4">
+                                                        <div className="relative">
+                                                            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[10px] font-black text-gray-400">RWF</span>
+                                                            <input
+                                                                type="number"
+                                                                placeholder={product.price}
+                                                                className={`w-32 pl-10 pr-3 py-2 bg-white dark:bg-charcoal-800 border-2 rounded-xl text-sm font-bold outline-none transition-all ${customPrice ? 'border-terracotta-500 text-terracotta-600' : 'border-gray-200 dark:border-charcoal-600 text-gray-400 focus:border-terracotta-500'}`}
+                                                                value={customPrice || ""}
+                                                                onChange={(e) => updatePrice(product.id, e.target.value)}
+                                                            />
+                                                        </div>
+                                                        {customPrice && (
+                                                            <button
+                                                                onClick={() => removePrice(product.id)}
+                                                                className="p-2 text-gray-300 hover:text-red-500 transition-colors"
+                                                                title="Remove override"
+                                                            >
+                                                                <FaTrash size={12} />
+                                                            </button>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            );
+                                        })
                                     )}
-                                </table>
+                                </div>
+                            </div>
+                        </div>
+                    )}
 
-                                <div className="mt-12 grid grid-cols-2 gap-20">
-                                    <div className="text-center">
-                                        <p className="font-bold border-b border-black pb-2 mb-20 uppercase text-xs tracking-widest">Le Client</p>
+                    {showPayModal && selectedClient && (
+                        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => setShowPayModal(false)}>
+                            <div className="bg-white dark:bg-charcoal-800 rounded-2xl w-full max-w-md p-6 shadow-2xl" onClick={e => e.stopPropagation()}>
+                                <div className="text-center mb-6">
+                                    <div className="w-16 h-16 bg-green-100 dark:bg-green-900/30 rounded-full flex items-center justify-center mx-auto mb-4 text-green-500">
+                                        <FaMoneyBillWave size={32} />
                                     </div>
-                                    <div className="text-center">
-                                        <p className="font-bold border-b border-black pb-2 mb-20 uppercase text-xs tracking-widest">Le Gérant / {siteSettings.siteName}</p>
+                                    <h2 className="text-2xl font-black text-charcoal-900 dark:text-white">Record Payment</h2>
+                                    <p className="text-gray-500 text-sm mt-1">{selectedClient.name} owes RWF {selectedClient.totalDebt.toLocaleString()}</p>
+                                </div>
+                                <form onSubmit={handlePayDebt} className="space-y-4">
+                                    <div>
+                                        <label className="block text-xs font-black text-gray-500 uppercase mb-1.5">Amount Paid (RWF)</label>
+                                        <input
+                                            type="number"
+                                            required
+                                            max={selectedClient.totalDebt}
+                                            className="w-full px-4 py-4 bg-gray-50 dark:bg-charcoal-700 border-2 border-gray-200 dark:border-charcoal-600 rounded-2xl outline-none focus:border-green-500 text-2xl font-black text-center dark:text-white"
+                                            value={payAmount}
+                                            onChange={e => setPayAmount(e.target.value)}
+                                            autoFocus
+                                        />
+                                    </div>
+                                    <div className="flex gap-3 pt-4">
+                                        <button
+                                            type="button"
+                                            onClick={() => setShowPayModal(false)}
+                                            className="flex-1 py-3 bg-gray-100 dark:bg-charcoal-700 text-gray-600 dark:text-white rounded-xl font-bold hover:bg-gray-200 transition-all"
+                                        >
+                                            Cancel
+                                        </button>
+                                        <button
+                                            type="submit"
+                                            className="flex-1 py-3 bg-green-500 text-white rounded-xl font-bold hover:bg-green-600 shadow-lg shadow-green-500/20 transition-all"
+                                        >
+                                            Confirm Pay
+                                        </button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                    )}
+
+                    {showFicheModal && selectedClient && (
+                        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => setShowFicheModal(false)}>
+                            <div className="bg-white dark:bg-charcoal-800 rounded-2xl w-full max-w-5xl p-6 flex flex-col max-h-[90vh] shadow-2xl" onClick={e => e.stopPropagation()}>
+                                <div className="flex justify-between items-center mb-6">
+                                    <h2 className="text-2xl font-black text-charcoal-900 dark:text-white">Fiche de Client Abonné</h2>
+                                    <div className="flex gap-3">
+                                        <button onClick={printFiche} className="flex items-center gap-2 px-5 py-2.5 bg-charcoal-900 text-white rounded-xl font-bold hover:bg-charcoal-800 transition-all shadow-lg"><FaPrint /> Print Fiche</button>
+                                        <button onClick={() => setShowFicheModal(false)} className="w-10 h-10 flex items-center justify-center bg-gray-100 dark:bg-charcoal-700 rounded-full hover:bg-gray-200 transition-all"><FaTimes /></button>
+                                    </div>
+                                </div>
+
+                                <div className="overflow-y-auto flex-1 bg-white" id="fiche-print-area">
+                                    <style>
+                                        {`
+                                        @media print {
+                                            @page { margin: 15mm; }
+                                            body { font-family: 'Inter', sans-serif; background: white; color: black; -webkit-print-color-adjust: exact; }
+                                            .print-table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 11px; }
+                                            .print-table th, .print-table td { border: 1px solid #000; padding: 6px 8px; text-align: left; }
+                                            .print-table th { background-color: #f3f4f6 !important; font-weight: 800; text-transform: uppercase; }
+                                            .print-header { display: flex; justify-content: justify-between; align-items: center; border-bottom: 3px solid #000; padding-bottom: 20px; margin-bottom: 30px; }
+                                            .print-logo { height: 60px; width: auto; object-contain: contain; }
+                                            .no-print { display: none; }
+                                            .text-red-600 { color: #dc2626 !important; }
+                                        }
+                                        `}
+                                    </style>
+                                    <div className="p-8">
+                                        <div className="print-header flex justify-between items-center mb-8 border-b-[3px] border-black pb-6">
+                                            <div className="flex items-center gap-4">
+                                                {siteSettings.logo ? (
+                                                    <img src={siteSettings.logo} alt="Logo" className="print-logo h-16 w-auto" />
+                                                ) : (
+                                                    <div className="w-16 h-16 bg-black text-white flex items-center justify-center font-black text-3xl rounded-xl">
+                                                        {siteSettings.siteName.charAt(0)}
+                                                    </div>
+                                                )}
+                                                <div>
+                                                    <h1 className="text-2xl font-black uppercase leading-tight">{siteSettings.siteName}</h1>
+                                                    <p className="text-xs font-bold tracking-widest text-gray-500 uppercase">Fiche de Suivi Client</p>
+                                                </div>
+                                            </div>
+                                            <div className="text-right">
+                                                <h2 className="text-xl font-black uppercase mb-1">FICHE DE CLIENT</h2>
+                                                <p className="text-sm font-bold">CLIENT: <span className="underline decoration-black">{selectedClient.name}</span></p>
+                                                <p className="text-xs font-mono mt-1 opacity-50">DATE: {new Date().toLocaleDateString()}</p>
+                                            </div>
+                                        </div>
+
+                                        <table className="print-table w-full border border-black text-sm">
+                                            <thead>
+                                                <tr className="bg-gray-100">
+                                                    <th className="border border-black p-2">DATE</th>
+                                                    <th className="border border-black p-2">DESIGNATION / PRODUCT</th>
+                                                    <th className="border border-black p-2 text-center">QTY</th>
+                                                    <th className="border border-black p-2 text-right">PU (RWF)</th>
+                                                    <th className="border border-black p-2 text-right">PT (RWF)</th>
+                                                    <th className="border border-black p-2 text-right text-red-600">DEBT (RWF)</th>
+                                                    <th className="border border-black p-2">RESPONSIBLE</th>
+                                                    <th className="border border-black p-2">SIGNATURE</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {clientFiche.map((tx, idx) => (
+                                                    <tr key={idx}>
+                                                        <td className="border border-black p-2">{new Date(tx.date).toLocaleDateString()}</td>
+                                                        <td className="border border-black p-2 font-bold">{tx.designation}</td>
+                                                        <td className="border border-black p-2 text-center">{tx.quantity}</td>
+                                                        <td className="border border-black p-2 text-right">{tx.pu.toLocaleString()}</td>
+                                                        <td className="border border-black p-2 text-right">{tx.pt.toLocaleString()}</td>
+                                                        <td className="border border-black p-2 text-right font-bold text-red-600">{tx.debtAmount.toLocaleString()}</td>
+                                                        <td className="border border-black p-2 text-xs">{tx.responsible?.name || "System"}</td>
+                                                        <td className="border border-black p-2"></td>
+                                                    </tr>
+                                                ))}
+                                                {clientFiche.length === 0 && (
+                                                    <tr>
+                                                        <td colSpan="8" className="p-8 text-center text-gray-500 italic">No unpaid transactions recorded.</td>
+                                                    </tr>
+                                                )}
+                                            </tbody>
+                                            {clientFiche.length > 0 && (
+                                                <tfoot>
+                                                    <tr className="bg-gray-50 font-black">
+                                                        <td colSpan="4" className="border border-black p-3 text-right text-xs">TOTAL GLOBAL (TG):</td>
+                                                        <td className="border border-black p-3 text-right">{clientFiche.reduce((sum, tx) => sum + tx.pt, 0).toLocaleString()}</td>
+                                                        <td className="border border-black p-3 text-right text-red-600">RWF {selectedClient.totalDebt.toLocaleString()}</td>
+                                                        <td colSpan="2" className="border border-black p-3 bg-white"></td>
+                                                    </tr>
+                                                </tfoot>
+                                            )}
+                                        </table>
+
+                                        <div className="mt-12 grid grid-cols-2 gap-20">
+                                            <div className="text-center">
+                                                <p className="font-bold border-b border-black pb-2 mb-20 uppercase text-xs tracking-widest">Le Client</p>
+                                            </div>
+                                            <div className="text-center">
+                                                <p className="font-bold border-b border-black pb-2 mb-20 uppercase text-xs tracking-widest">Le Gérant / {siteSettings.siteName}</p>
+                                            </div>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
                         </div>
-                    </div>
-                </div>
-            )}
-        </>
+                    )}
+                </main>
+            </div>
+        </div>
     );
 };
 

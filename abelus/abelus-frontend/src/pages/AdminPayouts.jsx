@@ -4,12 +4,9 @@ import {
     FaClock, FaSpinner, FaCheckCircle, FaTimesCircle,
     FaChevronLeft, FaChevronRight, FaStore, FaHandHoldingUsd, FaReceipt
 } from 'react-icons/fa';
-import Sidebar from '../components/Sidebar';
-import Topbar from '../components/Topbar';
 import api from '../utils/axiosInstance';
 
 export default function AdminPayouts() {
-    const [sidebarOpen, setSidebarOpen] = useState(false);
     const [payouts, setPayouts] = useState([]);
     const [stats, setStats] = useState({ pendingCount: 0, pendingAmount: 0 });
     const [loading, setLoading] = useState(true);
@@ -94,9 +91,7 @@ export default function AdminPayouts() {
 
     return (
         <div className="min-h-screen bg-cream-100 dark:bg-charcoal-900 transition-colors duration-300">
-            <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
-            <div className="lg:ml-64 min-h-screen flex flex-col transition-all duration-300">
-                <Topbar onMenuClick={() => setSidebarOpen(true)} title="Payout Requests" />
+            <div className="min-h-screen flex flex-col transition-all duration-300">
                 <main className="flex-1 p-4 lg:p-6 max-w-[1600px] w-full mx-auto">
                     {/* Header with Stats */}
                     <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">

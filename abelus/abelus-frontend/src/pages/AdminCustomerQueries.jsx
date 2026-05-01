@@ -1,14 +1,11 @@
 import { useState, useEffect } from "react";
 import api from "../utils/axiosInstance";
-import Sidebar from "../components/Sidebar";
-import Topbar from "../components/Topbar";
 import { FaRobot, FaUser, FaSearch, FaTrash } from "react-icons/fa";
 import toast from "react-hot-toast";
 
 export default function AdminCustomerQueries() {
     const [logs, setLogs] = useState([]);
     const [loading, setLoading] = useState(true);
-    const [sidebarOpen, setSidebarOpen] = useState(false);
     const [filter, setFilter] = useState("");
     const [selectedLogs, setSelectedLogs] = useState([]); // Array of IDs
 
@@ -66,10 +63,7 @@ export default function AdminCustomerQueries() {
 
     return (
         <div className="min-h-screen bg-cream-100 dark:bg-charcoal-900 transition-colors duration-300">
-            <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
-
-            <div className="lg:ml-64 min-h-screen flex flex-col transition-all duration-300">
-                <Topbar onMenuClick={() => setSidebarOpen(true)} title="Customer Queries" />
+            <div className="min-h-screen flex flex-col transition-all duration-300">
 
                 <main className="flex-1 p-4 lg:p-6 max-w-[1600px] w-full mx-auto">
                     {/* Header */}

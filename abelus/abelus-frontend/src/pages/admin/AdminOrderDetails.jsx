@@ -1,394 +1,263 @@
 import React, { useState, useEffect } from "react";
-import { useParams, Link } from "react-router-dom";
+import { useParams, useNavigate } from "react-router-dom";
+import { FaArrowLeft, FaPrint, FaCheck, FaBox, FaUser, FaMapMarkerAlt, FaPhone } from "react-icons/fa";
 import api from "../../utils/axiosInstance";
-import { FaArrowLeft, FaBox, FaMapMarkerAlt, FaUser, FaCreditCard } from "react-icons/fa";
+import assetUrl from "../../utils/assetUrl";
+import toast from "react-hot-toast";
 
 const AdminOrderDetails = () => {
     const { id } = useParams();
+    const navigate = useNavigate();
     const [order, setOrder] = useState(null);
     const [loading, setLoading] = useState(true);
     const [updating, setUpdating] = useState(false);
-    const [isEditing, setIsEditing] = useState(false);
-    const [editedItems, setEditedItems] = useState([]);
-    const [noteText, setNoteText] = useState("");
-    const [isCustomerNote, setIsCustomerNote] = useState(false);
-    const [addingNote, setAddingNote] = useState(false);
 
     useEffect(() => {
-        if (order) {
-            setEditedItems(order.items.map(item => ({
-                ...item,
-                product: item.product?.id || item.product, // Ensure ID is kept
-                productName: item.productName || item.product?.name,
-                price: item.price,
-                quantity: item.quantity
-            })));
-        }
-    }, [order]);
-
-    useEffect(() => {
-        const fetchOrderDetails = async () => {
+        const fetchOrder = async () => {
             try {
                 const { data } = await api.get(`/orders/${id}`);
                 setOrder(data);
-                setLoading(false);
-            } catch (error) {
-                console.error("Failed to fetch order details:", error);
+            } catch (err) {
+                toast.error("Failed to load order details");
+                navigate("/admin/orders");
+            } finally {
                 setLoading(false);
             }
         };
-
-        fetchOrderDetails();
-    }, [id]);
+        fetchOrder();
+    }, [id, navigate]);
 
     const handleStatusUpdate = async (newStatus) => {
-        if (!window.confirm(`Are you sure you want to change status to "${newStatus}"?`)) return;
-
         setUpdating(true);
         try {
-            const { data } = await api.put(`/orders/${id}/status`, { status: newStatus });
-            setOrder(data);
-            alert(`Order status updated to ${newStatus}`);
-        } catch (error) {
-            console.error("Failed to update status:", error);
-            alert("Failed to update status");
+            await api.put(`/orders/${id}/status`, { status: newStatus });
+            setOrder({ ...order, status: newStatus });
+            toast.success(`Order status updated to ${newStatus}`);
+        } catch (err) {
+            toast.error("Failed to update order status");
         } finally {
             setUpdating(false);
         }
     };
 
-    const handleSaveItems = async () => {
-        if (!window.confirm("Save changes to order items? Totals will be recalculated.")) return;
-        setUpdating(true);
-        try {
-            const { data } = await api.put(`/orders/${id}/items`, { items: editedItems });
-            setOrder(data);
-            setIsEditing(false);
-            alert("Order items updated successfully");
-        } catch (error) {
-            console.error("Failed to update items:", error);
-            alert("Failed to update items: " + (error.response?.data?.message || error.message));
-        } finally {
-            setUpdating(false);
-        }
+    const handlePrint = () => {
+        const printContent = document.getElementById("receipt-print-area");
+        const windowUrl = "about:blank";
+        const uniqueName = new Date().getTime();
+        const windowFeatures = "left=500,top=500,width=400,height=400";
+        const printWindow = window.open(windowUrl, uniqueName, windowFeatures);
+
+        printWindow.document.write(`
+            <html>
+                <head>
+                    <title>Print Receipt</title>
+                    <style>
+                        body { font-family: sans-serif; padding: 20px; }
+                        .receipt { width: 100%; max-width: 300px; margin: 0 auto; border: 1px solid #eee; padding: 10px; }
+                        .header { text-align: center; border-bottom: 2px dashed #ccc; padding-bottom: 10px; margin-bottom: 10px; }
+                        .item { display: flex; justify-content: space-between; font-size: 12px; margin-bottom: 5px; }
+                        .total { border-top: 2px dashed #ccc; padding-top: 10px; margin-top: 10px; font-weight: bold; }
+                    </style>
+                </head>
+                <body>
+                    <div class="receipt">
+                        ${printContent.innerHTML}
+                    </div>
+                </body>
+            </html>
+        `);
+        printWindow.document.close();
+        printWindow.focus();
+        printWindow.print();
+        printWindow.close();
     };
 
-    const updateItemQuantity = (index, newQty) => {
-        const updated = [...editedItems];
-        updated[index].quantity = parseInt(newQty) || 0;
-        setEditedItems(updated);
-    };
+    if (loading) {
+        return (
+            <div className="min-h-screen bg-cream-100 dark:bg-charcoal-900 flex items-center justify-center">
+                <div className="w-10 h-10 border-4 border-terracotta-500 border-t-transparent rounded-full animate-spin"></div>
+            </div>
+        );
+    }
 
-    const removeItem = (index) => {
-        if (!window.confirm("Remove this item?")) return;
-        const updated = [...editedItems];
-        updated.splice(index, 1);
-        setEditedItems(updated);
-    };
-
-    const handleAddNote = async (e) => {
-        e.preventDefault();
-        if (!noteText.trim()) return;
-
-        setAddingNote(true);
-        try {
-            const { data } = await api.post(`/orders/${id}/notes`, {
-                text: noteText,
-                isCustomerVisible: isCustomerNote
-            });
-            setOrder(data);
-            setNoteText("");
-            setIsCustomerNote(false);
-            alert("Note added successfully");
-        } catch (error) {
-            console.error("Failed to add note:", error);
-            alert("Failed to add note");
-        } finally {
-            setAddingNote(false);
-        }
-    };
-
-    if (loading) return <div className="p-8 text-center">Loading order details...</div>;
-    if (!order) return <div className="p-8 text-center text-red-500">Order not found</div>;
+    if (!order) return null;
 
     return (
-        <div className="p-6 bg-gray-50 min-h-screen">
-            <div className="max-w-5xl mx-auto">
-                <Link to="/admin/orders" className="flex items-center text-gray-600 hover:text-gray-900 mb-6">
-                    <FaArrowLeft className="mr-2" /> Back to Orders
-                </Link>
-
-                {/* Header */}
-                <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
-                    <div>
-                        <div className="flex items-center gap-3 mb-1">
-                            <h1 className="text-3xl font-bold text-gray-900">Order #{order.publicId}</h1>
-                            <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ${
-                                order.orderType === 'pos' 
-                                ? 'bg-orange-100 text-orange-700 border border-orange-200' 
-                                : 'bg-blue-100 text-blue-700 border border-blue-200'
-                            }`}>
-                                {order.orderType === 'pos' ? 'POS' : 'Online'}
-                            </span>
+        <div className="min-h-screen bg-cream-100 dark:bg-charcoal-900 transition-colors duration-300">
+            <div className="min-h-screen flex flex-col transition-all duration-300">
+                <main className="flex-1 p-4 lg:p-6 max-w-[1600px] w-full mx-auto">
+                    {/* Header */}
+                    <div className="mb-8 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                        <div className="flex items-center gap-4">
+                            <button 
+                                onClick={() => navigate(-1)}
+                                className="w-10 h-10 flex items-center justify-center rounded-xl bg-white dark:bg-charcoal-800 text-charcoal-600 dark:text-gray-400 hover:text-terracotta-500 shadow-sm border border-cream-200 dark:border-charcoal-700 transition-all"
+                            >
+                                <FaArrowLeft />
+                            </button>
+                            <div>
+                                <h1 className="text-2xl font-black text-charcoal-900 dark:text-white">Order #{order.id.slice(-8).toUpperCase()}</h1>
+                                <p className="text-gray-500 dark:text-gray-400 text-xs mt-0.5">Placed on {new Date(order.createdAt).toLocaleString()}</p>
+                            </div>
                         </div>
-                        <p className="text-gray-500">Placed on {new Date(order.createdAt).toLocaleString()}</p>
+                        <div className="flex items-center gap-3">
+                            <button
+                                onClick={handlePrint}
+                                className="flex items-center gap-2 px-5 py-2.5 bg-charcoal-900 text-white rounded-xl font-bold hover:bg-charcoal-800 transition-all shadow-lg"
+                            >
+                                <FaPrint /> Print Receipt
+                            </button>
+                            <div className="relative">
+                                <select
+                                    disabled={updating}
+                                    value={order.status}
+                                    onChange={(e) => handleStatusUpdate(e.target.value)}
+                                    className={`pl-4 pr-10 py-2.5 rounded-xl font-bold text-sm appearance-none cursor-pointer border-2 transition-all outline-none ${
+                                        order.status === 'delivered' ? 'bg-green-50 border-green-200 text-green-600' :
+                                        order.status === 'processing' ? 'bg-blue-50 border-blue-200 text-blue-600' :
+                                        order.status === 'cancelled' ? 'bg-red-50 border-red-200 text-red-600' :
+                                        'bg-orange-50 border-orange-200 text-orange-600'
+                                    }`}
+                                >
+                                    <option value="pending">Pending</option>
+                                    <option value="processing">Processing</option>
+                                    <option value="shipped">Shipped</option>
+                                    <option value="delivered">Delivered</option>
+                                    <option value="cancelled">Cancelled</option>
+                                </select>
+                            </div>
+                        </div>
                     </div>
-                    <div className="flex items-center gap-4">
-                        <span className="text-sm font-medium text-gray-700">Status:</span>
-                        <select
-                            className={`p-2 rounded-lg border font-semibold focus:ring-2 focus:ring-blue-500 outline-none ${order.status === 'cancelled' ? 'bg-red-50 text-red-700 border-red-200' :
-                                order.status === 'delivered' ? 'bg-green-50 text-green-700 border-green-200' :
-                                    'bg-white text-gray-700 border-gray-300'
-                                }`}
-                            value={order.status}
-                            onChange={(e) => handleStatusUpdate(e.target.value)}
-                            disabled={updating}
-                        >
-                            <option value="pending">Pending</option>
-                            <option value="processing">Processing</option>
-                            <option value="shipped">Shipped</option>
-                            <option value="delivered">Delivered</option>
-                            <option value="cancelled">Cancelled</option>
-                            <option value="refunded">Refunded</option>
-                        </select>
-                    </div>
-                </div>
 
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                    {/* Main Content */}
-                    <div className="lg:col-span-2 space-y-6">
-
-                        {/* Items */}
-                        <div className="bg-white rounded-xl shadow-sm p-6">
-                            <h2 className="text-xl font-semibold mb-4 flex items-center justify-between">
-                                <span className="flex items-center gap-2"><FaBox className="text-blue-500" /> Order Items</span>
-                                {!isEditing ? (
-                                    <button
-                                        onClick={() => setIsEditing(true)}
-                                        className="text-sm text-blue-600 hover:text-blue-800 font-medium"
-                                    >
-                                        Edit Items
-                                    </button>
-                                ) : (
-                                    <div className="flex gap-2">
-                                        <button
-                                            onClick={() => setIsEditing(false)}
-                                            className="text-sm text-gray-600 hover:text-gray-800 font-medium px-3 py-1 border rounded"
-                                        >
-                                            Cancel
-                                        </button>
-                                        <button
-                                            onClick={handleSaveItems}
-                                            disabled={updating}
-                                            className="text-sm bg-blue-600 text-white hover:bg-blue-700 font-medium px-3 py-1 rounded"
-                                        >
-                                            {updating ? "Saving..." : "Save Changes"}
-                                        </button>
+                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                        {/* Left Column: Order Items */}
+                        <div className="lg:col-span-2 space-y-6">
+                            <div className="bg-white dark:bg-charcoal-800 rounded-2xl shadow-sm border border-cream-200 dark:border-charcoal-700 overflow-hidden">
+                                <div className="p-6 border-b border-cream-100 dark:border-charcoal-700 flex justify-between items-center">
+                                    <h3 className="font-black text-charcoal-900 dark:text-white uppercase tracking-wider text-sm">Order Items</h3>
+                                    <span className="text-xs font-bold text-gray-400">{order.items?.length || 0} Products</span>
+                                </div>
+                                <div className="divide-y divide-cream-100 dark:divide-charcoal-700">
+                                    {order.items?.map((item, idx) => (
+                                        <div key={idx} className="p-6 flex items-center gap-4 hover:bg-cream-50/50 dark:hover:bg-charcoal-700/30 transition-colors">
+                                            <div className="w-16 h-16 rounded-xl bg-cream-100 dark:bg-charcoal-700 overflow-hidden flex-shrink-0">
+                                                {item.product?.image ? (
+                                                    <img src={assetUrl(item.product.image)} alt="" className="w-full h-full object-cover" />
+                                                ) : (
+                                                    <div className="w-full h-full flex items-center justify-center text-gray-300">
+                                                        <FaBox size={24} />
+                                                    </div>
+                                                )}
+                                            </div>
+                                            <div className="flex-1 min-w-0">
+                                                <h4 className="font-bold text-charcoal-900 dark:text-white truncate">{item.product?.name || "Product Deleted"}</h4>
+                                                <p className="text-xs text-gray-500 mt-0.5">Price: RWF {item.price?.toLocaleString()}</p>
+                                            </div>
+                                            <div className="text-right flex-shrink-0">
+                                                <div className="font-black text-charcoal-900 dark:text-white">RWF {(item.price * item.quantity).toLocaleString()}</div>
+                                                <div className="text-xs font-bold text-terracotta-500 mt-0.5">QTY: {item.quantity}</div>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                                <div className="p-6 bg-cream-50/50 dark:bg-charcoal-900/30 space-y-3">
+                                    <div className="flex justify-between text-sm">
+                                        <span className="text-gray-500">Subtotal</span>
+                                        <span className="font-bold text-charcoal-900 dark:text-white">RWF {order.totalAmount?.toLocaleString()}</span>
                                     </div>
-                                )}
-                            </h2>
-                            <div className="divide-y">
-                                {(isEditing ? editedItems : order.items)?.map((item, index) => (
-                                    <div key={index} className="py-4 flex gap-4 items-center">
-                                        <div className="w-16 h-16 bg-gray-100 rounded-lg flex-shrink-0 overflow-hidden">
-                                            {/* Placeholder for image if available */}
-                                            <div className="w-full h-full flex items-center justify-center text-gray-400 text-xs">No Img</div>
+                                    <div className="flex justify-between text-sm">
+                                        <span className="text-gray-500">Shipping</span>
+                                        <span className="font-bold text-charcoal-900 dark:text-white">RWF 0</span>
+                                    </div>
+                                    <div className="pt-3 border-t border-cream-200 dark:border-charcoal-700 flex justify-between items-center">
+                                        <span className="font-black text-charcoal-900 dark:text-white uppercase tracking-widest text-xs">Total Amount</span>
+                                        <span className="text-2xl font-black text-terracotta-500">RWF {order.totalAmount?.toLocaleString()}</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Right Column: Customer & Shipping Info */}
+                        <div className="space-y-6">
+                            <div className="bg-white dark:bg-charcoal-800 rounded-2xl shadow-sm border border-cream-200 dark:border-charcoal-700 p-6">
+                                <h3 className="font-black text-charcoal-900 dark:text-white uppercase tracking-wider text-sm mb-6 pb-2 border-b border-cream-100 dark:border-charcoal-700">Customer Details</h3>
+                                <div className="space-y-4">
+                                    <div className="flex items-center gap-3">
+                                        <div className="w-10 h-10 rounded-full bg-cream-100 dark:bg-charcoal-700 flex items-center justify-center text-charcoal-600 dark:text-white">
+                                            <FaUser />
                                         </div>
-                                        <div className="flex-1">
-                                            <h3 className="font-medium text-gray-900">{item.productName}</h3>
-                                            {!isEditing ? (
-                                                <p className="text-sm text-gray-500">Qty: {item.quantity} × {item.price.toLocaleString()} Rwf</p>
-                                            ) : (
-                                                <div className="flex items-center gap-2 mt-1">
-                                                    <label className="text-xs text-gray-600">Qty:</label>
-                                                    <input
-                                                        type="number"
-                                                        min="0"
-                                                        value={item.quantity}
-                                                        onChange={(e) => updateItemQuantity(index, e.target.value)}
-                                                        className="w-16 p-1 border rounded text-sm"
-                                                    />
-                                                    <span className="text-sm text-gray-500">× {item.price.toLocaleString()} Rwf</span>
-                                                </div>
-                                            )}
-                                            {item.customizations?.customText && (
-                                                <p className="text-xs text-gray-500 mt-1">Custom Text: "{item.customizations.customText}"</p>
-                                            )}
+                                        <div>
+                                            <p className="font-bold text-charcoal-900 dark:text-white">{order.user?.name || "Guest Customer"}</p>
+                                            <p className="text-xs text-gray-500">{order.user?.email || "No email provided"}</p>
                                         </div>
-                                        <div className="font-medium text-gray-900 text-right">
-                                            <div>{(item.price * item.quantity).toLocaleString()} Rwf</div>
-                                            {isEditing && (
-                                                <button
-                                                    onClick={() => removeItem(index)}
-                                                    className="text-xs text-red-500 hover:text-red-700 mt-1"
-                                                >
-                                                    Remove
-                                                </button>
-                                            )}
+                                    </div>
+                                    <div className="flex items-start gap-3">
+                                        <div className="w-10 h-10 rounded-full bg-cream-100 dark:bg-charcoal-700 flex items-center justify-center text-charcoal-600 dark:text-white flex-shrink-0">
+                                            <FaMapMarkerAlt />
                                         </div>
+                                        <div>
+                                            <p className="font-bold text-charcoal-900 dark:text-white text-sm">Shipping Address</p>
+                                            <p className="text-xs text-gray-500 mt-1 leading-relaxed">
+                                                {order.shippingAddress || "No shipping address provided"}
+                                            </p>
+                                        </div>
+                                    </div>
+                                    <div className="flex items-center gap-3">
+                                        <div className="w-10 h-10 rounded-full bg-cream-100 dark:bg-charcoal-700 flex items-center justify-center text-charcoal-600 dark:text-white">
+                                            <FaPhone />
+                                        </div>
+                                        <div>
+                                            <p className="font-bold text-charcoal-900 dark:text-white text-sm">Phone Number</p>
+                                            <p className="text-xs text-gray-500">{order.user?.phone || "N/A"}</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="bg-white dark:bg-charcoal-800 rounded-2xl shadow-sm border border-cream-200 dark:border-charcoal-700 p-6">
+                                <h3 className="font-black text-charcoal-900 dark:text-white uppercase tracking-wider text-sm mb-6 pb-2 border-b border-cream-100 dark:border-charcoal-700">Payment Information</h3>
+                                <div className="space-y-4">
+                                    <div className="flex justify-between items-center">
+                                        <span className="text-xs font-bold text-gray-500 uppercase">Method</span>
+                                        <span className="font-bold text-charcoal-800 dark:text-white text-sm">{order.paymentMethod || "COD"}</span>
+                                    </div>
+                                    <div className="flex justify-between items-center">
+                                        <span className="text-xs font-bold text-gray-500 uppercase">Status</span>
+                                        <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider ${
+                                            order.paymentStatus === 'paid' ? 'bg-green-50 text-green-600' : 'bg-orange-50 text-orange-600'
+                                        }`}>
+                                            {order.paymentStatus}
+                                        </span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Hidden Print Area */}
+                    <div className="hidden">
+                        <div id="receipt-print-area">
+                            <div style={{ textAlign: 'center', marginBottom: '20px' }}>
+                                <h2 style={{ margin: 0 }}>ABELUS</h2>
+                                <p style={{ fontSize: '10px', margin: '5px 0' }}>Official Receipt</p>
+                                <p style={{ fontSize: '10px' }}>Order ID: #{order.id.slice(-8).toUpperCase()}</p>
+                                <p style={{ fontSize: '10px' }}>Date: {new Date(order.createdAt).toLocaleDateString()}</p>
+                            </div>
+                            <div style={{ borderBottom: '1px dashed #000', paddingBottom: '10px', marginBottom: '10px' }}>
+                                {order.items?.map((item, idx) => (
+                                    <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', marginBottom: '4px' }}>
+                                        <span>{item.quantity}x {item.product?.name}</span>
+                                        <span>{(item.price * item.quantity).toLocaleString()}</span>
                                     </div>
                                 ))}
                             </div>
-                            <div className="border-t mt-4 pt-4 space-y-2">
-                                <div className="flex justify-between text-gray-600">
-                                    <span>Subtotal</span>
-                                    <span>{order.totals.subtotal.toLocaleString()} Rwf</span>
-                                </div>
-                                <div className="flex justify-between text-gray-600">
-                                    <span>Shipping</span>
-                                    <span>{order.totals.shipping.toLocaleString()} Rwf</span>
-                                </div>
-                                <div className="flex justify-between text-gray-600">
-                                    <span>Tax</span>
-                                    <span>{order.totals.tax.toLocaleString()} Rwf</span>
-                                </div>
-                                {order.totals.discount > 0 && (
-                                    <div className="flex justify-between text-green-600">
-                                        <span>Discount</span>
-                                        <span>-{order.totals.discount.toLocaleString()} Rwf</span>
-                                    </div>
-                                )}
-                                <div className="flex justify-between text-xl font-bold text-gray-900 pt-2 border-t">
-                                    <span>Total</span>
-                                    <span>{order.totals.grandTotal.toLocaleString()} Rwf</span>
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* Timeline / History (Placeholder) */}
-                        <div className="bg-white rounded-xl shadow-sm p-6">
-                            <h2 className="text-xl font-semibold mb-4">Order History</h2>
-                            <div className="space-y-4">
-                                <div className="flex gap-4">
-                                    <div className="w-2 bg-gray-200 rounded-full relative">
-                                        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-4 h-4 rounded-full bg-blue-500 border-4 border-white shadow"></div>
-                                    </div>
-                                    <div className="pb-4">
-                                        <p className="font-medium text-gray-900">Order Placed</p>
-                                        <p className="text-sm text-gray-500">{new Date(order.createdAt).toLocaleString()}</p>
-                                    </div>
-                                </div>
-                                {/* More history items could be added here if backend supported it */}
+                            <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 'bold' }}>
+                                <span>TOTAL:</span>
+                                <span>RWF {order.totalAmount?.toLocaleString()}</span>
                             </div>
                         </div>
                     </div>
-
-                    {/* Sidebar Info */}
-                    <div className="space-y-6">
-
-                        {/* Customer */}
-                        <div className="bg-white rounded-xl shadow-sm p-6">
-                            <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
-                                <FaUser className="text-gray-400" /> Customer
-                            </h2>
-                            <div className="space-y-2 text-sm">
-                                <p className="font-medium text-gray-900">
-                                    {order.customer?.name || order.guestInfo?.name || "Guest"}
-                                </p>
-                                <p className="text-gray-500">
-                                    {order.customer?.email || order.guestInfo?.email}
-                                </p>
-                                <p className="text-gray-500">
-                                    {order.guestInfo?.phone || "No phone provided"}
-                                </p>
-                            </div>
-                        </div>
-
-                        {/* Shipping Address */}
-                        <div className="bg-white rounded-xl shadow-sm p-6">
-                            <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
-                                <FaMapMarkerAlt className="text-gray-400" /> Shipping Address
-                            </h2>
-                            <div className="text-sm text-gray-600 space-y-1">
-                                <p>{order.shippingAddress?.address}</p>
-                                <p>{order.shippingAddress?.city}, {order.shippingAddress?.state}</p>
-                                <p>{order.shippingAddress?.country} {order.shippingAddress?.zip}</p>
-                            </div>
-                        </div>
-
-                        {/* Payment Info */}
-                        <div className="bg-white rounded-xl shadow-sm p-6">
-                            <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
-                                <FaCreditCard className="text-gray-400" /> Payment
-                            </h2>
-                            <div className="space-y-2 text-sm">
-                                <div className="flex justify-between">
-                                    <span className="text-gray-500">Method:</span>
-                                    <span className="font-medium capitalize">{order.payment?.method?.replace("_", " ")}</span>
-                                </div>
-                                <div className="flex justify-between">
-                                    <span className="text-gray-500">Status:</span>
-                                    <span className={`px-2 py-0.5 rounded text-xs font-semibold ${order.payment?.status === 'completed' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'
-                                        }`}>
-                                        {order.payment?.status}
-                                    </span>
-                                </div>
-                                {order.payment?.transactionId && (
-                                    <div className="flex justify-between">
-                                        <span className="text-gray-500">Trans ID:</span>
-                                        <span className="font-mono text-xs">{order.payment.transactionId}</span>
-                                    </div>
-                                )}
-                            </div>
-                        </div>
-
-                        {/* Order Notes */}
-                        <div className="bg-white rounded-xl shadow-sm p-6">
-                            <h2 className="text-lg font-semibold mb-4">Order Notes</h2>
-
-                            {/* Notes List */}
-                            <div className="space-y-4 mb-6 max-h-60 overflow-y-auto">
-                                {order.notes?.length > 0 ? (
-                                    order.notes.slice().reverse().map((note, index) => (
-                                        <div key={index} className={`p-3 rounded-lg text-sm ${note.isCustomerVisible ? 'bg-yellow-50 border border-yellow-100' : 'bg-gray-50 border border-gray-100'}`}>
-                                            <p className="text-gray-800 mb-1">{note.text}</p>
-                                            <div className="flex justify-between text-xs text-gray-500">
-                                                <span>{note.authorName || "System"}</span>
-                                                <span>{new Date(note.createdAt).toLocaleString()}</span>
-                                            </div>
-                                            {note.isCustomerVisible && (
-                                                <span className="text-xs text-yellow-600 font-medium mt-1 block">Customer Note</span>
-                                            )}
-                                        </div>
-                                    ))
-                                ) : (
-                                    <p className="text-sm text-gray-500 text-center py-2">No notes yet.</p>
-                                )}
-                            </div>
-
-                            {/* Add Note Form */}
-                            <form onSubmit={handleAddNote} className="space-y-3">
-                                <textarea
-                                    className="w-full p-2 border rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none resize-none"
-                                    rows="3"
-                                    placeholder="Add a note..."
-                                    value={noteText}
-                                    onChange={(e) => setNoteText(e.target.value)}
-                                    required
-                                ></textarea>
-                                <div className="flex items-center justify-between">
-                                    <label className="flex items-center gap-2 text-sm text-gray-600 cursor-pointer">
-                                        <input
-                                            type="checkbox"
-                                            checked={isCustomerNote}
-                                            onChange={(e) => setIsCustomerNote(e.target.checked)}
-                                            className="rounded text-blue-600 focus:ring-blue-500"
-                                        />
-                                        Customer Note
-                                    </label>
-                                    <button
-                                        type="submit"
-                                        disabled={addingNote}
-                                        className="bg-blue-600 text-white px-3 py-1.5 rounded text-sm font-medium hover:bg-blue-700 disabled:opacity-50"
-                                    >
-                                        {addingNote ? "Adding..." : "Add Note"}
-                                    </button>
-                                </div>
-                            </form>
-                        </div>
-
-                    </div>
-                </div>
+                </main>
             </div>
         </div>
     );

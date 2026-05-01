@@ -4,11 +4,9 @@ import {
     FaClock, FaCheckCircle, FaTimesCircle, FaImage,
     FaChevronLeft, FaChevronRight, FaStore
 } from 'react-icons/fa';
-import Sidebar from '../components/Sidebar';
-import Topbar from '../components/Topbar';
+import api from '../utils/axiosInstance';
 
 export default function AdminProductApproval() {
-    const [sidebarOpen, setSidebarOpen] = useState(false);
     const [products, setProducts] = useState([]);
     const [stats, setStats] = useState({ pending: 0, approved: 0, rejected: 0 });
     const [loading, setLoading] = useState(true);
@@ -25,8 +23,7 @@ export default function AdminProductApproval() {
     const [showBulkRejectModal, setShowBulkRejectModal] = useState(false);
     const [bulkRejectReason, setBulkRejectReason] = useState('');
 
-    const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
-    const BASE_URL = API_URL.replace(/\/api$/, '');
+    const BASE_URL = (process.env.REACT_APP_API_URL || 'http://localhost:5000/api').replace(/\/api$/, '');
 
     const getImageUrl = (image) => {
         if (!image) return null;
@@ -37,14 +34,12 @@ export default function AdminProductApproval() {
     const fetchProducts = useCallback(async () => {
         setLoading(true);
         try {
-            const token = localStorage.getItem('authToken');
             const params = new URLSearchParams({ page: currentPage, limit: 15, status: statusFilter, ...(searchTerm && { search: searchTerm }) });
-            const res = await fetch(`${API_URL}/product-approval?${params}`, { headers: { Authorization: `Bearer ${token}` } });
-            const data = await res.json();
-            if (data.success) { setProducts(data.data); setStats(data.stats); setTotalPages(data.pagination.pages); }
+            const res = await api.get(`/product-approval?${params}`);
+            if (res.data.success) { setProducts(res.data.data); setStats(res.data.stats); setTotalPages(res.data.pagination.pages); }
         } catch (err) { setError('Failed to fetch products'); }
         finally { setLoading(false); }
-    }, [currentPage, statusFilter, searchTerm, API_URL]);
+    }, [currentPage, statusFilter, searchTerm]);
 
     useEffect(() => { fetchProducts(); }, [fetchProducts]);
 
@@ -52,23 +47,17 @@ export default function AdminProductApproval() {
 
     const viewProductDetails = async (id) => {
         try {
-            const token = localStorage.getItem('authToken');
-            const res = await fetch(`${API_URL}/product-approval/${id}`, { headers: { Authorization: `Bearer ${token}` } });
-            const data = await res.json();
-            if (data.success) { setSelectedProduct(data.data); setShowModal(true); }
+            const res = await api.get(`/product-approval/${id}`);
+            if (res.data.success) { setSelectedProduct(res.data.data); setShowModal(true); }
         } catch (err) { setError('Failed to fetch product details'); }
     };
 
     const approveProduct = async (id, note = '') => {
         setProcessing(true);
         try {
-            const token = localStorage.getItem('authToken');
-            const res = await fetch(`${API_URL}/product-approval/${id}/approve`, {
-                method: 'PUT', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ note })
-            });
-            const data = await res.json();
-            if (data.success) { setSuccess('Product approved!'); setShowModal(false); setSelectedProduct(null); fetchProducts(); }
-            else { setError(data.message); }
+            const res = await api.put(`/product-approval/${id}/approve`, { note });
+            if (res.data.success) { setSuccess('Product approved!'); setShowModal(false); setSelectedProduct(null); fetchProducts(); }
+            else { setError(res.data.message); }
         } catch (err) { setError('Failed to approve product'); }
         finally { setProcessing(false); }
     };
@@ -77,13 +66,9 @@ export default function AdminProductApproval() {
         if (!reason) { setError('Please provide a rejection reason'); return; }
         setProcessing(true);
         try {
-            const token = localStorage.getItem('authToken');
-            const res = await fetch(`${API_URL}/product-approval/${id}/reject`, {
-                method: 'PUT', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ reason })
-            });
-            const data = await res.json();
-            if (data.success) { setSuccess('Product rejected'); setShowModal(false); setSelectedProduct(null); fetchProducts(); }
-            else { setError(data.message); }
+            const res = await api.put(`/product-approval/${id}/reject`, { reason });
+            if (res.data.success) { setSuccess('Product rejected'); setShowModal(false); setSelectedProduct(null); fetchProducts(); }
+            else { setError(res.data.message); }
         } catch (err) { setError('Failed to reject product'); }
         finally { setProcessing(false); }
     };
@@ -91,24 +76,16 @@ export default function AdminProductApproval() {
     const bulkApprove = async () => {
         if (!selectedIds.length || !window.confirm(`Approve ${selectedIds.length} products?`)) return;
         try {
-            const token = localStorage.getItem('authToken');
-            const res = await fetch(`${API_URL}/product-approval/bulk-approve`, {
-                method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ productIds: selectedIds })
-            });
-            const data = await res.json();
-            if (data.success) { setSuccess(data.message); setSelectedIds([]); fetchProducts(); }
+            const res = await api.post('/product-approval/bulk-approve', { productIds: selectedIds });
+            if (res.data.success) { setSuccess(res.data.message); setSelectedIds([]); fetchProducts(); }
         } catch (err) { setError('Failed to bulk approve'); }
     };
 
     const bulkReject = async () => {
         if (!selectedIds.length || !bulkRejectReason.trim()) { setError('Please provide a rejection reason'); return; }
         try {
-            const token = localStorage.getItem('authToken');
-            const res = await fetch(`${API_URL}/product-approval/bulk-reject`, {
-                method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ productIds: selectedIds, reason: bulkRejectReason })
-            });
-            const data = await res.json();
-            if (data.success) { setSuccess(data.message); setSelectedIds([]); setShowBulkRejectModal(false); setBulkRejectReason(''); fetchProducts(); }
+            const res = await api.post('/product-approval/bulk-reject', { productIds: selectedIds, reason: bulkRejectReason });
+            if (res.data.success) { setSuccess(res.data.message); setSelectedIds([]); setShowBulkRejectModal(false); setBulkRejectReason(''); fetchProducts(); }
         } catch (err) { setError('Failed to bulk reject'); }
     };
 
@@ -130,9 +107,7 @@ export default function AdminProductApproval() {
 
     return (
         <div className="min-h-screen bg-cream-100 dark:bg-charcoal-900 transition-colors duration-300">
-            <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
-            <div className="lg:ml-64 min-h-screen flex flex-col transition-all duration-300">
-                <Topbar onMenuClick={() => setSidebarOpen(true)} title="Product Approval" />
+            <div className="min-h-screen flex flex-col transition-all duration-300">
                 <main className="flex-1 p-4 lg:p-6 max-w-[1600px] w-full mx-auto">
                     {/* Header */}
                     <div className="mb-6">

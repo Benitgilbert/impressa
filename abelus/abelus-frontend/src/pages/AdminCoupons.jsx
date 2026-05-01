@@ -1,6 +1,4 @@
 import { useState, useEffect, useCallback } from "react";
-import Sidebar from "../components/Sidebar";
-import Topbar from "../components/Topbar";
 import api from "../utils/axiosInstance";
 import { FaTrash, FaEdit, FaPlus, FaTag, FaTimes, FaPercent, FaTruck } from "react-icons/fa";
 
@@ -13,7 +11,6 @@ const getTypeIcon = (type) => {
 const isExpired = (date) => new Date(date) < new Date();
 
 function AdminCoupons() {
-    const [sidebarOpen, setSidebarOpen] = useState(false);
     const [coupons, setCoupons] = useState([]);
     const [loading, setLoading] = useState(true);
     const [showModal, setShowModal] = useState(false);
@@ -81,10 +78,7 @@ function AdminCoupons() {
 
     return (
         <div className="min-h-screen bg-cream-100 dark:bg-charcoal-900 transition-colors duration-300">
-            <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
-
-            <div className="lg:ml-64 min-h-screen flex flex-col transition-all duration-300">
-                <Topbar onMenuClick={() => setSidebarOpen(true)} title="Coupons" />
+            <div className="min-h-screen flex flex-col transition-all duration-300">
 
                 <main className="flex-1 p-4 lg:p-6 max-w-[1600px] w-full mx-auto">
                     {/* Header */}

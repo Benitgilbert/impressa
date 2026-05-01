@@ -3,8 +3,7 @@ import {
     FaPlus, FaEdit, FaTrash, FaCalendarAlt, FaClock, FaBox,
     FaSave, FaTimes, FaFire
 } from 'react-icons/fa';
-import Sidebar from '../components/Sidebar';
-import Topbar from '../components/Topbar';
+import api from '../utils/axiosInstance';
 
 const colorOptions = [
     { label: 'Terracotta → Sand', value: 'from-terracotta-500 to-sand-400' },
@@ -16,7 +15,6 @@ const colorOptions = [
 ];
 
 export default function AdminFlashSales() {
-    const [sidebarOpen, setSidebarOpen] = useState(false);
     const [flashSales, setFlashSales] = useState([]);
     const [products, setProducts] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -42,38 +40,32 @@ export default function AdminFlashSales() {
         stockLimit: ''
     });
 
-    const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
 
 
 
 
     const fetchFlashSales = useCallback(async () => {
         try {
-            const token = localStorage.getItem('authToken');
-            const res = await fetch(`${API_URL}/flash-sales`, {
-                headers: { Authorization: `Bearer ${token}` }
-            });
-            const data = await res.json();
-            if (data.success) {
-                setFlashSales(data.data);
+            const res = await api.get('/flash-sales');
+            if (res.data.success) {
+                setFlashSales(res.data.data);
             }
         } catch (err) {
             setError('Failed to fetch flash sales');
         } finally {
             setLoading(false);
         }
-    }, [API_URL]);
+    }, []);
 
     const fetchProducts = useCallback(async () => {
         try {
-            const res = await fetch(`${API_URL}/products`);
-            const data = await res.json();
-            const productList = Array.isArray(data) ? data : (data.products || data.data || []);
+            const res = await api.get('/products');
+            const productList = Array.isArray(res.data) ? res.data : (res.data.products || res.data.data || []);
             setProducts(productList);
         } catch (err) {
             console.error('Failed to fetch products');
         }
-    }, [API_URL]);
+    }, []);
 
     useEffect(() => {
         fetchFlashSales();
@@ -104,34 +96,22 @@ export default function AdminFlashSales() {
         setSuccess('');
 
         try {
-            const token = localStorage.getItem('authToken');
-            const url = editingSale
-                ? `${API_URL}/flash-sales/${editingSale.id}`
-                : `${API_URL}/flash-sales`;
-
             const payload = {
                 ...form,
                 startDate: new Date(form.startDate).toISOString(),
                 endDate: new Date(form.endDate).toISOString()
             };
 
-            const res = await fetch(url, {
-                method: editingSale ? 'PUT' : 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    Authorization: `Bearer ${token}`
-                },
-                body: JSON.stringify(payload)
-            });
+            const res = editingSale 
+                ? await api.put(`/flash-sales/${editingSale.id}`, payload)
+                : await api.post('/flash-sales', payload);
 
-            const data = await res.json();
-
-            if (data.success) {
+            if (res.data.success) {
                 setSuccess(editingSale ? 'Flash sale updated!' : 'Flash sale created!');
                 fetchFlashSales();
                 closeModal();
             } else {
-                setError(data.message || 'Failed to save flash sale');
+                setError(res.data.message || 'Failed to save flash sale');
             }
         } catch (err) {
             setError('Failed to save flash sale');
@@ -142,19 +122,12 @@ export default function AdminFlashSales() {
         if (!window.confirm('Are you sure you want to delete this flash sale?')) return;
 
         try {
-            const token = localStorage.getItem('authToken');
-            const res = await fetch(`${API_URL}/flash-sales/${id}`, {
-                method: 'DELETE',
-                headers: { Authorization: `Bearer ${token}` }
-            });
-
-            const data = await res.json();
-
-            if (data.success) {
+            const res = await api.delete(`/flash-sales/${id}`);
+            if (res.data.success) {
                 setSuccess('Flash sale deleted!');
                 fetchFlashSales();
             } else {
-                setError(data.message || 'Failed to delete flash sale');
+                setError(res.data.message || 'Failed to delete flash sale');
             }
         } catch (err) {
             setError('Failed to delete flash sale');
@@ -166,29 +139,19 @@ export default function AdminFlashSales() {
         if (!selectedSale) return;
 
         try {
-            const token = localStorage.getItem('authToken');
-            const res = await fetch(`${API_URL}/flash-sales/${selectedSale.id}/products`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    Authorization: `Bearer ${token}`
-                },
-                body: JSON.stringify({
-                    productId: productForm.productId,
-                    flashSalePrice: Number(productForm.flashSalePrice),
-                    stockLimit: productForm.stockLimit ? Number(productForm.stockLimit) : null
-                })
+            const res = await api.post(`/flash-sales/${selectedSale.id}/products`, {
+                productId: productForm.productId,
+                flashSalePrice: Number(productForm.flashSalePrice),
+                stockLimit: productForm.stockLimit ? Number(productForm.stockLimit) : null
             });
 
-            const data = await res.json();
-
-            if (data.success) {
+            if (res.data.success) {
                 setSuccess('Product added to flash sale!');
                 fetchFlashSales();
                 setShowProductModal(false);
                 setProductForm({ productId: '', flashSalePrice: '', stockLimit: '' });
             } else {
-                setError(data.message || 'Failed to add product');
+                setError(res.data.message || 'Failed to add product');
             }
         } catch (err) {
             setError('Failed to add product');
@@ -199,19 +162,12 @@ export default function AdminFlashSales() {
         if (!window.confirm('Remove this product from the flash sale?')) return;
 
         try {
-            const token = localStorage.getItem('authToken');
-            const res = await fetch(`${API_URL}/flash-sales/${saleId}/products/${productId}`, {
-                method: 'DELETE',
-                headers: { Authorization: `Bearer ${token}` }
-            });
-
-            const data = await res.json();
-
-            if (data.success) {
+            const res = await api.delete(`/flash-sales/${saleId}/products/${productId}`);
+            if (res.data.success) {
                 setSuccess('Product removed!');
                 fetchFlashSales();
             } else {
-                setError(data.message || 'Failed to remove product');
+                setError(res.data.message || 'Failed to remove product');
             }
         } catch (err) {
             setError('Failed to remove product');
@@ -265,10 +221,7 @@ export default function AdminFlashSales() {
 
     return (
         <div className="min-h-screen bg-cream-100 dark:bg-charcoal-900 transition-colors duration-300">
-            <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
-
-            <div className="lg:ml-64 min-h-screen flex flex-col transition-all duration-300">
-                <Topbar onMenuClick={() => setSidebarOpen(true)} title="Flash Sales" />
+            <div className="min-h-screen flex flex-col transition-all duration-300">
 
                 <main className="flex-1 p-4 lg:p-6 max-w-[1600px] w-full mx-auto">
                     {/* Header */}

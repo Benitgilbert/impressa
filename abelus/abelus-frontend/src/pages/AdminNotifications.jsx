@@ -1,11 +1,8 @@
 import { useState, useEffect, useCallback } from "react";
-import Sidebar from "../components/Sidebar";
-import Topbar from "../components/Topbar";
 import api from "../utils/axiosInstance";
 import { FaCheck, FaCheckDouble, FaTrash, FaBell, FaInfoCircle, FaBox, FaMoneyBillWave, FaUserCheck, FaExclamationTriangle } from "react-icons/fa";
 
 const AdminNotifications = () => {
-    const [sidebarOpen, setSidebarOpen] = useState(false);
     const [notifications, setNotifications] = useState([]);
     const [loading, setLoading] = useState(true);
     const [filter, setFilter] = useState("all");
@@ -70,9 +67,7 @@ const AdminNotifications = () => {
 
     return (
         <div className="min-h-screen bg-cream-100 dark:bg-charcoal-900 transition-colors duration-300">
-            <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
-            <div className="lg:ml-64 min-h-screen flex flex-col transition-all duration-300">
-                <Topbar onMenuClick={() => setSidebarOpen(true)} title="Notifications" />
+            <div className="min-h-screen flex flex-col transition-all duration-300">
                 <main className="flex-1 p-4 lg:p-6 max-w-[1200px] w-full mx-auto">
                     {/* Header with Filters & Actions */}
                     <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">

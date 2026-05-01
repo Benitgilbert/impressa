@@ -4,11 +4,9 @@ import {
     FaClock, FaCheckCircle, FaSpinner, FaExclamationTriangle,
     FaChevronLeft, FaChevronRight, FaTimes, FaUser
 } from 'react-icons/fa';
-import Sidebar from '../components/Sidebar';
-import Topbar from '../components/Topbar';
+import api from '../utils/axiosInstance';
 
 export default function AdminTickets() {
-    const [sidebarOpen, setSidebarOpen] = useState(false);
     const [tickets, setTickets] = useState([]);
     const [stats, setStats] = useState({ total: 0, open: 0, inProgress: 0, waiting: 0, resolved: 0 });
     const [loading, setLoading] = useState(true);
@@ -22,28 +20,23 @@ export default function AdminTickets() {
     const [replyText, setReplyText] = useState('');
     const [processing, setProcessing] = useState(false);
 
-    const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
 
     const fetchTickets = useCallback(async () => {
         setLoading(true);
         try {
-            const token = localStorage.getItem('authToken');
             const params = new URLSearchParams({ page: currentPage, limit: 15, ...(statusFilter !== 'all' && { status: statusFilter }) });
-            const res = await fetch(`${API_URL}/tickets/admin?${params}`, { headers: { Authorization: `Bearer ${token}` } });
-            const data = await res.json();
-            if (data.success) { setTickets(data.data); setStats(data.stats); setTotalPages(data.pagination.pages); }
+            const res = await api.get(`/tickets/admin?${params}`);
+            if (res.data.success) { setTickets(res.data.data); setStats(res.data.stats); setTotalPages(res.data.pagination.pages); }
         } catch (err) { setError('Failed to fetch tickets'); }
         finally { setLoading(false); }
-    }, [currentPage, statusFilter, API_URL]);
+    }, [currentPage, statusFilter]);
 
     useEffect(() => { fetchTickets(); }, [fetchTickets]);
 
     const viewTicketDetails = async (id) => {
         try {
-            const token = localStorage.getItem('authToken');
-            const res = await fetch(`${API_URL}/tickets/admin/${id}`, { headers: { Authorization: `Bearer ${token}` } });
-            const data = await res.json();
-            if (data.success) { setSelectedTicket(data.data); setShowModal(true); }
+            const res = await api.get(`/tickets/admin/${id}`);
+            if (res.data.success) { setSelectedTicket(res.data.data); setShowModal(true); }
         } catch (err) { setError('Failed to fetch details'); }
     };
 
@@ -51,34 +44,24 @@ export default function AdminTickets() {
         if (!replyText.trim()) return;
         setProcessing(true);
         try {
-            const token = localStorage.getItem('authToken');
-            const res = await fetch(`${API_URL}/tickets/admin/${selectedTicket.id}/message`, {
-                method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ message: replyText })
-            });
-            const data = await res.json();
-            if (data.success) { setSelectedTicket(data.data); setReplyText(''); setSuccess('Reply sent'); }
+            const res = await api.post(`/tickets/admin/${selectedTicket.id}/message`, { message: replyText });
+            if (res.data.success) { setSelectedTicket(res.data.data); setReplyText(''); setSuccess('Reply sent'); }
         } catch (err) { setError('Failed to send reply'); }
         finally { setProcessing(false); }
     };
 
     const updateStatus = async (id, status) => {
         try {
-            const token = localStorage.getItem('authToken');
-            const res = await fetch(`${API_URL}/tickets/admin/${id}/status`, {
-                method: 'PUT', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ status })
-            });
-            const data = await res.json();
-            if (data.success) { setSuccess(`Ticket ${status.replace('_', ' ')}`); fetchTickets(); if (showModal && selectedTicket?.id === id) setSelectedTicket({ ...selectedTicket, status }); }
+            const res = await api.put(`/tickets/admin/${id}/status`, { status });
+            if (res.data.success) { setSuccess(`Ticket ${status.replace('_', ' ')}`); fetchTickets(); if (showModal && selectedTicket?.id === id) setSelectedTicket({ ...selectedTicket, status }); }
         } catch (err) { setError('Failed to update status'); }
     };
 
     const deleteTicket = async (id) => {
         if (!window.confirm('Delete this ticket?')) return;
         try {
-            const token = localStorage.getItem('authToken');
-            const res = await fetch(`${API_URL}/tickets/admin/${id}`, { method: 'DELETE', headers: { Authorization: `Bearer ${token}` } });
-            const data = await res.json();
-            if (data.success) { setSuccess('Ticket deleted'); fetchTickets(); if (showModal) setShowModal(false); }
+            const res = await api.delete(`/tickets/admin/${id}`);
+            if (res.data.success) { setSuccess('Ticket deleted'); fetchTickets(); if (showModal) setShowModal(false); }
         } catch (err) { setError('Failed to delete'); }
     };
 
@@ -110,9 +93,7 @@ export default function AdminTickets() {
 
     return (
         <div className="min-h-screen bg-cream-100 dark:bg-charcoal-900 transition-colors duration-300">
-            <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
-            <div className="lg:ml-64 min-h-screen flex flex-col transition-all duration-300">
-                <Topbar onMenuClick={() => setSidebarOpen(true)} title="Support Tickets" />
+            <div className="min-h-screen flex flex-col transition-all duration-300">
                 <main className="flex-1 p-4 lg:p-6 max-w-[1600px] w-full mx-auto">
                     {/* Header */}
                     <div className="mb-6">

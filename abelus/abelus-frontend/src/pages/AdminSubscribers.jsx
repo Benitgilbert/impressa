@@ -4,12 +4,10 @@ import {
     FaUserCheck, FaUserTimes, FaChevronLeft, FaChevronRight,
     FaPaperPlane, FaTimes, FaEye
 } from 'react-icons/fa';
-import Sidebar from '../components/Sidebar';
-import Topbar from '../components/Topbar';
+import api from '../utils/axiosInstance';
 import { NEWSLETTER_TEMPLATES } from '../data/newsletterTemplates';
 
 export default function AdminSubscribers() {
-    const [sidebarOpen, setSidebarOpen] = useState(false);
     const [subscribers, setSubscribers] = useState([]);
     const [stats, setStats] = useState({ total: 0, active: 0, inactive: 0 });
     const [loading, setLoading] = useState(true);
@@ -33,7 +31,6 @@ export default function AdminSubscribers() {
     const [templateValues, setTemplateValues] = useState({});
     const [showPreview, setShowPreview] = useState(false);
 
-    const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
 
 
     useEffect(() => { if (error || success) { const t = setTimeout(() => { setError(''); setSuccess(''); }, 3000); return () => clearTimeout(t); } }, [error, success]);
@@ -47,39 +44,31 @@ export default function AdminSubscribers() {
     const fetchSubscribers = useCallback(async () => {
         setLoading(true);
         try {
-            const token = localStorage.getItem('authToken');
             const params = new URLSearchParams({ page: currentPage, limit: 20, ...(statusFilter !== 'all' && { status: statusFilter }) });
-            const res = await fetch(`${API_URL}/newsletter/subscribers?${params}`, { headers: { Authorization: `Bearer ${token}` } });
-            const data = await res.json();
-            if (data.success) { setSubscribers(data.data); setStats(data.stats); setTotalPages(data.pagination.pages); }
-            else setError(data.message || 'Failed to fetch subscribers');
+            const res = await api.get(`/newsletter/subscribers?${params}`);
+            if (res.data.success) { setSubscribers(res.data.data); setStats(res.data.stats); setTotalPages(res.data.pagination.pages); }
+            else setError(res.data.message || 'Failed to fetch subscribers');
         } catch (err) { setError('Failed to fetch subscribers'); }
         finally { setLoading(false); }
-    }, [currentPage, statusFilter, API_URL]);
+    }, [currentPage, statusFilter]);
 
     useEffect(() => { fetchSubscribers(); }, [fetchSubscribers]);
 
     const handleDelete = async (id) => {
         if (!window.confirm('Remove this subscriber permanently?')) return;
         try {
-            const token = localStorage.getItem('authToken');
-            const res = await fetch(`${API_URL}/newsletter/subscribers/${id}`, { method: 'DELETE', headers: { Authorization: `Bearer ${token}` } });
-            const data = await res.json();
-            if (data.success) { setSuccess('Subscriber removed'); fetchSubscribers(); }
-            else setError(data.message || 'Failed to delete');
+            const res = await api.delete(`/newsletter/subscribers/${id}`);
+            if (res.data.success) { setSuccess('Subscriber removed'); fetchSubscribers(); }
+            else setError(res.data.message || 'Failed to delete');
         } catch (err) { setError('Failed to delete subscriber'); }
     };
 
     const handleExport = async () => {
         try {
-            const token = localStorage.getItem('authToken');
-            const res = await fetch(`${API_URL}/newsletter/export`, { headers: { Authorization: `Bearer ${token}` } });
-            if (res.ok) {
-                const blob = await res.blob();
-                const url = window.URL.createObjectURL(blob);
-                const a = document.createElement('a'); a.href = url; a.download = 'subscribers.csv'; a.click();
-                window.URL.revokeObjectURL(url); setSuccess('Export downloaded!');
-            }
+            const res = await api.get('/newsletter/export', { responseType: 'blob' });
+            const url = window.URL.createObjectURL(new Blob([res.data]));
+            const a = document.createElement('a'); a.href = url; a.download = 'subscribers.csv'; a.click();
+            window.URL.revokeObjectURL(url); setSuccess('Export downloaded!');
         } catch (err) { setError('Failed to export'); }
     };
 
@@ -91,23 +80,16 @@ export default function AdminSubscribers() {
     const handleSendNewsletter = async (e) => {
         e.preventDefault(); setSending(true);
         try {
-            const token = localStorage.getItem('authToken');
-            const res = await fetch(`${API_URL}/newsletter/send`, {
-                method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-                body: JSON.stringify({ subject: emailSubject, message: emailMessage, recipientType, recipientId: recipientType === 'specific' ? recipientId : undefined })
-            });
-            const data = await res.json();
-            if (data.success) { setSuccess(data.message); setShowModal(false); setEmailSubject(''); setEmailMessage(''); setRecipientType('subscribers'); setRecipientId(''); }
-            else setError(data.message || 'Failed to send newsletter');
+            const res = await api.post('/newsletter/send', { subject: emailSubject, message: emailMessage, recipientType, recipientId: recipientType === 'specific' ? recipientId : undefined });
+            if (res.data.success) { setSuccess(res.data.message); setShowModal(false); setEmailSubject(''); setEmailMessage(''); setRecipientType('subscribers'); setRecipientId(''); }
+            else setError(res.data.message || 'Failed to send newsletter');
         } catch (err) { setError('Failed to send newsletter'); }
         finally { setSending(false); }
     };
 
     return (
         <div className="min-h-screen bg-cream-100 dark:bg-charcoal-900 transition-colors duration-300">
-            <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
-            <div className="lg:ml-64 min-h-screen flex flex-col transition-all duration-300">
-                <Topbar onMenuClick={() => setSidebarOpen(true)} title="Newsletter Subscribers" />
+            <div className="min-h-screen flex flex-col transition-all duration-300">
                 <main className="flex-1 p-4 lg:p-6 max-w-[1600px] w-full mx-auto">
                     {/* Header */}
                     <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">

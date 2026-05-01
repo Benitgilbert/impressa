@@ -4,11 +4,9 @@ import {
     FaHandshake, FaLink, FaToggleOn, FaToggleOff,
     FaImage, FaArrowUp, FaArrowDown
 } from 'react-icons/fa';
-import Sidebar from '../components/Sidebar';
-import Topbar from '../components/Topbar';
+import api from '../utils/axiosInstance';
 
 export default function AdminBrandPartners() {
-    const [sidebarOpen, setSidebarOpen] = useState(false);
     const [partners, setPartners] = useState([]);
     const [loading, setLoading] = useState(true);
     const [showModal, setShowModal] = useState(false);
@@ -18,17 +16,14 @@ export default function AdminBrandPartners() {
     const [form, setForm] = useState({ name: '', logo: '', websiteUrl: '', isActive: true });
     const [logoFile, setLogoFile] = useState(null);
 
-    const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
 
     const fetchPartners = useCallback(async () => {
         try {
-            const token = localStorage.getItem('authToken');
-            const res = await fetch(`${API_URL}/brand-partners`, { headers: { Authorization: `Bearer ${token}` } });
-            const data = await res.json();
-            if (data.success) setPartners(data.data);
+            const res = await api.get('/brand-partners');
+            if (res.data.success) setPartners(res.data.data);
         } catch (err) { setError('Failed to fetch brand partners'); }
         finally { setLoading(false); }
-    }, [API_URL]);
+    }, []);
 
     useEffect(() => { fetchPartners(); }, [fetchPartners]);
     useEffect(() => { if (error || success) { const t = setTimeout(() => { setError(''); setSuccess(''); }, 3000); return () => clearTimeout(t); } }, [error, success]);
@@ -36,8 +31,6 @@ export default function AdminBrandPartners() {
     const handleSubmit = async (e) => {
         e.preventDefault();
         try {
-            const token = localStorage.getItem('authToken');
-            const url = editingPartner ? `${API_URL}/brand-partners/${editingPartner.id}` : `${API_URL}/brand-partners`;
             const formData = new FormData();
             formData.append('name', form.name);
             formData.append('websiteUrl', form.websiteUrl);
@@ -45,27 +38,23 @@ export default function AdminBrandPartners() {
             if (logoFile) formData.append('logo', logoFile);
             else if (form.logo) formData.append('logo', form.logo);
 
-            const res = await fetch(url, { method: editingPartner ? 'PUT' : 'POST', headers: { Authorization: `Bearer ${token}` }, body: formData });
-            const data = await res.json();
-            if (data.success) { setSuccess(editingPartner ? 'Brand partner updated!' : 'Brand partner created!'); fetchPartners(); closeModal(); }
-            else setError(data.message || 'Failed to save');
+            const res = editingPartner ? await api.put(`/brand-partners/${editingPartner.id}`, formData) : await api.post('/brand-partners', formData);
+            if (res.data.success) { setSuccess(editingPartner ? 'Brand partner updated!' : 'Brand partner created!'); fetchPartners(); closeModal(); }
+            else setError(res.data.message || 'Failed to save');
         } catch (err) { setError('Failed to save brand partner'); }
     };
 
     const handleDelete = async (id) => {
         if (!window.confirm('Delete this brand partner?')) return;
         try {
-            const token = localStorage.getItem('authToken');
-            const res = await fetch(`${API_URL}/brand-partners/${id}`, { method: 'DELETE', headers: { Authorization: `Bearer ${token}` } });
-            if ((await res.json()).success) { setSuccess('Brand partner deleted!'); fetchPartners(); }
+            const res = await api.delete(`/brand-partners/${id}`);
+            if (res.data.success) { setSuccess('Brand partner deleted!'); fetchPartners(); }
         } catch (err) { setError('Failed to delete'); }
     };
 
-    const handleToggle = async (id) => {
         try {
-            const token = localStorage.getItem('authToken');
-            const res = await fetch(`${API_URL}/brand-partners/${id}/toggle`, { method: 'PATCH', headers: { Authorization: `Bearer ${token}` } });
-            if ((await res.json()).success) fetchPartners();
+            const res = await api.patch(`/brand-partners/${id}/toggle`);
+            if (res.data.success) fetchPartners();
         } catch (err) { setError('Failed to toggle'); }
     };
 
@@ -75,12 +64,8 @@ export default function AdminBrandPartners() {
         const newPartners = [...partners];
         [newPartners[index], newPartners[newIndex]] = [newPartners[newIndex], newPartners[index]];
         try {
-            const token = localStorage.getItem('authToken');
-            await fetch(`${API_URL}/brand-partners/reorder`, {
-                method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-                body: JSON.stringify({ partners: newPartners.map((p, idx) => ({ id: p.id, order: idx })) })
-            });
-            fetchPartners();
+            const res = await api.post('/brand-partners/reorder', { partners: newPartners.map((p, idx) => ({ id: p.id, order: idx })) });
+            if (res.data.success) fetchPartners();
         } catch (err) { setError('Failed to reorder'); }
     };
 
@@ -100,9 +85,7 @@ export default function AdminBrandPartners() {
 
     return (
         <div className="min-h-screen bg-cream-100 dark:bg-charcoal-900 transition-colors duration-300">
-            <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
-            <div className="lg:ml-64 min-h-screen flex flex-col transition-all duration-300">
-                <Topbar onMenuClick={() => setSidebarOpen(true)} title="Brand Partners" />
+            <div className="min-h-screen flex flex-col transition-all duration-300">
                 <main className="flex-1 p-4 lg:p-6 max-w-[1600px] w-full mx-auto">
                     {/* Header */}
                     <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">

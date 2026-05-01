@@ -1,11 +1,8 @@
 import { useState, useEffect } from "react";
-import Sidebar from "../components/Sidebar";
-import Topbar from "../components/Topbar";
-import axios from "../utils/axiosInstance";
+import api from "../utils/axiosInstance";
 import { FaTrash, FaEdit, FaPlus, FaTags, FaTimes } from "react-icons/fa";
 
 function AdminAttributes() {
-    const [sidebarOpen, setSidebarOpen] = useState(false);
     const [attributes, setAttributes] = useState([]);
     const [loading, setLoading] = useState(true);
     const [showModal, setShowModal] = useState(false);
@@ -17,7 +14,7 @@ function AdminAttributes() {
 
     const fetchAttributes = async () => {
         try {
-            const { data } = await axios.get("/attributes");
+            const { data } = await api.get("/attributes");
             setAttributes(data);
         } catch (error) {
             console.error("Error fetching attributes:", error);
@@ -29,7 +26,7 @@ function AdminAttributes() {
     const handleDelete = async (id) => {
         if (window.confirm("Are you sure? This will remove this attribute from all products.")) {
             try {
-                await axios.delete(`/attributes/${id}`);
+                await api.delete(`/attributes/${id}`);
                 fetchAttributes();
             } catch (error) {
                 console.error("Error deleting attribute:", error);
@@ -41,9 +38,9 @@ function AdminAttributes() {
         e.preventDefault();
         try {
             if (editingId) {
-                await axios.put(`/attributes/${editingId}`, formData);
+                await api.put(`/attributes/${editingId}`, formData);
             } else {
-                await axios.post("/attributes", formData);
+                await api.post("/attributes", formData);
             }
             setShowModal(false);
             setFormData({ name: "", type: "select", values: [] });
@@ -75,26 +72,21 @@ function AdminAttributes() {
     };
 
     return (
-        <div className="min-h-screen bg-cream-100 dark:bg-charcoal-900 transition-colors duration-300">
-            <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
-
-            <div className="lg:ml-64 min-h-screen flex flex-col transition-all duration-300">
-                <Topbar onMenuClick={() => setSidebarOpen(true)} title="Attributes" />
-
-                <main className="flex-1 p-4 lg:p-6 max-w-[1600px] w-full mx-auto">
-                    {/* Page Header */}
-                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
-                        <div>
-                            <h1 className="text-2xl font-bold text-charcoal-800 dark:text-white">Product Attributes</h1>
-                            <p className="text-charcoal-500 dark:text-charcoal-400 text-sm mt-1">Manage product variations like size, color, etc.</p>
-                        </div>
-                        <button
-                            onClick={() => { setEditingId(null); setFormData({ name: "", type: "select", values: [] }); setShowModal(true); }}
-                            className="flex items-center gap-2 px-4 py-2.5 bg-terracotta-500 hover:bg-terracotta-600 text-white rounded-xl font-medium transition-all"
-                        >
-                            <FaPlus /> Add Attribute
-                        </button>
+        <div className="min-h-screen flex flex-col transition-all duration-300">
+            <main className="flex-1 p-4 lg:p-6 max-w-[1600px] w-full mx-auto">
+                {/* Header */}
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
+                    <div>
+                        <h1 className="text-2xl font-bold text-charcoal-800 dark:text-white">Product Attributes</h1>
+                        <p className="text-charcoal-500 dark:text-charcoal-400 text-sm mt-1">Manage sizes, colors and other variations</p>
                     </div>
+                    <button
+                        onClick={() => { setEditingId(null); setFormData({ name: "", type: "select", values: [] }); setShowModal(true); }}
+                        className="flex items-center gap-2 px-4 py-2.5 bg-terracotta-500 hover:bg-terracotta-600 text-white rounded-xl font-medium transition-all"
+                    >
+                        <FaPlus /> Add Attribute
+                    </button>
+                </div>
 
                     {/* Table */}
                     <div className="bg-white dark:bg-charcoal-800 rounded-2xl shadow-sm border border-cream-200 dark:border-charcoal-700 overflow-hidden">

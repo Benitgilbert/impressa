@@ -4,11 +4,9 @@ import {
     FaClock, FaCheckCircle, FaTimesCircle, FaFlag,
     FaChevronLeft, FaChevronRight
 } from 'react-icons/fa';
-import Sidebar from '../components/Sidebar';
-import Topbar from '../components/Topbar';
+import api from '../utils/axiosInstance';
 
 export default function AdminReviews() {
-    const [sidebarOpen, setSidebarOpen] = useState(false);
     const [reviews, setReviews] = useState([]);
     const [stats, setStats] = useState({ total: 0, pending: 0, approved: 0, rejected: 0, reported: 0, averageRating: 0 });
     const [loading, setLoading] = useState(true);
@@ -22,39 +20,32 @@ export default function AdminReviews() {
     const [showModal, setShowModal] = useState(false);
     const [processing, setProcessing] = useState(false);
 
-    const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
 
 
     const fetchReviews = useCallback(async () => {
         setLoading(true);
         try {
-            const token = localStorage.getItem('authToken');
             const params = new URLSearchParams({ page: currentPage, limit: 15, ...(statusFilter !== 'all' && { status: statusFilter }), ...(ratingFilter && { rating: ratingFilter }) });
-            const res = await fetch(`${API_URL}/reviews-admin?${params}`, { headers: { Authorization: `Bearer ${token}` } });
-            const data = await res.json();
-            if (data.success) { setReviews(data.data); setStats(data.stats); setTotalPages(data.pagination.pages); }
+            const res = await api.get(`/reviews-admin?${params}`);
+            if (res.data.success) { setReviews(res.data.data); setStats(res.data.stats); setTotalPages(res.data.pagination.pages); }
         } catch (err) { setError('Failed to fetch reviews'); }
         finally { setLoading(false); }
-    }, [currentPage, statusFilter, ratingFilter, API_URL]);
+    }, [currentPage, statusFilter, ratingFilter]);
 
     useEffect(() => { fetchReviews(); }, [fetchReviews]);
 
     const viewReviewDetails = async (id) => {
         try {
-            const token = localStorage.getItem('authToken');
-            const res = await fetch(`${API_URL}/reviews-admin/${id}`, { headers: { Authorization: `Bearer ${token}` } });
-            const data = await res.json();
-            if (data.success) { setSelectedReview(data.data); setShowModal(true); }
+            const res = await api.get(`/reviews-admin/${id}`);
+            if (res.data.success) { setSelectedReview(res.data.data); setShowModal(true); }
         } catch (err) { setError('Failed to fetch review details'); }
     };
 
     const approveReview = async (id) => {
         setProcessing(true);
         try {
-            const token = localStorage.getItem('authToken');
-            const res = await fetch(`${API_URL}/reviews-admin/${id}/approve`, { method: 'PUT', headers: { Authorization: `Bearer ${token}` } });
-            const data = await res.json();
-            if (data.success) { setSuccess('Review approved'); fetchReviews(); if (showModal) setShowModal(false); }
+            const res = await api.put(`/reviews-admin/${id}/approve`);
+            if (res.data.success) { setSuccess('Review approved'); fetchReviews(); if (showModal) setShowModal(false); }
         } catch (err) { setError('Failed to approve'); }
         finally { setProcessing(false); }
     };
@@ -62,10 +53,8 @@ export default function AdminReviews() {
     const rejectReview = async (id, reason) => {
         setProcessing(true);
         try {
-            const token = localStorage.getItem('authToken');
-            const res = await fetch(`${API_URL}/reviews-admin/${id}/reject`, { method: 'PUT', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ reason }) });
-            const data = await res.json();
-            if (data.success) { setSuccess('Review rejected'); fetchReviews(); if (showModal) setShowModal(false); }
+            const res = await api.put(`/reviews-admin/${id}/reject`, { reason });
+            if (res.data.success) { setSuccess('Review rejected'); fetchReviews(); if (showModal) setShowModal(false); }
         } catch (err) { setError('Failed to reject'); }
         finally { setProcessing(false); }
     };
@@ -73,10 +62,8 @@ export default function AdminReviews() {
     const deleteReview = async (id) => {
         if (!window.confirm('Delete this review permanently?')) return;
         try {
-            const token = localStorage.getItem('authToken');
-            const res = await fetch(`${API_URL}/reviews-admin/${id}`, { method: 'DELETE', headers: { Authorization: `Bearer ${token}` } });
-            const data = await res.json();
-            if (data.success) { setSuccess('Review deleted'); fetchReviews(); if (showModal) setShowModal(false); }
+            const res = await api.delete(`/reviews-admin/${id}`);
+            if (res.data.success) { setSuccess('Review deleted'); fetchReviews(); if (showModal) setShowModal(false); }
         } catch (err) { setError('Failed to delete'); }
     };
 
@@ -84,10 +71,8 @@ export default function AdminReviews() {
         if (!text) return;
         setProcessing(true);
         try {
-            const token = localStorage.getItem('authToken');
-            const res = await fetch(`${API_URL}/reviews-admin/${id}/reply`, { method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ text }) });
-            const data = await res.json();
-            if (data.success) { setSuccess('Reply added'); setSelectedReview(data.data); }
+            const res = await api.post(`/reviews-admin/${id}/reply`, { text });
+            if (res.data.success) { setSuccess('Reply added'); setSelectedReview(res.data.data); }
         } catch (err) { setError('Failed to reply'); }
         finally { setProcessing(false); }
     };
@@ -112,9 +97,7 @@ export default function AdminReviews() {
 
     return (
         <div className="min-h-screen bg-cream-100 dark:bg-charcoal-900 transition-colors duration-300">
-            <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
-            <div className="lg:ml-64 min-h-screen flex flex-col transition-all duration-300">
-                <Topbar onMenuClick={() => setSidebarOpen(true)} title="Reviews" />
+            <div className="min-h-screen flex flex-col transition-all duration-300">
                 <main className="flex-1 p-4 lg:p-6 max-w-[1600px] w-full mx-auto">
                     {/* Header with Avg Rating */}
                     <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">

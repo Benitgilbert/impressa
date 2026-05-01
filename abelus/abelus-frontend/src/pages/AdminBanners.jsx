@@ -3,11 +3,9 @@ import {
     FaPlus, FaEdit, FaTrash, FaTimes,
     FaDesktop, FaCalendarAlt, FaLink, FaToggleOn, FaToggleOff
 } from 'react-icons/fa';
-import Sidebar from '../components/Sidebar';
-import Topbar from '../components/Topbar';
+import api from '../utils/axiosInstance';
 
 export default function AdminBanners() {
-    const [sidebarOpen, setSidebarOpen] = useState(false);
     const [banners, setBanners] = useState([]);
     const [loading, setLoading] = useState(true);
     const [showModal, setShowModal] = useState(false);
@@ -21,8 +19,7 @@ export default function AdminBanners() {
         backgroundImage: '', gradientFrom: '#8b5cf6', gradientTo: '#d946ef', startDate: '', endDate: '', position: 'hero', isActive: true
     });
 
-    const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
-    const BASE_URL = API_URL.replace(/\/api$/, '');
+    const BASE_URL = (process.env.REACT_APP_API_URL || '').replace(/\/api$/, '');
 
     const presetGradients = [
         { from: '#8b5cf6', to: '#d946ef', label: 'Violet → Fuchsia' },
@@ -35,13 +32,11 @@ export default function AdminBanners() {
 
     const fetchBanners = useCallback(async () => {
         try {
-            const token = localStorage.getItem('authToken');
-            const res = await fetch(`${API_URL}/banners`, { headers: { Authorization: `Bearer ${token}` } });
-            const data = await res.json();
-            if (data.success) setBanners(data.data);
+            const res = await api.get('/banners');
+            if (res.data.success) setBanners(res.data.data);
         } catch (err) { setError('Failed to fetch banners'); }
         finally { setLoading(false); }
-    }, [API_URL]);
+    }, []);
 
     useEffect(() => { fetchBanners(); }, [fetchBanners]);
 
@@ -67,10 +62,8 @@ export default function AdminBanners() {
         const formData = new FormData();
         formData.append('image', file);
         try {
-            const token = localStorage.getItem('authToken');
-            const res = await fetch(`${API_URL}/upload`, { method: 'POST', headers: { Authorization: `Bearer ${token}` }, body: formData });
-            const data = await res.json();
-            if (data.success) setForm({ ...form, backgroundImage: `${BASE_URL}${data.data.url}` });
+            const res = await api.post('/upload', formData, { headers: { 'Content-Type': 'multipart/form-data' } });
+            if (res.data.success) setForm({ ...form, backgroundImage: `${BASE_URL}${res.data.data.url}` });
             else setError('Failed to upload image');
         } catch (err) { setError('Error uploading image'); }
         finally { setUploading(false); }
@@ -79,40 +72,30 @@ export default function AdminBanners() {
     const handleSubmit = async (e) => {
         e.preventDefault();
         try {
-            const token = localStorage.getItem('authToken');
-            const url = editingBanner ? `${API_URL}/banners/${editingBanner.id}` : `${API_URL}/banners`;
             const payload = {
                 ...form,
                 startDate: form.startDate ? new Date(form.startDate).toISOString() : null,
                 endDate: form.endDate ? new Date(form.endDate).toISOString() : null
             };
-            const res = await fetch(url, {
-                method: editingBanner ? 'PUT' : 'POST',
-                headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-                body: JSON.stringify(payload)
-            });
-            const data = await res.json();
-            if (data.success) { setSuccess(editingBanner ? 'Banner updated!' : 'Banner created!'); fetchBanners(); closeModal(); }
-            else setError(data.message || 'Failed to save banner');
+            const res = editingBanner ? await api.put(`/banners/${editingBanner.id}`, payload) : await api.post('/banners', payload);
+            if (res.data.success) { setSuccess(editingBanner ? 'Banner updated!' : 'Banner created!'); fetchBanners(); closeModal(); }
+            else setError(res.data.message || 'Failed to save banner');
         } catch (err) { setError('Failed to save banner'); }
     };
 
     const handleDelete = async (id) => {
         if (!window.confirm('Delete this banner?')) return;
         try {
-            const token = localStorage.getItem('authToken');
-            const res = await fetch(`${API_URL}/banners/${id}`, { method: 'DELETE', headers: { Authorization: `Bearer ${token}` } });
-            const data = await res.json();
-            if (data.success) { setSuccess('Banner deleted!'); fetchBanners(); }
-            else setError(data.message);
+            const res = await api.delete(`/banners/${id}`);
+            if (res.data.success) { setSuccess('Banner deleted!'); fetchBanners(); }
+            else setError(res.data.message);
         } catch (err) { setError('Failed to delete'); }
     };
 
     const handleToggle = async (id) => {
         try {
-            const token = localStorage.getItem('authToken');
-            const res = await fetch(`${API_URL}/banners/${id}/toggle`, { method: 'PATCH', headers: { Authorization: `Bearer ${token}` } });
-            if ((await res.json()).success) fetchBanners();
+            const res = await api.patch(`/banners/${id}/toggle`);
+            if (res.data.success) fetchBanners();
         } catch (err) { setError('Failed to toggle'); }
     };
 
@@ -138,9 +121,7 @@ export default function AdminBanners() {
 
     return (
         <div className="min-h-screen bg-cream-100 dark:bg-charcoal-900 transition-colors duration-300">
-            <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
-            <div className="lg:ml-64 min-h-screen flex flex-col transition-all duration-300">
-                <Topbar onMenuClick={() => setSidebarOpen(true)} title="Banners" />
+            <div className="min-h-screen flex flex-col transition-all duration-300">
                 <main className="flex-1 p-4 lg:p-6 max-w-[1600px] w-full mx-auto">
                     {/* Header */}
                     <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">

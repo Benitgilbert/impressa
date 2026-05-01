@@ -1,13 +1,11 @@
-import { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { FaArrowLeft, FaSave, FaImage } from "react-icons/fa";
-import toast from "react-hot-toast";
+import { FaSave, FaTimes, FaImage } from "react-icons/fa";
 import api from "../../utils/axiosInstance";
-import Sidebar from "../../components/Sidebar";
-import Topbar from "../../components/Topbar";
 import assetUrl from "../../utils/assetUrl";
+import toast from "react-hot-toast";
 
-export default function AdminBlogEditor() {
+const AdminBlogEditor = () => {
     const { id } = useParams();
     const navigate = useNavigate();
     const isEditMode = !!id;
@@ -18,41 +16,41 @@ export default function AdminBlogEditor() {
         content: "",
         author: "",
         category: "",
-        image: ""
+        image: "",
+        status: "draft"
     });
     const [imageFile, setImageFile] = useState(null);
     const [imagePreview, setImagePreview] = useState("");
     const [loading, setLoading] = useState(false);
     const [fetchLoading, setFetchLoading] = useState(isEditMode);
-    const [sidebarOpen, setSidebarOpen] = useState(false);
-
-    const fetchBlog = useCallback(async () => {
-        try {
-            const { data } = await api.get(`/blogs/${id}`);
-            setFormData({
-                title: data.title,
-                excerpt: data.excerpt,
-                content: data.content,
-                author: data.author,
-                category: data.category,
-                image: data.image
-            });
-            if (data.image) {
-                setImagePreview(assetUrl(data.image));
-            }
-        } catch (err) {
-            toast.error("Failed to load blog post");
-            navigate("/admin/blogs");
-        } finally {
-            setFetchLoading(false);
-        }
-    }, [id, navigate]);
 
     useEffect(() => {
         if (isEditMode) {
+            const fetchBlog = async () => {
+                try {
+                    const { data } = await api.get(`/blogs/${id}`);
+                    setFormData({
+                        title: data.title || "",
+                        excerpt: data.excerpt || "",
+                        content: data.content || "",
+                        author: data.author || "",
+                        category: data.category || "",
+                        image: data.image || "",
+                        status: data.status || "draft"
+                    });
+                    if (data.image) {
+                        setImagePreview(assetUrl(data.image));
+                    }
+                } catch (err) {
+                    toast.error("Failed to load blog post");
+                    navigate("/admin/blogs");
+                } finally {
+                    setFetchLoading(false);
+                }
+            };
             fetchBlog();
         }
-    }, [isEditMode, fetchBlog]);
+    }, [id, isEditMode, navigate]);
 
     const handleInputChange = (e) => {
         const { name, value } = e.target;
@@ -80,125 +78,148 @@ export default function AdminBlogEditor() {
                 const uploadRes = await api.post("/upload", uploadData, {
                     headers: { "Content-Type": "multipart/form-data" }
                 });
-                imageUrl = uploadRes.data.data?.url || uploadRes.data.url || uploadRes.data.data?.filename; // Handle nested data structure
+                imageUrl = uploadRes.data.data?.url || uploadRes.data.url || uploadRes.data.data?.filename;
             }
 
             const payload = { ...formData, image: imageUrl };
 
             if (isEditMode) {
                 await api.put(`/blogs/${id}`, payload);
+                toast.success("Blog post updated successfully!");
             } else {
                 await api.post("/blogs", payload);
+                toast.success("Blog post created successfully!");
             }
 
             navigate("/admin/blogs");
         } catch (err) {
-            // Error handled by UI, no console log needed in production
-            toast.error("Failed to save blog post. Please try again.");
+            toast.error("Failed to save blog post");
         } finally {
             setLoading(false);
         }
     };
 
     if (fetchLoading) {
-        return <div className="min-h-screen flex items-center justify-center bg-cream-100 dark:bg-charcoal-900 text-charcoal-500">Loading editor...</div>;
+        return (
+            <div className="min-h-screen bg-cream-100 dark:bg-charcoal-900 flex items-center justify-center">
+                <div className="w-8 h-8 border-2 border-terracotta-500 border-t-transparent rounded-full animate-spin"></div>
+            </div>
+        );
     }
 
     return (
         <div className="min-h-screen bg-cream-100 dark:bg-charcoal-900 transition-colors duration-300">
-            <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
-
-            <div className="lg:ml-64 min-h-screen flex flex-col transition-all duration-300">
-                <Topbar onMenuClick={() => setSidebarOpen(true)} title={isEditMode ? "Edit Post" : "New Post"} />
-
-                <main className="flex-1 p-4 lg:p-6 max-w-[1200px] w-full mx-auto">
-                    <form onSubmit={handleSubmit} className="space-y-6">
-                        {/* Header Actions */}
-                        <div className="flex items-center justify-between mb-6">
+            <div className="min-h-screen flex flex-col transition-all duration-300">
+                <main className="flex-1 p-4 lg:p-6 max-w-[1400px] w-full mx-auto">
+                    {/* Header */}
+                    <div className="mb-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                        <div>
+                            <h1 className="text-2xl font-bold text-charcoal-800 dark:text-white">
+                                {isEditMode ? "Edit Blog Post" : "Create New Blog Post"}
+                            </h1>
+                            <p className="text-charcoal-500 dark:text-charcoal-400 text-sm mt-1">
+                                {isEditMode ? "Update your existing blog post content" : "Draft a new article for the platform"}
+                            </p>
+                        </div>
+                        <div className="flex items-center gap-3">
                             <button
-                                type="button"
                                 onClick={() => navigate("/admin/blogs")}
-                                className="flex items-center gap-2 text-charcoal-500 hover:text-terracotta-500 transition-colors font-medium"
+                                className="px-4 py-2 text-charcoal-600 dark:text-charcoal-400 hover:text-terracotta-500 font-medium transition-colors flex items-center gap-2"
                             >
-                                <FaArrowLeft /> Back to Blogs
+                                <FaTimes /> Cancel
                             </button>
                             <button
-                                type="submit"
+                                onClick={handleSubmit}
                                 disabled={loading}
-                                className="flex items-center gap-2 px-8 py-3 bg-terracotta-500 hover:bg-terracotta-600 text-white font-bold rounded-xl shadow-lg shadow-terracotta-500/20 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                                className="flex items-center gap-2 px-6 py-2.5 bg-terracotta-500 hover:bg-terracotta-600 text-white font-bold rounded-xl transition-all shadow-lg shadow-terracotta-500/20 disabled:opacity-50"
                             >
                                 {loading ? <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div> : <FaSave />}
                                 {isEditMode ? "Update Post" : "Publish Post"}
                             </button>
                         </div>
+                    </div>
 
-                        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                            {/* Main Content */}
-                            <div className="lg:col-span-2 space-y-6">
-                                <div className="bg-white dark:bg-charcoal-800 p-6 rounded-2xl shadow-sm border border-cream-200 dark:border-charcoal-700 space-y-4">
+                    {/* Editor Form */}
+                    <form onSubmit={handleSubmit} className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                        {/* Main Content Area */}
+                        <div className="lg:col-span-2 space-y-6">
+                            <div className="bg-white dark:bg-charcoal-800 rounded-2xl p-6 shadow-sm border border-cream-200 dark:border-charcoal-700">
+                                <div className="space-y-6">
                                     <div>
-                                        <label className="block text-sm font-bold text-charcoal-700 dark:text-charcoal-300 mb-2">Title</label>
+                                        <label className="block text-xs font-bold text-charcoal-600 dark:text-charcoal-300 uppercase tracking-wider mb-2">Post Title</label>
                                         <input
                                             type="text"
                                             name="title"
+                                            required
                                             value={formData.title}
                                             onChange={handleInputChange}
-                                            required
-                                            className="w-full px-4 py-3 rounded-xl border border-cream-200 dark:border-charcoal-700 bg-cream-50 dark:bg-charcoal-900 text-charcoal-800 dark:text-white focus:border-terracotta-500 outline-none transition-colors font-bold text-lg"
-                                            placeholder="Enter post title"
+                                            className="w-full px-4 py-3 bg-cream-100 dark:bg-charcoal-700 border border-transparent focus:border-terracotta-500 rounded-xl text-charcoal-800 dark:text-white outline-none transition-colors font-bold text-lg"
+                                            placeholder="Enter a compelling title..."
                                         />
                                     </div>
                                     <div>
-                                        <label className="block text-sm font-bold text-charcoal-700 dark:text-charcoal-300 mb-2">Excerpt / Subtitle</label>
+                                        <label className="block text-xs font-bold text-charcoal-600 dark:text-charcoal-300 uppercase tracking-wider mb-2">Excerpt / Summary</label>
                                         <textarea
                                             name="excerpt"
+                                            required
                                             value={formData.excerpt}
                                             onChange={handleInputChange}
-                                            rows="3"
-                                            required
-                                            className="w-full px-4 py-3 rounded-xl border border-cream-200 dark:border-charcoal-700 bg-cream-50 dark:bg-charcoal-900 text-charcoal-800 dark:text-white focus:border-terracotta-500 outline-none transition-colors resize-none"
-                                            placeholder="Short summary for preview cards..."
-                                        ></textarea>
+                                            className="w-full px-4 py-3 bg-cream-100 dark:bg-charcoal-700 border border-transparent focus:border-terracotta-500 rounded-xl text-charcoal-800 dark:text-white outline-none transition-colors h-24 resize-none"
+                                            placeholder="A short summary for search results and cards..."
+                                        />
                                     </div>
                                     <div>
-                                        <label className="block text-sm font-bold text-charcoal-700 dark:text-charcoal-300 mb-2">Content</label>
+                                        <label className="block text-xs font-bold text-charcoal-600 dark:text-charcoal-300 uppercase tracking-wider mb-2">Content</label>
                                         <textarea
                                             name="content"
+                                            required
                                             value={formData.content}
                                             onChange={handleInputChange}
-                                            rows="15"
-                                            required
-                                            className="w-full px-4 py-3 rounded-xl border border-cream-200 dark:border-charcoal-700 bg-cream-50 dark:bg-charcoal-900 text-charcoal-800 dark:text-white focus:border-terracotta-500 outline-none transition-colors font-mono text-sm leading-relaxed"
-                                            placeholder="Write your article content here (Markdown or HTML supported if rendered)..."
-                                        ></textarea>
+                                            className="w-full px-4 py-3 bg-cream-100 dark:bg-charcoal-700 border border-transparent focus:border-terracotta-500 rounded-xl text-charcoal-800 dark:text-white outline-none transition-colors min-h-[500px] resize-y font-mono text-sm leading-relaxed"
+                                            placeholder="Write your article content here..."
+                                        />
                                     </div>
                                 </div>
                             </div>
+                        </div>
 
-                            {/* Sidebar Settings */}
-                            <div className="space-y-6">
-                                <div className="bg-white dark:bg-charcoal-800 p-6 rounded-2xl shadow-sm border border-cream-200 dark:border-charcoal-700 space-y-4">
-                                    <h3 className="font-bold text-charcoal-800 dark:text-white border-b border-cream-100 dark:border-charcoal-700 pb-2">Publishing</h3>
+                        {/* Sidebar Options */}
+                        <div className="space-y-6">
+                            <div className="bg-white dark:bg-charcoal-800 rounded-2xl p-6 shadow-sm border border-cream-200 dark:border-charcoal-700">
+                                <h3 className="font-bold text-charcoal-800 dark:text-white mb-4 border-b border-cream-100 dark:border-charcoal-700 pb-2">Publishing Settings</h3>
+                                <div className="space-y-4">
                                     <div>
-                                        <label className="block text-sm font-bold text-charcoal-700 dark:text-charcoal-300 mb-2">Author</label>
+                                        <label className="block text-xs font-bold text-charcoal-600 dark:text-charcoal-300 uppercase tracking-wider mb-2">Status</label>
+                                        <select
+                                            name="status"
+                                            value={formData.status}
+                                            onChange={handleInputChange}
+                                            className="w-full px-4 py-2.5 bg-cream-100 dark:bg-charcoal-700 border border-transparent focus:border-terracotta-500 rounded-xl text-sm text-charcoal-800 dark:text-white outline-none cursor-pointer"
+                                        >
+                                            <option value="draft">Draft</option>
+                                            <option value="published">Published</option>
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-bold text-charcoal-600 dark:text-charcoal-300 uppercase tracking-wider mb-2">Author Name</label>
                                         <input
                                             type="text"
                                             name="author"
+                                            required
                                             value={formData.author}
                                             onChange={handleInputChange}
-                                            required
-                                            className="w-full px-4 py-2.5 rounded-xl border border-cream-200 dark:border-charcoal-700 bg-cream-50 dark:bg-charcoal-900 text-charcoal-800 dark:text-white focus:border-terracotta-500 outline-none transition-colors"
+                                            className="w-full px-4 py-2.5 bg-cream-100 dark:bg-charcoal-700 border border-transparent focus:border-terracotta-500 rounded-xl text-sm text-charcoal-800 dark:text-white outline-none"
                                             placeholder="Author Name"
                                         />
                                     </div>
                                     <div>
-                                        <label className="block text-sm font-bold text-charcoal-700 dark:text-charcoal-300 mb-2">Category</label>
+                                        <label className="block text-xs font-bold text-charcoal-600 dark:text-charcoal-300 uppercase tracking-wider mb-2">Category</label>
                                         <select
                                             name="category"
                                             value={formData.category}
                                             onChange={handleInputChange}
                                             required
-                                            className="w-full px-4 py-2.5 rounded-xl border border-cream-200 dark:border-charcoal-700 bg-cream-50 dark:bg-charcoal-900 text-charcoal-800 dark:text-white focus:border-terracotta-500 outline-none transition-colors appearance-none cursor-pointer"
+                                            className="w-full px-4 py-2.5 bg-cream-100 dark:bg-charcoal-700 border border-transparent focus:border-terracotta-500 rounded-xl text-sm text-charcoal-800 dark:text-white outline-none cursor-pointer"
                                         >
                                             <option value="" disabled>Select a category</option>
                                             <option value="Seller Guides">Seller Guides</option>
@@ -210,37 +231,37 @@ export default function AdminBlogEditor() {
                                         </select>
                                     </div>
                                 </div>
+                            </div>
 
-                                <div className="bg-white dark:bg-charcoal-800 p-6 rounded-2xl shadow-sm border border-cream-200 dark:border-charcoal-700 space-y-4">
-                                    <h3 className="font-bold text-charcoal-800 dark:text-white border-b border-cream-100 dark:border-charcoal-700 pb-2">Featured Image</h3>
-                                    <div className="space-y-4">
-                                        <div className="aspect-video rounded-xl overflow-hidden bg-cream-100 dark:bg-charcoal-900 border-2 border-dashed border-charcoal-200 dark:border-charcoal-600 flex items-center justify-center relative group">
-                                            {imagePreview ? (
-                                                <>
-                                                    <img src={imagePreview} alt="Preview" className="w-full h-full object-cover" />
-                                                    <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                                                        <span className="text-white font-medium">Change Image</span>
-                                                    </div>
-                                                </>
-                                            ) : (
-                                                <div className="text-center p-4">
-                                                    <FaImage className="mx-auto text-3xl text-charcoal-300 mb-2" />
-                                                    <span className="text-sm text-charcoal-400">No image selected</span>
+                            <div className="bg-white dark:bg-charcoal-800 rounded-2xl p-6 shadow-sm border border-cream-200 dark:border-charcoal-700">
+                                <h3 className="font-bold text-charcoal-800 dark:text-white mb-4 border-b border-cream-100 dark:border-charcoal-700 pb-2">Featured Image</h3>
+                                <div className="space-y-4">
+                                    <div className="aspect-video rounded-xl overflow-hidden bg-cream-100 dark:bg-charcoal-900 border-2 border-dashed border-charcoal-200 dark:border-charcoal-600 flex items-center justify-center relative group">
+                                        {imagePreview ? (
+                                            <>
+                                                <img src={imagePreview} alt="Preview" className="w-full h-full object-cover" />
+                                                <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                                                    <span className="text-white text-xs font-bold uppercase tracking-widest">Change Image</span>
                                                 </div>
-                                            )}
-                                            <input
-                                                type="file"
-                                                accept="image/*"
-                                                onChange={handleImageChange}
-                                                className="absolute inset-0 opacity-0 cursor-pointer"
-                                            />
-                                        </div>
-                                        {imageFile && (
-                                            <p className="text-xs text-charcoal-500 text-center truncate px-2">
-                                                Selected: {imageFile.name}
-                                            </p>
+                                            </>
+                                        ) : (
+                                            <div className="text-center p-4">
+                                                <FaImage className="mx-auto text-3xl text-charcoal-300 mb-2" />
+                                                <span className="text-xs font-bold text-charcoal-400 uppercase tracking-wider">Upload Image</span>
+                                            </div>
                                         )}
+                                        <input
+                                            type="file"
+                                            accept="image/*"
+                                            onChange={handleImageChange}
+                                            className="absolute inset-0 opacity-0 cursor-pointer"
+                                        />
                                     </div>
+                                    {imageFile && (
+                                        <p className="text-[10px] text-charcoal-500 text-center truncate px-2 italic">
+                                            {imageFile.name}
+                                        </p>
+                                    )}
                                 </div>
                             </div>
                         </div>
@@ -249,4 +270,6 @@ export default function AdminBlogEditor() {
             </div>
         </div>
     );
-}
+};
+
+export default AdminBlogEditor;

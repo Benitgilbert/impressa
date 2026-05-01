@@ -1,466 +1,288 @@
-import React, { useState, useEffect, useCallback } from "react";
-import {
-    FaGift, FaPlus, FaEdit, FaTrash, FaSave, FaTimes,
-    FaEye, FaEyeSlash, FaPalette, FaTag, FaCalendarAlt
-} from "react-icons/fa";
-import Sidebar from "../../components/Sidebar";
-import Topbar from "../../components/Topbar";
-import { getAdminGiftCardProducts, createGiftCardProduct, updateGiftCardProduct, deleteGiftCardProduct } from "../../services/api";
-import { useToast } from "../../context/ToastContext";
-
-// Gradient presets for easy selection
-const GRADIENT_PRESETS = [
-    { name: "Purple", value: "from-violet-500 to-indigo-600" },
-    { name: "Orange", value: "from-terracotta-500 to-amber-500" },
-    { name: "Dark", value: "from-charcoal-700 to-charcoal-900" },
-    { name: "Teal", value: "from-emerald-500 to-teal-600" },
-    { name: "Pink", value: "from-pink-500 to-rose-600" },
-    { name: "Blue", value: "from-blue-500 to-cyan-500" },
-    { name: "Gold", value: "from-amber-400 to-yellow-500" },
-    { name: "Red", value: "from-red-500 to-rose-600" },
-];
+import React, { useState, useEffect } from "react";
+import { FaPlus, FaEdit, FaTrash, FaSpinner, FaTimes, FaSearch, FaGift } from "react-icons/fa";
+import api from "../../utils/axiosInstance";
+import toast from "react-hot-toast";
 
 const AdminGiftCardProducts = () => {
-    const [sidebarOpen, setSidebarOpen] = useState(false);
     const [products, setProducts] = useState([]);
     const [loading, setLoading] = useState(true);
-    const { showSuccess, showError } = useToast();
-
-    // Modal states
+    const [searchTerm, setSearchTerm] = useState("");
+    
     const [showModal, setShowModal] = useState(false);
-    const [showDeleteModal, setShowDeleteModal] = useState(false);
     const [editingProduct, setEditingProduct] = useState(null);
-    const [isSubmitting, setIsSubmitting] = useState(false);
-
-    // Form state
     const [formData, setFormData] = useState({
-        label: "",
-        amount: "",
-        color: "from-violet-500 to-indigo-600",
-        isCustom: false,
-        isActive: true,
-        expiryDays: 365,
+        name: "",
+        price: "",
+        value: "",
+        description: "",
+        isActive: true
     });
-
-    const fetchProducts = useCallback(async () => {
-        setLoading(true);
-        try {
-            const response = await getAdminGiftCardProducts();
-            setProducts(response.data || []);
-        } catch (error) {
-            console.error("Failed to fetch products:", error);
-            showError("Failed to load gift card products");
-        } finally {
-            setLoading(false);
-        }
-    }, [showError]);
 
     useEffect(() => {
         fetchProducts();
-    }, [fetchProducts]);
+    }, []);
 
-    // OPEN CREATE MODAL
-    const openCreateModal = () => {
-        setEditingProduct(null);
-        setFormData({
-            label: "",
-            amount: "",
-            color: "from-violet-500 to-indigo-600",
-            isCustom: false,
-            isActive: true,
-            expiryDays: 365,
-        });
+    const fetchProducts = async () => {
+        try {
+            const { data } = await api.get("/giftcards/products");
+            setProducts(data);
+        } catch (error) {
+            toast.error("Failed to fetch products");
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleOpenModal = (product = null) => {
+        if (product) {
+            setEditingProduct(product);
+            setFormData({
+                name: product.name,
+                price: product.price,
+                value: product.value,
+                description: product.description || "",
+                isActive: product.isActive
+            });
+        } else {
+            setEditingProduct(null);
+            setFormData({
+                name: "",
+                price: "",
+                value: "",
+                description: "",
+                isActive: true
+            });
+        }
         setShowModal(true);
     };
 
-    // OPEN EDIT MODAL
-    const openEditModal = (product) => {
-        setEditingProduct(product);
-        setFormData({
-            label: product.label,
-            amount: product.amount,
-            color: product.color,
-            isCustom: product.isCustom,
-            isActive: product.isActive,
-            expiryDays: product.expiryDays || 365,
-        });
-        setShowModal(true);
-    };
-
-    // HANDLE CREATE/UPDATE
     const handleSubmit = async (e) => {
         e.preventDefault();
-        setIsSubmitting(true);
-
         try {
-            const payload = {
-                label: formData.label,
-                amount: formData.isCustom ? 0 : parseFloat(formData.amount) || 0,
-                color: formData.color,
-                isCustom: formData.isCustom,
-                isActive: formData.isActive,
-                expiryDays: parseInt(formData.expiryDays) || 365,
-            };
-
             if (editingProduct) {
-                await updateGiftCardProduct(editingProduct.id, payload);
-                showSuccess("Gift card product updated!");
+                await api.put(`/giftcards/products/${editingProduct.id}`, formData);
+                toast.success("Product updated");
             } else {
-                await createGiftCardProduct(payload);
-                showSuccess("Gift card product created!");
+                await api.post("/giftcards/products", formData);
+                toast.success("Product created");
             }
-
             setShowModal(false);
             fetchProducts();
         } catch (error) {
-            showError(error.response?.data?.message || "Operation failed");
-        } finally {
-            setIsSubmitting(false);
+            toast.error("Operation failed");
         }
     };
 
-    // TOGGLE ACTIVE STATUS
-    const toggleActive = async (product) => {
+    const handleDelete = async (id) => {
+        if (!window.confirm("Delete this product?")) return;
         try {
-            await updateGiftCardProduct(product.id, { isActive: !product.isActive });
-            showSuccess(`Product ${product.isActive ? "hidden" : "shown"} `);
+            await api.delete(`/giftcards/products/${id}`);
+            toast.success("Product deleted");
             fetchProducts();
         } catch (error) {
-            showError("Failed to update status");
+            toast.error("Failed to delete");
         }
     };
 
-    // DELETE
-    const openDeleteModal = (product) => {
-        setEditingProduct(product);
-        setShowDeleteModal(true);
-    };
-
-    const handleDelete = async () => {
-        setIsSubmitting(true);
-        try {
-            await deleteGiftCardProduct(editingProduct.id);
-            showSuccess("Gift card product deleted!");
-            setShowDeleteModal(false);
-            fetchProducts();
-        } catch (error) {
-            showError("Failed to delete product");
-        } finally {
-            setIsSubmitting(false);
-        }
-    };
-
-    const formatRwf = (amount) => {
-        return `${Number(amount || 0).toLocaleString()} RWF`;
-    };
+    const filteredProducts = products.filter(p => 
+        p.name.toLowerCase().includes(searchTerm.toLowerCase())
+    );
 
     return (
         <div className="min-h-screen bg-cream-100 dark:bg-charcoal-900 transition-colors duration-300">
-            <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
-
-            <div className="lg:ml-64 min-h-screen flex flex-col transition-all duration-300">
-                <Topbar onMenuClick={() => setSidebarOpen(true)} title="Gift Card Products" />
-
-                <main className="flex-1 p-4 lg:p-6 max-w-[1400px] w-full mx-auto">
+            <div className="min-h-screen flex flex-col transition-all duration-300">
+                <main className="flex-1 p-4 lg:p-6 max-w-[1600px] w-full mx-auto">
                     {/* Header */}
-                    <div className="mb-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                    <div className="mb-8 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                         <div>
-                            <h1 className="text-2xl font-bold text-charcoal-800 dark:text-white">
-                                Gift Card Products
-                            </h1>
-                            <p className="text-charcoal-500 dark:text-charcoal-400 text-sm mt-1">
-                                Manage the gift card tiers customers can purchase
-                            </p>
+                            <h1 className="text-3xl font-black text-charcoal-900 dark:text-white">Gift Card Products</h1>
+                            <p className="text-gray-500 dark:text-gray-400 mt-1">Manage physical gift cards available for sale</p>
                         </div>
                         <button
-                            onClick={openCreateModal}
-                            className="flex items-center gap-2 px-5 py-2.5 bg-terracotta-500 hover:bg-terracotta-600 text-white font-bold rounded-xl transition-colors shadow-lg shadow-terracotta-500/20"
+                            onClick={() => handleOpenModal()}
+                            className="flex items-center gap-2 bg-terracotta-500 hover:bg-terracotta-600 text-white px-5 py-2.5 rounded-xl font-bold transition-all shadow-lg shadow-terracotta-500/30"
                         >
-                            <FaPlus /> Add Product
+                            <FaPlus /> New Product
                         </button>
                     </div>
 
-                    {/* Product Grid */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                    {/* Toolbar */}
+                    <div className="mb-6 bg-white dark:bg-charcoal-800 p-4 rounded-2xl shadow-sm border border-cream-200 dark:border-charcoal-700 flex flex-col md:flex-row gap-4 justify-between items-center">
+                        <div className="relative w-full md:w-96">
+                            <FaSearch className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" />
+                            <input
+                                type="text"
+                                placeholder="Search products..."
+                                className="w-full pl-11 pr-4 py-2.5 bg-cream-50 dark:bg-charcoal-700 border border-transparent focus:border-terracotta-500 rounded-xl text-sm text-charcoal-800 dark:text-white outline-none transition-all"
+                                value={searchTerm}
+                                onChange={(e) => setSearchTerm(e.target.value)}
+                            />
+                        </div>
+                    </div>
+
+                    {/* Content */}
+                    <div className="bg-white dark:bg-charcoal-800 rounded-2xl shadow-sm border border-cream-200 dark:border-charcoal-700 overflow-hidden">
                         {loading ? (
-                            Array.from({ length: 4 }).map((_, i) => (
-                                <div key={i} className="bg-white dark:bg-charcoal-800 rounded-2xl p-1 animate-pulse">
-                                    <div className="aspect-[1.6/1] bg-charcoal-200 dark:bg-charcoal-700 rounded-xl mb-4"></div>
-                                    <div className="p-4 space-y-2">
-                                        <div className="h-4 bg-charcoal-200 dark:bg-charcoal-700 rounded w-3/4"></div>
-                                        <div className="h-6 bg-charcoal-200 dark:bg-charcoal-700 rounded w-1/2"></div>
-                                    </div>
-                                </div>
-                            ))
-                        ) : products.length === 0 ? (
-                            <div className="col-span-full text-center py-16">
-                                <FaGift className="text-6xl text-charcoal-300 dark:text-charcoal-600 mx-auto mb-4" />
-                                <h3 className="text-lg font-bold text-charcoal-600 dark:text-charcoal-400 mb-2">No Gift Card Products</h3>
-                                <p className="text-charcoal-400 mb-6">Create your first gift card tier to get started</p>
-                                <button
-                                    onClick={openCreateModal}
-                                    className="px-6 py-3 bg-terracotta-500 text-white font-bold rounded-xl hover:bg-terracotta-600 transition-colors"
-                                >
-                                    <FaPlus className="inline mr-2" /> Create Product
-                                </button>
+                            <div className="p-12 text-center">
+                                <FaSpinner className="animate-spin text-3xl text-terracotta-500 mx-auto mb-3" />
+                                <p className="text-charcoal-500 dark:text-charcoal-400 font-bold uppercase tracking-widest text-xs">Loading Products...</p>
                             </div>
                         ) : (
-                            products.map((product) => (
-                                <div
-                                    key={product.id}
-                                    className={`relative bg-white dark:bg-charcoal-800 rounded-2xl p-1 shadow-sm border border-cream-200 dark:border-charcoal-700 overflow-hidden transition-all ${!product.isActive && "opacity-60"}`}
-                                >
-                                    {/* Status Badge */}
-                                    {!product.isActive && (
-                                        <div className="absolute top-4 right-4 z-10 px-2 py-1 bg-charcoal-900/80 text-white text-[10px] font-bold uppercase rounded-full">
-                                            Hidden
-                                        </div>
-                                    )}
-
-                                    {/* Card Preview */}
-                                    <div className={`aspect-[1.6/1] rounded-xl bg-gradient-to-br ${product.color} p-5 flex flex-col justify-between text-white relative overflow-hidden`}>
-                                        <div className="absolute top-0 right-0 w-28 h-28 bg-white/10 rounded-full blur-3xl -mr-14 -mt-14"></div>
-                                        <div className="z-10">
-                                            <div className="text-[10px] font-bold opacity-80 uppercase tracking-widest">{product.label}</div>
-                                            <div className="text-2xl font-black mt-1">Abelus</div>
-                                        </div>
-                                        <div className="z-10 flex justify-between items-end">
-                                            <div className="text-lg font-bold">
-                                                {product.isCustom ? "Custom" : formatRwf(product.amount)}
-                                            </div>
-                                            <FaGift className="text-2xl opacity-30" />
-                                        </div>
-                                    </div>
-
-                                    {/* Actions */}
-                                    <div className="p-4 flex items-center justify-between gap-2">
-                                        <div>
-                                            <h4 className="font-bold text-charcoal-800 dark:text-white">{product.label}</h4>
-                                            <p className="text-sm text-charcoal-500">
-                                                {product.isCustom ? "User enters amount" : formatRwf(product.amount)}
-                                            </p>
-                                        </div>
-                                        <div className="flex items-center gap-1">
-                                            <button
-                                                onClick={() => toggleActive(product)}
-                                                className={`w-8 h-8 flex items-center justify-center rounded-lg transition-colors ${product.isActive
-                                                    ? "text-sage-500 hover:bg-sage-50 dark:hover:bg-sage-900/20"
-                                                    : "text-charcoal-400 hover:bg-charcoal-100 dark:hover:bg-charcoal-700"
-                                                    }`}
-                                                title={product.isActive ? "Hide" : "Show"}
-                                            >
-                                                {product.isActive ? <FaEye /> : <FaEyeSlash />}
-                                            </button>
-                                            <button
-                                                onClick={() => openEditModal(product)}
-                                                className="w-8 h-8 flex items-center justify-center rounded-lg text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors"
-                                                title="Edit"
-                                            >
-                                                <FaEdit />
-                                            </button>
-                                            <button
-                                                onClick={() => openDeleteModal(product)}
-                                                className="w-8 h-8 flex items-center justify-center rounded-lg text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
-                                                title="Delete"
-                                            >
-                                                <FaTrash />
-                                            </button>
-                                        </div>
-                                    </div>
-                                </div>
-                            ))
+                            <div className="overflow-x-auto">
+                                <table className="w-full text-left text-sm">
+                                    <thead className="bg-cream-50 dark:bg-charcoal-900">
+                                        <tr>
+                                            <th className="px-6 py-4 font-black text-charcoal-500 dark:text-charcoal-400 uppercase tracking-wider">Product Name</th>
+                                            <th className="px-6 py-4 font-black text-charcoal-500 dark:text-charcoal-400 uppercase tracking-wider">Value</th>
+                                            <th className="px-6 py-4 font-black text-charcoal-500 dark:text-charcoal-400 uppercase tracking-wider">Price</th>
+                                            <th className="px-6 py-4 font-black text-charcoal-500 dark:text-charcoal-400 uppercase tracking-wider">Status</th>
+                                            <th className="px-6 py-4 font-black text-charcoal-500 dark:text-charcoal-400 uppercase tracking-wider text-right">Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-cream-100 dark:divide-charcoal-700">
+                                        {filteredProducts.map((p) => (
+                                            <tr key={p.id} className="hover:bg-cream-50 dark:hover:bg-charcoal-700/50 transition-colors group">
+                                                <td className="px-6 py-4">
+                                                    <div className="flex items-center gap-3">
+                                                        <div className="w-10 h-10 rounded-xl bg-terracotta-50 dark:bg-terracotta-900/10 flex items-center justify-center text-terracotta-500">
+                                                            <FaGift />
+                                                        </div>
+                                                        <div>
+                                                            <div className="font-bold text-charcoal-900 dark:text-white">{p.name}</div>
+                                                            <div className="text-[10px] text-gray-400 font-mono mt-0.5">ID: {p.id}</div>
+                                                        </div>
+                                                    </div>
+                                                </td>
+                                                <td className="px-6 py-4">
+                                                    <span className="font-black text-charcoal-900 dark:text-white">RWF {p.value.toLocaleString()}</span>
+                                                </td>
+                                                <td className="px-6 py-4">
+                                                    <span className="text-gray-500 dark:text-gray-400">RWF {p.price.toLocaleString()}</span>
+                                                </td>
+                                                <td className="px-6 py-4">
+                                                    <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider ${p.isActive ? 'bg-green-50 text-green-600 dark:bg-green-900/20' : 'bg-red-50 text-red-600 dark:bg-red-900/20'}`}>
+                                                        {p.isActive ? 'Active' : 'Inactive'}
+                                                    </span>
+                                                </td>
+                                                <td className="px-6 py-4 text-right">
+                                                    <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                        <button
+                                                            onClick={() => handleOpenModal(p)}
+                                                            className="w-8 h-8 flex items-center justify-center rounded-lg bg-cream-50 dark:bg-charcoal-700 text-charcoal-600 dark:text-gray-300 hover:bg-terracotta-500 hover:text-white transition-all"
+                                                            title="Edit"
+                                                        >
+                                                            <FaEdit size={14} />
+                                                        </button>
+                                                        <button
+                                                            onClick={() => handleDelete(p.id)}
+                                                            className="w-8 h-8 flex items-center justify-center rounded-lg bg-cream-50 dark:bg-charcoal-700 text-charcoal-600 dark:text-gray-300 hover:bg-red-500 hover:text-white transition-all"
+                                                            title="Delete"
+                                                        >
+                                                            <FaTrash size={12} />
+                                                        </button>
+                                                    </div>
+                                                    <div className="flex justify-end gap-1 group-hover:hidden">
+                                                        <div className="w-1.5 h-1.5 rounded-full bg-gray-200 dark:bg-charcoal-600"></div>
+                                                        <div className="w-1.5 h-1.5 rounded-full bg-gray-200 dark:bg-charcoal-600"></div>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        ))}
+                                        {filteredProducts.length === 0 && !loading && (
+                                            <tr>
+                                                <td colSpan="5" className="px-6 py-12 text-center text-gray-400 italic">No gift card products found.</td>
+                                            </tr>
+                                        )}
+                                    </tbody>
+                                </table>
+                            </div>
                         )}
                     </div>
-                </main>
-            </div>
 
-            {/* CREATE/EDIT MODAL */}
-            {showModal && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-                    <div className="bg-white dark:bg-charcoal-800 rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden animate-in zoom-in-95 duration-200 max-h-[90vh] flex flex-col">
-                        {/* Modal Header */}
-                        <div className="px-6 py-4 border-b border-cream-200 dark:border-charcoal-700 flex items-center justify-between bg-gradient-to-r from-terracotta-500/10 to-transparent">
-                            <h3 className="text-lg font-bold text-charcoal-800 dark:text-white flex items-center gap-2">
-                                {editingProduct ? <FaEdit className="text-blue-500" /> : <FaPlus className="text-terracotta-500" />}
-                                {editingProduct ? "Edit Gift Card Product" : "Create Gift Card Product"}
-                            </h3>
-                            <button onClick={() => setShowModal(false)} className="p-2 text-charcoal-400 hover:text-charcoal-600 hover:bg-charcoal-100 dark:hover:bg-charcoal-700 rounded-lg transition-colors">
-                                <FaTimes />
-                            </button>
-                        </div>
-
-                        <form onSubmit={handleSubmit} className="p-6 space-y-5 overflow-y-auto flex-1">
-                            {/* Live Preview Card */}
-                            <div className="mb-2">
-                                <p className="text-xs font-medium text-charcoal-500 dark:text-charcoal-400 mb-2 uppercase tracking-wider">Live Preview</p>
-                                <div className={`aspect-[2/1] rounded-xl bg-gradient-to-br ${formData.color} p-5 flex flex-col justify-between text-white relative overflow-hidden shadow-lg`}>
-                                    <div className="absolute top-0 right-0 w-28 h-28 bg-white/10 rounded-full blur-3xl -mr-14 -mt-14"></div>
-                                    <div className="z-10">
-                                        <div className="text-[10px] font-bold opacity-80 uppercase tracking-widest">{formData.label || "Label"}</div>
-                                        <div className="text-2xl font-black mt-1">Abelus</div>
+                    {/* Modal */}
+                    {showModal && (
+                        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => setShowModal(false)}>
+                            <div className="bg-white dark:bg-charcoal-800 rounded-2xl w-full max-w-md p-6 transform transition-all animate-in zoom-in duration-200 shadow-2xl" onClick={e => e.stopPropagation()}>
+                                <div className="flex justify-between items-center mb-6">
+                                    <h2 className="text-2xl font-black text-charcoal-900 dark:text-white">
+                                        {editingProduct ? "Edit Product" : "New Gift Card Product"}
+                                    </h2>
+                                    <button onClick={() => setShowModal(false)} className="text-gray-400 hover:text-gray-600"><FaTimes /></button>
+                                </div>
+                                <form onSubmit={handleSubmit} className="space-y-4">
+                                    <div>
+                                        <label className="block text-xs font-black text-gray-500 uppercase mb-1.5">Product Name</label>
+                                        <input
+                                            type="text"
+                                            required
+                                            className="w-full px-4 py-3 bg-cream-50 dark:bg-charcoal-700 border border-cream-200 dark:border-charcoal-600 rounded-xl outline-none focus:border-terracotta-500 dark:text-white"
+                                            placeholder="e.g. Premium Silver Card"
+                                            value={formData.name}
+                                            onChange={e => setFormData({ ...formData, name: e.target.value })}
+                                        />
                                     </div>
-                                    <div className="z-10 flex justify-between items-end">
-                                        <div className="text-lg font-bold">
-                                            {formData.isCustom ? "Custom" : formatRwf(formData.amount || 0)}
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div>
+                                            <label className="block text-xs font-black text-gray-500 uppercase mb-1.5">Value (RWF)</label>
+                                            <input
+                                                type="number"
+                                                required
+                                                className="w-full px-4 py-3 bg-cream-50 dark:bg-charcoal-700 border border-cream-200 dark:border-charcoal-600 rounded-xl outline-none focus:border-terracotta-500 dark:text-white font-bold"
+                                                value={formData.value}
+                                                onChange={e => setFormData({ ...formData, value: e.target.value })}
+                                            />
                                         </div>
-                                        <FaGift className="text-2xl opacity-30" />
+                                        <div>
+                                            <label className="block text-xs font-black text-gray-500 uppercase mb-1.5">Price (RWF)</label>
+                                            <input
+                                                type="number"
+                                                required
+                                                className="w-full px-4 py-3 bg-cream-50 dark:bg-charcoal-700 border border-cream-200 dark:border-charcoal-600 rounded-xl outline-none focus:border-terracotta-500 dark:text-white font-bold"
+                                                value={formData.price}
+                                                onChange={e => setFormData({ ...formData, price: e.target.value })}
+                                            />
+                                        </div>
                                     </div>
-                                </div>
-                            </div>
-
-                            {/* Label Field */}
-                            <div>
-                                <label className="block text-xs font-bold text-charcoal-600 dark:text-charcoal-300 uppercase tracking-wider mb-2">
-                                    <FaTag className="inline mr-1" /> Label
-                                </label>
-                                <input
-                                    type="text"
-                                    required
-                                    value={formData.label}
-                                    onChange={(e) => setFormData({ ...formData, label: e.target.value })}
-                                    className="w-full px-4 py-3 bg-cream-100 dark:bg-charcoal-700 border border-cream-200 dark:border-charcoal-600 rounded-xl text-charcoal-800 dark:text-white outline-none focus:border-terracotta-500 focus:ring-2 focus:ring-terracotta-500/20 transition-all"
-                                    placeholder="e.g., Starter, Premium, VIP"
-                                />
-                            </div>
-
-                            {/* Is Custom Toggle */}
-                            <div className="flex items-center gap-3 p-3 bg-cream-50 dark:bg-charcoal-700/50 rounded-xl">
-                                <button
-                                    type="button"
-                                    onClick={() => setFormData({ ...formData, isCustom: !formData.isCustom })}
-                                    className={`relative w-12 h-6 rounded-full transition-colors ${formData.isCustom ? "bg-terracotta-500" : "bg-charcoal-300 dark:bg-charcoal-600"}`}
-                                >
-                                    <span className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-transform shadow-sm ${formData.isCustom ? "left-7" : "left-1"}`} />
-                                </button>
-                                <span className="text-sm text-charcoal-600 dark:text-charcoal-300">
-                                    Custom amount (user enters value)
-                                </span>
-                            </div>
-
-                            {/* Amount */}
-                            {!formData.isCustom && (
-                                <div>
-                                    <label className="block text-xs font-bold text-charcoal-600 dark:text-charcoal-300 uppercase tracking-wider mb-2">
-                                        Amount (RWF)
-                                    </label>
-                                    <input
-                                        type="number"
-                                        required={!formData.isCustom}
-                                        min="1000"
-                                        value={formData.amount}
-                                        onChange={(e) => setFormData({ ...formData, amount: e.target.value })}
-                                        className="w-full px-4 py-3 bg-cream-100 dark:bg-charcoal-700 border border-cream-200 dark:border-charcoal-600 rounded-xl text-charcoal-800 dark:text-white outline-none focus:border-terracotta-500 focus:ring-2 focus:ring-terracotta-500/20 transition-all"
-                                        placeholder="e.g., 25000"
-                                    />
-                                </div>
-                            )}
-
-                            {/* Color Picker */}
-                            <div>
-                                <label className="block text-xs font-bold text-charcoal-600 dark:text-charcoal-300 uppercase tracking-wider mb-2">
-                                    <FaPalette className="inline mr-1" /> Card Color
-                                </label>
-                                <div className="grid grid-cols-4 gap-2">
-                                    {GRADIENT_PRESETS.map((preset) => (
+                                    <div>
+                                        <label className="block text-xs font-black text-gray-500 uppercase mb-1.5">Description</label>
+                                        <textarea
+                                            className="w-full px-4 py-3 bg-cream-50 dark:bg-charcoal-700 border border-cream-200 dark:border-charcoal-600 rounded-xl outline-none focus:border-terracotta-500 dark:text-white h-24 resize-none"
+                                            placeholder="Brief product description..."
+                                            value={formData.description}
+                                            onChange={e => setFormData({ ...formData, description: e.target.value })}
+                                        />
+                                    </div>
+                                    <div className="flex items-center gap-3 py-2">
+                                        <input
+                                            type="checkbox"
+                                            id="isActive"
+                                            className="w-5 h-5 rounded border-cream-300 text-terracotta-500 focus:ring-terracotta-500"
+                                            checked={formData.isActive}
+                                            onChange={e => setFormData({ ...formData, isActive: e.target.checked })}
+                                        />
+                                        <label htmlFor="isActive" className="text-sm font-bold text-charcoal-700 dark:text-charcoal-300 cursor-pointer">Product is active and available</label>
+                                    </div>
+                                    <div className="flex gap-3 pt-4">
                                         <button
                                             type="button"
-                                            key={preset.value}
-                                            onClick={() => setFormData({ ...formData, color: preset.value })}
-                                            className={`h-10 rounded-lg bg-gradient-to-r ${preset.value} transition-all ${formData.color === preset.value
-                                                ? "ring-2 ring-offset-2 ring-terracotta-500 scale-105"
-                                                : "hover:scale-105"
-                                                }`}
-                                            title={preset.name}
-                                        />
-                                    ))}
-                                </div>
-                            </div>
-
-                            {/* Expiry Period */}
-                            <div>
-                                <label className="block text-xs font-bold text-charcoal-600 dark:text-charcoal-300 uppercase tracking-wider mb-2">
-                                    <FaCalendarAlt className="inline mr-1" /> Expiry Period (Days)
-                                </label>
-                                <input
-                                    type="number"
-                                    required
-                                    min="1"
-                                    value={formData.expiryDays}
-                                    onChange={(e) => setFormData({ ...formData, expiryDays: e.target.value })}
-                                    className="w-full px-4 py-3 bg-cream-100 dark:bg-charcoal-700 border border-cream-200 dark:border-charcoal-600 rounded-xl text-charcoal-800 dark:text-white outline-none focus:border-terracotta-500 focus:ring-2 focus:ring-terracotta-500/20 transition-all"
-                                    placeholder="e.g., 365"
-                                />
-                                <p className="text-xs text-charcoal-400 mt-1.5">How long gift cards of this type remain valid after purchase</p>
-                            </div>
-
-                            {/* Active Status */}
-                            <div className="flex items-center gap-3 p-3 bg-cream-50 dark:bg-charcoal-700/50 rounded-xl">
-                                <button
-                                    type="button"
-                                    onClick={() => setFormData({ ...formData, isActive: !formData.isActive })}
-                                    className={`relative w-12 h-6 rounded-full transition-colors ${formData.isActive ? "bg-sage-500" : "bg-charcoal-300 dark:bg-charcoal-600"}`}
-                                >
-                                    <span className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-transform shadow-sm ${formData.isActive ? "left-7" : "left-1"}`} />
-                                </button>
-                                <span className="text-sm text-charcoal-600 dark:text-charcoal-300">
-                                    {formData.isActive ? "Visible to customers" : "Hidden from customers"}
-                                </span>
-                            </div>
-
-                            {/* Actions */}
-                            <div className="flex gap-3 pt-4">
-                                <button
-                                    type="button"
-                                    onClick={() => setShowModal(false)}
-                                    className="flex-1 px-4 py-3 border border-cream-200 dark:border-charcoal-600 text-charcoal-600 dark:text-charcoal-300 rounded-xl font-medium hover:bg-cream-100 dark:hover:bg-charcoal-700 transition-colors"
-                                >
-                                    Cancel
-                                </button>
-                                <button
-                                    type="submit"
-                                    disabled={isSubmitting}
-                                    className="flex-1 px-4 py-3 bg-terracotta-500 hover:bg-terracotta-600 text-white rounded-xl font-bold transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
-                                >
-                                    {isSubmitting ? "Saving..." : <><FaSave /> {editingProduct ? "Update" : "Create"}</>}
-                                </button>
-                            </div>
-                        </form>
-                    </div>
-                </div>
-            )}
-
-            {/* DELETE MODAL */}
-            {showDeleteModal && editingProduct && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-                    <div className="bg-white dark:bg-charcoal-800 rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden animate-in zoom-in-95 duration-200">
-                        <div className="p-6 text-center">
-                            <div className="w-16 h-16 bg-red-100 dark:bg-red-900/20 rounded-full flex items-center justify-center mx-auto mb-4">
-                                <FaTrash className="text-2xl text-red-500" />
-                            </div>
-                            <h3 className="text-lg font-bold text-charcoal-800 dark:text-white mb-2">Delete Product?</h3>
-                            <p className="text-charcoal-500 dark:text-charcoal-400 text-sm mb-4">
-                                This will permanently delete the <strong>{editingProduct.label}</strong> gift card product.
-                            </p>
-                            <p className="text-xs text-red-500 mb-6">This action cannot be undone.</p>
-                            <div className="flex gap-3">
-                                <button
-                                    onClick={() => setShowDeleteModal(false)}
-                                    className="flex-1 px-4 py-3 border border-cream-200 dark:border-charcoal-600 text-charcoal-600 dark:text-charcoal-300 rounded-xl font-medium hover:bg-cream-100 dark:hover:bg-charcoal-700 transition-colors"
-                                >
-                                    Cancel
-                                </button>
-                                <button
-                                    onClick={handleDelete}
-                                    disabled={isSubmitting}
-                                    className="flex-1 px-4 py-3 bg-red-500 hover:bg-red-600 text-white rounded-xl font-bold transition-colors disabled:opacity-50"
-                                >
-                                    {isSubmitting ? "Deleting..." : "Delete"}
-                                </button>
+                                            onClick={() => setShowModal(false)}
+                                            className="flex-1 py-3 bg-gray-100 dark:bg-charcoal-700 text-charcoal-800 dark:text-white rounded-xl font-bold hover:bg-gray-200 transition-all"
+                                        >
+                                            Cancel
+                                        </button>
+                                        <button
+                                            type="submit"
+                                            className="flex-1 py-3 bg-terracotta-500 text-white rounded-xl font-bold hover:bg-terracotta-600 shadow-lg shadow-terracotta-500/20 transition-all"
+                                        >
+                                            {editingProduct ? "Update Product" : "Create Product"}
+                                        </button>
+                                    </div>
+                                </form>
                             </div>
                         </div>
-                    </div>
-                </div>
-            )}
+                    )}
+                </main>
+            </div>
         </div>
     );
 };

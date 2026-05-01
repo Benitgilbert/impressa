@@ -1,6 +1,4 @@
 import { useState, useEffect, useCallback } from "react";
-import Sidebar from "../components/Sidebar";
-import Topbar from "../components/Topbar";
 import api from "../utils/axiosInstance";
 import { FaTrash, FaEdit, FaPlus, FaGlobeAfrica, FaMapMarkerAlt, FaBoxOpen, FaSave, FaTimes } from "react-icons/fa";
 import { useToast } from "../context/ToastContext";
@@ -8,7 +6,6 @@ import { getProvinces, getDistricts } from "../utils/locationHelpers";
 
 function AdminShipping() {
     const { showSuccess, showError } = useToast();
-    const [sidebarOpen, setSidebarOpen] = useState(false);
     const [zones, setZones] = useState([]);
     const [loading, setLoading] = useState(true);
     const [showModal, setShowModal] = useState(false);
@@ -110,9 +107,7 @@ function AdminShipping() {
 
     return (
         <div className="min-h-screen bg-cream-100 dark:bg-charcoal-900 transition-colors duration-300">
-            <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
-            <div className="lg:ml-64 min-h-screen flex flex-col transition-all duration-300">
-                <Topbar onMenuClick={() => setSidebarOpen(true)} title="Delivery Zones" />
+            <div className="min-h-screen flex flex-col transition-all duration-300">
                 <main className="flex-1 p-4 lg:p-6 max-w-[1600px] w-full mx-auto">
                     {/* Header */}
                     <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">

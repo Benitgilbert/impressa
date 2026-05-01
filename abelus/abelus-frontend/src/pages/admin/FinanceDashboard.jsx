@@ -1,165 +1,134 @@
-import { useState, useEffect, useCallback } from "react";
-import axios from "../../utils/axiosInstance";
-import { Line, Doughnut } from "react-chartjs-2";
-import {
-    Chart as ChartJS,
-    CategoryScale,
-    LinearScale,
-    PointElement,
-    LineElement,
-    Title,
-    Tooltip,
-    Legend,
-    ArcElement,
-} from "chart.js";
-import JournalEntryForm from "../../components/finance/JournalEntryForm";
-import LedgerView from "../../components/finance/LedgerView";
-import Sidebar from "../../components/Sidebar";
-import Topbar from "../../components/Topbar";
-import { FaChartLine, FaBook, FaFileInvoice } from "react-icons/fa";
-
-ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend, ArcElement);
+import React, { useState, useEffect } from "react";
+import { FaChartLine, FaWallet, FaArrowUp, FaSync, FaDownload } from "react-icons/fa";
+import api from "../../utils/axiosInstance";
+import toast from "react-hot-toast";
 
 const FinanceDashboard = () => {
-    const [sidebarOpen, setSidebarOpen] = useState(false);
-    const [summary, setSummary] = useState(null);
-    const [activeTab, setActiveTab] = useState("overview");
+    const [stats, setStats] = useState({
+        totalRevenue: 0,
+        pendingPayments: 0,
+        netProfit: 0,
+        monthlyGrowth: 0,
+        transactions: []
+    });
+    const [loading, setLoading] = useState(true);
 
-    const fetchSummary = useCallback(async () => {
-        try {
-            const res = await axios.get("/finance/summary");
-            setSummary(res.data);
-        } catch (err) {
-            console.error("Failed to fetch financial summary");
-        }
+    useEffect(() => {
+        fetchStats();
     }, []);
 
-    useEffect(() => { fetchSummary(); }, [fetchSummary]);
-
-    if (!summary) {
-        return (
-            <div className="min-h-screen bg-cream-100 dark:bg-charcoal-900 flex items-center justify-center">
-                <div className="text-center">
-                    <div className="w-8 h-8 border-2 border-terracotta-500 border-t-transparent rounded-full animate-spin mx-auto mb-3"></div>
-                    <p className="text-charcoal-500 dark:text-charcoal-400">Loading Financial Data...</p>
-                </div>
-            </div>
-        );
-    }
-
-    const tabs = [
-        { id: 'overview', label: 'Overview', icon: <FaChartLine /> },
-        { id: 'journal', label: 'Journal Entry', icon: <FaBook /> },
-        { id: 'ledger', label: 'General Ledger', icon: <FaFileInvoice /> },
-    ];
-
-    const chartData = {
-        labels: ["Revenue", "Expenses", "Net Income"],
-        datasets: [{
-            label: "Financial Overview",
-            data: [summary.revenue, summary.expenses, summary.netIncome],
-            backgroundColor: ["#7C9A82", "#C67C4E", "#3B82F6"],
-            borderColor: ["#5a7a60", "#a65c2e", "#2563EB"],
-            borderWidth: 2,
-        }],
-    };
-
-    const doughnutData = {
-        labels: ["Assets", "Liabilities", "Equity"],
-        datasets: [{
-            data: [summary.assets, summary.liabilities, summary.equity],
-            backgroundColor: ["#7C9A82", "#D4A574", "#6366F1"],
-        }],
+    const fetchStats = async () => {
+        setLoading(true);
+        try {
+            const { data } = await api.get("/admin/finance/stats");
+            setStats(data);
+        } catch (error) {
+            console.error("Failed to fetch finance stats:", error);
+            toast.error("Failed to load financial data");
+        } finally {
+            setLoading(false);
+        }
     };
 
     return (
         <div className="min-h-screen bg-cream-100 dark:bg-charcoal-900 transition-colors duration-300">
-            <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
-            <div className="lg:ml-64 min-h-screen flex flex-col transition-all duration-300">
-                <Topbar onMenuClick={() => setSidebarOpen(true)} title="Finance" />
+            <div className="min-h-screen flex flex-col transition-all duration-300">
                 <main className="flex-1 p-4 lg:p-6 max-w-[1600px] w-full mx-auto">
-                    {/* Header with Tabs */}
-                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
+                    {/* Header */}
+                    <div className="mb-8 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                         <div>
-                            <h1 className="text-2xl font-bold text-charcoal-800 dark:text-white">Financial Analysis</h1>
-                            <p className="text-charcoal-500 dark:text-charcoal-400 text-sm mt-1">Track revenue, expenses, and financial health</p>
+                            <h1 className="text-3xl font-black text-charcoal-900 dark:text-white">Finance Dashboard</h1>
+                            <p className="text-gray-500 dark:text-gray-400 mt-1">Real-time financial performance and transaction tracking</p>
                         </div>
-                        <div className="flex bg-white dark:bg-charcoal-800 rounded-xl p-1 border border-cream-200 dark:border-charcoal-700">
-                            {tabs.map(tab => (
-                                <button key={tab.id} onClick={() => setActiveTab(tab.id)}
-                                    className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium text-sm transition-all ${activeTab === tab.id ? 'bg-terracotta-500 text-white' : 'text-charcoal-600 dark:text-charcoal-400 hover:bg-cream-100 dark:hover:bg-charcoal-700'}`}>
-                                    {tab.icon} <span className="hidden sm:inline">{tab.label}</span>
-                                </button>
-                            ))}
+                        <div className="flex items-center gap-3">
+                            <button 
+                                onClick={fetchStats}
+                                className="w-10 h-10 flex items-center justify-center rounded-xl bg-white dark:bg-charcoal-800 text-charcoal-600 dark:text-gray-400 hover:text-terracotta-500 border border-cream-200 dark:border-charcoal-700 transition-all shadow-sm"
+                                title="Sync Data"
+                            >
+                                <FaSync className={loading ? "animate-spin" : ""} />
+                            </button>
+                            <button className="flex items-center gap-2 bg-charcoal-900 text-white px-5 py-2.5 rounded-xl font-bold hover:bg-charcoal-800 transition-all shadow-lg">
+                                <FaDownload /> Generate Report
+                            </button>
                         </div>
                     </div>
 
-                    {activeTab === "overview" && (
-                        <>
-                            {/* Summary Cards */}
-                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-                                <div className="bg-gradient-to-br from-sage-500 to-sage-600 rounded-2xl p-6 text-white shadow-lg">
-                                    <h3 className="text-sage-100 font-medium text-sm uppercase tracking-wider">Total Revenue</h3>
-                                    <p className="text-3xl font-bold mt-2">RWF {summary.revenue?.toLocaleString() || 0}</p>
+                    {/* Quick Stats Grid */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+                        {[
+                            { label: "Total Revenue", value: stats.totalRevenue, icon: <FaChartLine />, color: "text-blue-500", bg: "bg-blue-50" },
+                            { label: "Pending Payments", value: stats.pendingPayments, icon: <FaWallet />, color: "text-orange-500", bg: "bg-orange-50" },
+                            { label: "Net Profit", value: stats.netProfit, icon: <FaArrowUp />, color: "text-sage-500", bg: "bg-sage-50" },
+                            { label: "Monthly Growth", value: `${stats.monthlyGrowth}%`, icon: <FaChartLine />, color: "text-terracotta-500", bg: "bg-terracotta-50" }
+                        ].map((stat, idx) => (
+                            <div key={idx} className="bg-white dark:bg-charcoal-800 p-6 rounded-2xl shadow-sm border border-cream-200 dark:border-charcoal-700">
+                                <div className={`w-12 h-12 ${stat.bg} dark:bg-charcoal-700 rounded-xl flex items-center justify-center ${stat.color} mb-4 text-xl`}>
+                                    {stat.icon}
                                 </div>
-                                <div className="bg-gradient-to-br from-terracotta-500 to-terracotta-600 rounded-2xl p-6 text-white shadow-lg">
-                                    <h3 className="text-terracotta-100 font-medium text-sm uppercase tracking-wider">Total Expenses</h3>
-                                    <p className="text-3xl font-bold mt-2">RWF {summary.expenses?.toLocaleString() || 0}</p>
+                                <p className="text-xs font-bold text-gray-500 uppercase tracking-widest mb-1">{stat.label}</p>
+                                <h3 className="text-2xl font-black text-charcoal-900 dark:text-white">
+                                    {typeof stat.value === 'number' ? `RWF ${stat.value.toLocaleString()}` : stat.value}
+                                </h3>
+                            </div>
+                        ))}
+                    </div>
+
+                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                        {/* Recent Transactions */}
+                        <div className="lg:col-span-2">
+                            <div className="bg-white dark:bg-charcoal-800 rounded-2xl shadow-sm border border-cream-200 dark:border-charcoal-700 overflow-hidden">
+                                <div className="p-6 border-b border-cream-100 dark:border-charcoal-700 flex justify-between items-center">
+                                    <h3 className="font-black text-charcoal-900 dark:text-white uppercase tracking-wider text-sm">Recent Transactions</h3>
+                                    <button className="text-xs font-bold text-terracotta-500 hover:underline">View All</button>
                                 </div>
-                                <div className="bg-gradient-to-br from-blue-500 to-blue-600 rounded-2xl p-6 text-white shadow-lg">
-                                    <h3 className="text-blue-100 font-medium text-sm uppercase tracking-wider">Net Income</h3>
-                                    <p className="text-3xl font-bold mt-2">RWF {summary.netIncome?.toLocaleString() || 0}</p>
+                                <div className="overflow-x-auto">
+                                    <table className="w-full text-left text-sm">
+                                        <thead className="bg-cream-50 dark:bg-charcoal-900">
+                                            <tr>
+                                                <th className="px-6 py-4 font-black text-charcoal-500 dark:text-charcoal-400 uppercase tracking-wider">Transaction</th>
+                                                <th className="px-6 py-4 font-black text-charcoal-500 dark:text-charcoal-400 uppercase tracking-wider">Amount</th>
+                                                <th className="px-6 py-4 font-black text-charcoal-500 dark:text-charcoal-400 uppercase tracking-wider">Status</th>
+                                                <th className="px-6 py-4 font-black text-charcoal-500 dark:text-charcoal-400 uppercase tracking-wider">Date</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-cream-100 dark:divide-charcoal-700">
+                                            {stats.transactions && stats.transactions.length > 0 ? stats.transactions.map((t, idx) => (
+                                                <tr key={idx} className="hover:bg-cream-50/50 dark:hover:bg-charcoal-700/30 transition-colors">
+                                                    <td className="px-6 py-4">
+                                                        <div className="font-bold text-charcoal-900 dark:text-white">{t.type || "Transaction"}</div>
+                                                        <div className="text-[10px] text-gray-400 uppercase">ID: {t.id?.slice(-8) || "N/A"}</div>
+                                                    </td>
+                                                    <td className="px-6 py-4 font-black text-charcoal-900 dark:text-white">RWF {t.amount?.toLocaleString()}</td>
+                                                    <td className="px-6 py-4">
+                                                        <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider ${
+                                                            t.status === 'completed' ? 'bg-green-50 text-green-600' : 'bg-orange-50 text-orange-600'
+                                                        }`}>
+                                                            {t.status || "pending"}
+                                                        </span>
+                                                    </td>
+                                                    <td className="px-6 py-4 text-xs text-gray-500">{new Date(t.date || Date.now()).toLocaleDateString()}</td>
+                                                </tr>
+                                            )) : (
+                                                <tr>
+                                                    <td colSpan="4" className="px-6 py-12 text-center text-gray-400 italic">No recent transactions found.</td>
+                                                </tr>
+                                            )}
+                                        </tbody>
+                                    </table>
                                 </div>
                             </div>
-
-                            {/* Charts */}
-                            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                                <div className="bg-white dark:bg-charcoal-800 rounded-2xl border border-cream-200 dark:border-charcoal-700 p-6">
-                                    <h3 className="text-lg font-bold text-charcoal-800 dark:text-white mb-4">Financial Performance</h3>
-                                    <div className="h-64">
-                                        <Line data={chartData} options={{ maintainAspectRatio: false, responsive: true, plugins: { legend: { labels: { color: '#6b7280' } } }, scales: { x: { ticks: { color: '#6b7280' } }, y: { ticks: { color: '#6b7280' } } } }} />
-                                    </div>
-                                </div>
-                                <div className="bg-white dark:bg-charcoal-800 rounded-2xl border border-cream-200 dark:border-charcoal-700 p-6">
-                                    <h3 className="text-lg font-bold text-charcoal-800 dark:text-white mb-4">Asset Distribution</h3>
-                                    <div className="h-64 flex items-center justify-center">
-                                        <Doughnut data={doughnutData} options={{ maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { color: '#6b7280' } } } }} />
-                                    </div>
-                                </div>
-                            </div>
-
-                            {/* Balance Sheet Preview */}
-                            <div className="mt-6 bg-white dark:bg-charcoal-800 rounded-2xl border border-cream-200 dark:border-charcoal-700 p-6">
-                                <h3 className="text-lg font-bold text-charcoal-800 dark:text-white mb-4">Balance Sheet Summary</h3>
-                                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                    <div className="p-4 bg-sage-50 dark:bg-sage-900/20 rounded-xl">
-                                        <p className="text-sm text-sage-600 dark:text-sage-400 font-medium">Total Assets</p>
-                                        <p className="text-2xl font-bold text-sage-700 dark:text-sage-300 mt-1">RWF {summary.assets?.toLocaleString() || 0}</p>
-                                    </div>
-                                    <div className="p-4 bg-sand-50 dark:bg-sand-900/20 rounded-xl">
-                                        <p className="text-sm text-sand-600 dark:text-sand-400 font-medium">Total Liabilities</p>
-                                        <p className="text-2xl font-bold text-sand-700 dark:text-sand-300 mt-1">RWF {summary.liabilities?.toLocaleString() || 0}</p>
-                                    </div>
-                                    <div className="p-4 bg-purple-50 dark:bg-purple-900/20 rounded-xl">
-                                        <p className="text-sm text-purple-600 dark:text-purple-400 font-medium">Owner's Equity</p>
-                                        <p className="text-2xl font-bold text-purple-700 dark:text-purple-300 mt-1">RWF {summary.equity?.toLocaleString() || 0}</p>
-                                    </div>
-                                </div>
-                            </div>
-                        </>
-                    )}
-
-                    {activeTab === "journal" && (
-                        <div className="bg-white dark:bg-charcoal-800 rounded-2xl border border-cream-200 dark:border-charcoal-700 p-6">
-                            <JournalEntryForm onSuccess={fetchSummary} />
                         </div>
-                    )}
 
-                    {activeTab === "ledger" && (
-                        <div className="bg-white dark:bg-charcoal-800 rounded-2xl border border-cream-200 dark:border-charcoal-700 p-6">
-                            <LedgerView />
+                        {/* Revenue Breakdown / Placeholder for Chart */}
+                        <div className="bg-white dark:bg-charcoal-800 rounded-2xl shadow-sm border border-cream-200 dark:border-charcoal-700 p-6 flex flex-col items-center justify-center text-center">
+                            <div className="w-20 h-20 bg-cream-50 dark:bg-charcoal-700 rounded-full flex items-center justify-center text-terracotta-500 text-3xl mb-4">
+                                <FaChartLine />
+                            </div>
+                            <h3 className="font-black text-charcoal-900 dark:text-white uppercase tracking-wider text-sm mb-2">Revenue Insights</h3>
+                            <p className="text-xs text-gray-500 leading-relaxed max-w-[200px]">Detailed revenue breakdown charts and forecasting will appear here.</p>
                         </div>
-                    )}
+                    </div>
                 </main>
             </div>
         </div>

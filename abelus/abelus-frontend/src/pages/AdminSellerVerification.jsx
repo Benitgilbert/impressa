@@ -4,11 +4,9 @@ import {
     FaClock, FaCheckCircle, FaTimesCircle, FaBuilding,
     FaIdCard, FaPhone, FaEnvelope, FaDownload, FaUser
 } from 'react-icons/fa';
-import Sidebar from '../components/Sidebar';
-import Topbar from '../components/Topbar';
+import api from '../utils/axiosInstance';
 
 export default function AdminSellerVerification() {
-    const [sidebarOpen, setSidebarOpen] = useState(false);
     const [sellers, setSellers] = useState([]);
     const [stats, setStats] = useState({ pending: 0, approved: 0, rejected: 0 });
     const [loading, setLoading] = useState(true);
@@ -22,29 +20,24 @@ export default function AdminSellerVerification() {
     const [processing, setProcessing] = useState(false);
     const [rejectionReason, setRejectionReason] = useState('');
 
-    const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
-    const BASE_URL = API_URL.replace(/\/api$/, '');
+    const BASE_URL = (api.defaults.baseURL || '').replace(/\/api$/, '');
 
     const fetchSellers = useCallback(async () => {
         setLoading(true);
         try {
-            const token = localStorage.getItem('authToken');
             const params = new URLSearchParams({ page: currentPage, limit: 15, status: statusFilter });
-            const res = await fetch(`${API_URL}/seller-verification/pending?${params}`, { headers: { Authorization: `Bearer ${token}` } });
-            const data = await res.json();
-            if (data.success) { setSellers(data.data); setStats(data.stats); setTotalPages(data.pagination.pages); }
+            const res = await api.get(`/seller-verification/pending?${params}`);
+            if (res.data.success) { setSellers(res.data.data); setStats(res.data.stats); setTotalPages(res.data.pagination.pages); }
         } catch (err) { setError('Failed to fetch sellers'); }
         finally { setLoading(false); }
-    }, [currentPage, statusFilter, API_URL]);
+    }, [currentPage, statusFilter]);
 
     useEffect(() => { fetchSellers(); }, [fetchSellers]);
 
     const viewSellerDetails = async (id) => {
         try {
-            const token = localStorage.getItem('authToken');
-            const res = await fetch(`${API_URL}/seller-verification/${id}`, { headers: { Authorization: `Bearer ${token}` } });
-            const data = await res.json();
-            if (data.success) { setSelectedSeller(data.data); setShowModal(true); setRejectionReason(''); }
+            const res = await api.get(`/seller-verification/${id}`);
+            if (res.data.success) { setSelectedSeller(res.data.data); setShowModal(true); setRejectionReason(''); }
         } catch (err) { setError('Failed to fetch seller details'); }
     };
 
@@ -52,14 +45,9 @@ export default function AdminSellerVerification() {
         if (action === 'reject' && !rejectionReason.trim()) { setError('Please provide a rejection reason'); return; }
         setProcessing(true);
         try {
-            const token = localStorage.getItem('authToken');
-            const res = await fetch(`${API_URL}/seller-verification/${selectedSeller.id}/verify`, {
-                method: 'PUT', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-                body: JSON.stringify({ action, rejectionReason: action === 'reject' ? rejectionReason : undefined })
-            });
-            const data = await res.json();
-            if (data.success) { setSuccess(data.message); setShowModal(false); setSelectedSeller(null); fetchSellers(); }
-            else setError(data.message);
+            const res = await api.put(`/seller-verification/${selectedSeller.id}/verify`, { action, rejectionReason: action === 'reject' ? rejectionReason : undefined });
+            if (res.data.success) { setSuccess(res.data.message); setShowModal(false); setSelectedSeller(null); fetchSellers(); }
+            else setError(res.data.message);
         } catch (err) { setError('Failed to process verification'); }
         finally { setProcessing(false); }
     };
@@ -88,9 +76,7 @@ export default function AdminSellerVerification() {
 
     return (
         <div className="min-h-screen bg-cream-100 dark:bg-charcoal-900 transition-colors duration-300">
-            <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
-            <div className="lg:ml-64 min-h-screen flex flex-col transition-all duration-300">
-                <Topbar onMenuClick={() => setSidebarOpen(true)} title="Seller Verification" />
+            <div className="min-h-screen flex flex-col transition-all duration-300">
                 <main className="flex-1 p-4 lg:p-6 max-w-[1600px] w-full mx-auto">
                     {/* Header */}
                     <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
