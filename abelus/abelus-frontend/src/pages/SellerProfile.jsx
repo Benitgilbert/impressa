@@ -1,8 +1,6 @@
 import { useState, useEffect } from "react";
 import { FaSave, FaStore, FaCamera, FaEnvelope, FaPhone, FaUser } from "react-icons/fa";
 import api from "../utils/axiosInstance";
-import SellerSidebar from "../components/SellerSidebar";
-import Header from "../components/Header";
 import { useToast } from "../context/ToastContext";
 
 const SellerProfile = () => {
@@ -94,27 +92,17 @@ const SellerProfile = () => {
 
     if (loading) {
         return (
-            <div className="flex h-screen bg-gray-50 dark:bg-gray-900 overflow-hidden">
-                <SellerSidebar />
-                <div className="flex-1 flex flex-col min-w-0 h-full overflow-hidden">
-                    <Header />
-                    <main className="flex-1 p-8 flex items-center justify-center">
-                        <div className="flex items-center justify-center h-64 text-gray-500 dark:text-gray-400">
-                            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600 mr-3"></div>
-                            Loading profile...
-                        </div>
-                    </main>
+            <main className="flex-1 p-8 flex items-center justify-center">
+                <div className="flex items-center justify-center h-64 text-gray-500 dark:text-gray-400">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600 mr-3"></div>
+                    Loading profile...
                 </div>
-            </div>
+            </main>
         );
     }
 
     return (
-        <div className="flex h-screen bg-gray-50 dark:bg-gray-900 transition-colors duration-200 overflow-hidden">
-            <SellerSidebar />
-            <div className="flex-1 flex flex-col min-w-0 h-full overflow-hidden">
-                <Header />
-                <main className="flex-1 overflow-y-auto p-8">
+        <main className="flex-1 overflow-y-auto p-8">
                     <div className="max-w-4xl mx-auto">
                         {/* Page Header */}
                         <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
@@ -278,9 +266,7 @@ const SellerProfile = () => {
 
                         </form>
                     </div>
-                </main>
-            </div>
-        </div>
+        </main>
     );
 };
 

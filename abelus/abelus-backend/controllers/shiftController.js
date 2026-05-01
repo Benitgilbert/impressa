@@ -161,3 +161,21 @@ export const getActiveShiftStats = async (req, res) => {
         res.status(500).json({ success: false, message: "Server Error" });
     }
 };
+
+/**
+ * 🕒 Get list of shifts for the logged-in user
+ */
+export const getMyShifts = async (req, res) => {
+    try {
+        const shifts = await prisma.shift.findMany({
+            where: { userId: req.user.id },
+            orderBy: { startTime: 'desc' },
+            take: 50 // Limit to last 50 shifts
+        });
+
+        res.status(200).json({ success: true, data: shifts });
+    } catch (error) {
+        logger.error({ err: error }, "Failed to get shift list");
+        res.status(500).json({ success: false, message: "Server Error" });
+    }
+};

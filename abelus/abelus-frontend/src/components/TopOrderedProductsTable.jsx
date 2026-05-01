@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import axios from "../utils/axiosInstance";
 
-function TopOrderedProductsTable() {
+function TopOrderedProductsTable({ refreshKey }) {
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -18,7 +18,7 @@ function TopOrderedProductsTable() {
     };
 
     fetchTopProducts();
-  }, []);
+  }, [refreshKey]);
 
   if (loading) return (
     <div className="h-full flex items-center justify-center p-4">

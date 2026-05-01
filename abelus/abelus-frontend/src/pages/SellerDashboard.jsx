@@ -34,7 +34,6 @@ ChartJS.register(
 );
 
 export default function SellerDashboard() {
-    const [sidebarOpen, setSidebarOpen] = useState(false);
     const [user, setUser] = useState(null);
     const [stats, setStats] = useState({
         totalProducts: 0,
@@ -197,27 +196,17 @@ export default function SellerDashboard() {
 
     if (loading) {
         return (
-            <div className="flex h-screen bg-gray-50 dark:bg-gray-900 transition-colors duration-200">
-                <SellerSidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
-                <div className="flex-1 flex flex-col min-w-0 h-full overflow-hidden">
-                    <Topbar onMenuClick={() => setSidebarOpen(true)} title="Dashboard" />
-                    <main className="flex-1 p-8 flex items-center justify-center">
-                        <div className="flex flex-col items-center">
-                            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600 mb-2"></div>
-                            <p className="text-gray-500 dark:text-gray-400 text-sm">Loading dashboard...</p>
-                        </div>
-                    </main>
+            <main className="flex-1 p-8 flex items-center justify-center">
+                <div className="flex flex-col items-center">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600 mb-2"></div>
+                    <p className="text-gray-500 dark:text-gray-400 text-sm">Loading dashboard...</p>
                 </div>
-            </div>
+            </main>
         );
     }
 
     return (
-        <div className="flex h-screen bg-gray-50 dark:bg-gray-900 transition-colors duration-200">
-            <SellerSidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
-            <div className="flex-1 flex flex-col min-w-0 h-full overflow-hidden">
-                <Topbar onMenuClick={() => setSidebarOpen(true)} title={user?.role === 'cashier' ? "Cashier Dashboard" : "Dashboard"} />
-                <main className="flex-1 overflow-y-auto p-4 md:p-8">
+        <main className="flex-1 overflow-y-auto p-4 md:p-8">
                     <div className="max-w-7xl mx-auto">
                         {/* Welcome Header */}
                         <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
@@ -384,10 +373,6 @@ export default function SellerDashboard() {
                             </div>
                         </div>
                     </div>
-                </main>
-                <AdminChatBot storageKey="sellerChatMessages" title="Seller Assistant" />
-            </div>
-        </div>
+        </main>
     );
-
 }

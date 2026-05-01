@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import axios from "../utils/axiosInstance";
 
-function CustomizationDemandTable() {
+function CustomizationDemandTable({ refreshKey }) {
   const [demandData, setDemandData] = useState(null);
   const [loading, setLoading] = useState(true);
 
@@ -18,7 +18,7 @@ function CustomizationDemandTable() {
     };
 
     fetchCustomizationDemand();
-  }, []);
+  }, [refreshKey]);
 
   if (loading) return (
     <div className="h-full flex items-center justify-center p-4">

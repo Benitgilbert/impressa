@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import api from "../utils/axiosInstance";
 import { FaExclamationTriangle, FaBox } from "react-icons/fa";
 
-function LowStockWidget() {
+function LowStockWidget({ refreshKey }) {
     const [products, setProducts] = useState([]);
     const [outOfStock, setOutOfStock] = useState(0);
     const [loading, setLoading] = useState(true);
@@ -20,7 +20,7 @@ function LowStockWidget() {
             }
         };
         fetchData();
-    }, []);
+    }, [refreshKey]);
 
     const getStockClass = (stock) => {
         if (stock <= 3) return 'bg-red-100 text-red-700 dark:bg-red-900/20 dark:text-red-400';

@@ -5,7 +5,7 @@ import axios from "../utils/axiosInstance";
 
 ChartJS.register(BarElement, CategoryScale, LinearScale, Tooltip, Legend);
 
-function WeeklyProfitChart() {
+function WeeklyProfitChart({ refreshKey }) {
   const [chartData, setChartData] = useState(null);
 
   useEffect(() => {
@@ -27,7 +27,7 @@ function WeeklyProfitChart() {
     }).catch(err => {
       console.error("Failed to load weekly profit data:", err);
     });
-  }, []);
+  }, [refreshKey]);
 
   const options = {
     responsive: true,

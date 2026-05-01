@@ -76,6 +76,7 @@ import GiftCards from "./pages/GiftCards";
 import Unsubscribe from "./pages/Unsubscribe";
 import SellerAbonne from "./pages/SellerAbonne";
 import AdminAbonne from "./pages/admin/AdminAbonne";
+import SellerShifts from "./pages/SellerShifts";
 
 
 import { CartProvider } from "./context/CartContext";
@@ -85,6 +86,8 @@ import { ThemeProvider } from "./context/ThemeContext";
 import { AuthProvider } from "./context/AuthContext";
 import ProtectedRoute from "./components/ProtectedRoute";
 import InstallApp from "./components/InstallApp";
+import AdminLayout from "./components/AdminLayout";
+import SellerLayout from "./components/SellerLayout";
 
 import { Toaster } from "react-hot-toast";
 
@@ -127,16 +130,76 @@ function App() {
                   <Route path="/login" element={<Login />} />
                   <Route path="/register" element={<Register />} />
                   <Route path="/auth/success" element={<AuthSuccess />} />
-                  <Route path="/admin" element={
+                  {/* Admin Routes with Shared Layout */}
+                  <Route element={
                     <ProtectedRoute allowedRoles={['admin']}>
-                      <AdminDashboard />
+                      <AdminLayout />
                     </ProtectedRoute>
-                  } />
-                  <Route path="/admin/users" element={
-                    <ProtectedRoute allowedRoles={['admin']}>
-                      <AdminUsers />
+                  }>
+                    <Route path="/admin" element={<AdminDashboard />} />
+                    <Route path="/admin/users" element={<AdminUsers />} />
+                    <Route path="/admin/orders" element={<AdminOrders />} />
+                    <Route path="/admin/orders/:id" element={<AdminOrderDetails />} />
+                    <Route path="/admin/gift-cards" element={<AdminGiftCards />} />
+                    <Route path="/admin/gift-card-products" element={<AdminGiftCardProducts />} />
+                    <Route path="/admin/products" element={<AdminProducts />} />
+                    <Route path="/admin/coupons" element={<AdminCoupons />} />
+                    <Route path="/admin/delivery" element={<AdminDelivery />} />
+                    <Route path="/admin/taxes" element={<AdminTax />} />
+                    <Route path="/admin/attributes" element={<AdminAttributes />} />
+                    <Route path="/admin/reports" element={<AdminReports />} />
+                    <Route path="/admin/settings" element={<AdminSettings />} />
+                    <Route path="/admin/categories" element={<AdminCategories />} />
+                    <Route path="/admin/flash-sales" element={<AdminFlashSales />} />
+                    <Route path="/admin/banners" element={<AdminBanners />} />
+                    <Route path="/admin/testimonials" element={<AdminTestimonials />} />
+                    <Route path="/admin/brand-partners" element={<AdminBrandPartners />} />
+                    <Route path="/admin/site-settings" element={<AdminSiteSettings />} />
+                    <Route path="/admin/subscribers" element={<AdminSubscribers />} />
+                    <Route path="/admin/sellers" element={<AdminSellers />} />
+                    <Route path="/admin/commissions" element={<AdminCommissions />} />
+                    <Route path="/admin/payouts" element={<AdminPayouts />} />
+                    <Route path="/admin/product-approval" element={<AdminProductApproval />} />
+                    <Route path="/admin/reviews" element={<AdminReviews />} />
+                    <Route path="/admin/tickets" element={<AdminTickets />} />
+                    <Route path="/admin/customer-queries" element={<AdminCustomerQueries />} />
+                    <Route path="/admin/seller-verification" element={<AdminSellerVerification />} />
+                    <Route path="/admin/blogs" element={<AdminBlogs />} />
+                    <Route path="/admin/blogs/new" element={<AdminBlogEditor />} />
+                    <Route path="/admin/blogs/edit/:id" element={<AdminBlogEditor />} />
+                    <Route path="/admin/violations" element={<AdminViolations />} />
+                    <Route path="/admin/seller-reports" element={<AdminSellerReports />} />
+                    <Route path="/admin/finance" element={<FinanceDashboard />} />
+                    <Route path="/admin/pos" element={<POS />} />
+                    <Route path="/admin/notifications" element={<AdminNotifications />} />
+                    <Route path="/admin/abonnes" element={<AdminAbonne />} />
+                  </Route>
+
+                  {/* Seller Routes with Shared Layout */}
+                  <Route element={
+                    <ProtectedRoute allowedRoles={['seller', 'admin', 'cashier']}>
+                      <SellerLayout />
                     </ProtectedRoute>
-                  } />
+                  }>
+                    <Route path="/seller/dashboard" element={<SellerDashboard />} />
+                    <Route path="/seller/pos" element={<SellerPOS />} />
+                    <Route path="/seller/products" element={<SellerProducts />} />
+                    <Route path="/seller/orders" element={<SellerOrders />} />
+                    <Route path="/seller/print-orders" element={<SellerPrintOrders />} />
+                    <Route path="/seller/orders/:id" element={<SellerOrderDetails />} />
+                    <Route path="/seller/payouts" element={<SellerPayouts />} />
+                    <Route path="/seller/profile" element={<SellerProfile />} />
+                    <Route path="/seller/abonnes" element={<SellerAbonne />} />
+                    <Route path="/seller/reports" element={<SellerReports />} />
+                    <Route path="/seller/team" element={<SellerTeam />} />
+                    <Route path="/seller/notifications" element={<SellerNotifications />} />
+                    <Route path="/seller/shifts" element={<SellerShifts />} />
+                  </Route>
+
+                  <Route path="/become-seller" element={<SellerRegistration />} />
+                  <Route path="/forgot-password" element={<ForgotPassword />} />
+                  <Route path="/logout" element={<Logout />} />
+
                   <Route path="/dashboard" element={
                     <ProtectedRoute allowedRoles={['customer', 'seller', 'admin', 'cashier']}>
                       <UserDashboard />
@@ -144,250 +207,6 @@ function App() {
                   } />
                   <Route path="/guest" element={<div>Guest Page</div>} />
 
-                  {/* Seller Routes */}
-                  <Route path="/seller/dashboard" element={
-                    <ProtectedRoute allowedRoles={['seller', 'admin']}>
-                      <SellerDashboard />
-                    </ProtectedRoute>
-                  } />
-                  <Route path="/seller/pos" element={
-                    <ProtectedRoute allowedRoles={['seller', 'admin']}>
-                      <SellerPOS />
-                    </ProtectedRoute>
-                  } />
-                  <Route path="/seller/products" element={
-                    <ProtectedRoute allowedRoles={['seller', 'admin']}>
-                      <SellerProducts />
-                    </ProtectedRoute>
-                  } />
-                  {/* SellerAddProduct route removed */}
-
-                  <Route path="/seller/orders" element={
-                    <ProtectedRoute allowedRoles={['seller', 'admin']}>
-                      <SellerOrders />
-                    </ProtectedRoute>
-                  } />
-                  <Route path="/seller/print-orders" element={
-                    <ProtectedRoute allowedRoles={['seller', 'admin']}>
-                      <SellerPrintOrders />
-                    </ProtectedRoute>
-                  } />
-                  <Route path="/seller/orders/:id" element={
-                    <ProtectedRoute allowedRoles={['seller', 'admin']}>
-                      <SellerOrderDetails />
-                    </ProtectedRoute>
-                  } />
-                  <Route path="/seller/payouts" element={
-                    <ProtectedRoute allowedRoles={['seller', 'admin']}>
-                      <SellerPayouts />
-                    </ProtectedRoute>
-                  } />
-                  <Route path="/seller/profile" element={
-                    <ProtectedRoute allowedRoles={['seller', 'admin']}>
-                      <SellerProfile />
-                    </ProtectedRoute>
-                  } />
-                  <Route path="/seller/abonnes" element={
-                    <ProtectedRoute allowedRoles={['seller', 'admin']}>
-                      <SellerAbonne />
-                    </ProtectedRoute>
-                  } />
-                  <Route path="/seller/reports" element={
-                    <ProtectedRoute allowedRoles={['seller', 'admin']}>
-                      <SellerReports />
-                    </ProtectedRoute>
-                  } />
-                  <Route path="/seller/team" element={
-                    <ProtectedRoute allowedRoles={['seller', 'admin']}>
-                      <SellerTeam />
-                    </ProtectedRoute>
-                  } />
-
-                  <Route path="/become-seller" element={<SellerRegistration />} />
-
-                  <Route path="/forgot-password" element={<ForgotPassword />} />
-                  <Route path="/logout" element={<Logout />} />
-                  <Route path="/admin/orders" element={
-                    <ProtectedRoute allowedRoles={['admin']}>
-                      <AdminOrders />
-                    </ProtectedRoute>
-                  } />
-                  <Route path="/admin/orders/:id" element={
-                    <ProtectedRoute allowedRoles={['admin']}>
-                      <AdminOrderDetails />
-                    </ProtectedRoute>
-                  } />
-                  <Route path="/admin/gift-cards" element={
-                    <ProtectedRoute allowedRoles={['admin']}>
-                      <AdminGiftCards />
-                    </ProtectedRoute>
-                  } />
-                  <Route path="/admin/gift-card-products" element={
-                    <ProtectedRoute allowedRoles={['admin']}>
-                      <AdminGiftCardProducts />
-                    </ProtectedRoute>
-                  } />
-                  <Route path="/admin/products" element={
-                    <ProtectedRoute allowedRoles={['admin']}>
-                      <AdminProducts />
-                    </ProtectedRoute>
-                  } />
-                  <Route path="/admin/coupons" element={
-                    <ProtectedRoute allowedRoles={['admin']}>
-                      <AdminCoupons />
-                    </ProtectedRoute>
-                  } />
-                  <Route path="/admin/delivery" element={
-                    <ProtectedRoute allowedRoles={['admin']}>
-                      <AdminDelivery />
-                    </ProtectedRoute>
-                  } />
-                  <Route path="/admin/taxes" element={
-                    <ProtectedRoute allowedRoles={['admin']}>
-                      <AdminTax />
-                    </ProtectedRoute>
-                  } />
-                  <Route path="/admin/attributes" element={
-                    <ProtectedRoute allowedRoles={['admin']}>
-                      <AdminAttributes />
-                    </ProtectedRoute>
-                  } />
-                  <Route path="/admin/reports" element={
-                    <ProtectedRoute allowedRoles={['admin']}>
-                      <AdminReports />
-                    </ProtectedRoute>
-                  } />
-                  <Route path="/admin/settings" element={
-                    <ProtectedRoute allowedRoles={['admin']}>
-                      <AdminSettings />
-                    </ProtectedRoute>
-                  } />
-                  <Route path="/admin/categories" element={
-                    <ProtectedRoute allowedRoles={['admin']}>
-                      <AdminCategories />
-                    </ProtectedRoute>
-                  } />
-                  <Route path="/admin/flash-sales" element={
-                    <ProtectedRoute allowedRoles={['admin']}>
-                      <AdminFlashSales />
-                    </ProtectedRoute>
-                  } />
-                  <Route path="/admin/banners" element={
-                    <ProtectedRoute allowedRoles={['admin']}>
-                      <AdminBanners />
-                    </ProtectedRoute>
-                  } />
-                  <Route path="/admin/testimonials" element={
-                    <ProtectedRoute allowedRoles={['admin']}>
-                      <AdminTestimonials />
-                    </ProtectedRoute>
-                  } />
-                  <Route path="/admin/brand-partners" element={
-                    <ProtectedRoute allowedRoles={['admin']}>
-                      <AdminBrandPartners />
-                    </ProtectedRoute>
-                  } />
-                  <Route path="/admin/site-settings" element={
-                    <ProtectedRoute allowedRoles={['admin']}>
-                      <AdminSiteSettings />
-                    </ProtectedRoute>
-                  } />
-                  <Route path="/admin/subscribers" element={
-                    <ProtectedRoute allowedRoles={['admin']}>
-                      <AdminSubscribers />
-                    </ProtectedRoute>
-                  } />
-                  <Route path="/admin/sellers" element={
-                    <ProtectedRoute allowedRoles={['admin']}>
-                      <AdminSellers />
-                    </ProtectedRoute>
-                  } />
-                  <Route path="/admin/commissions" element={
-                    <ProtectedRoute allowedRoles={['admin']}>
-                      <AdminCommissions />
-                    </ProtectedRoute>
-                  } />
-                  <Route path="/admin/payouts" element={
-                    <ProtectedRoute allowedRoles={['admin']}>
-                      <AdminPayouts />
-                    </ProtectedRoute>
-                  } />
-                  <Route path="/admin/product-approval" element={
-                    <ProtectedRoute allowedRoles={['admin']}>
-                      <AdminProductApproval />
-                    </ProtectedRoute>
-                  } />
-                  <Route path="/admin/reviews" element={
-                    <ProtectedRoute allowedRoles={['admin']}>
-                      <AdminReviews />
-                    </ProtectedRoute>
-                  } />
-                  <Route path="/admin/tickets" element={
-                    <ProtectedRoute allowedRoles={['admin']}>
-                      <AdminTickets />
-                    </ProtectedRoute>
-                  } />
-                  <Route path="/admin/customer-queries" element={
-                    <ProtectedRoute allowedRoles={['admin']}>
-                      <AdminCustomerQueries />
-                    </ProtectedRoute>
-                  } />
-                  <Route path="/admin/seller-verification" element={
-                    <ProtectedRoute allowedRoles={['admin']}>
-                      <AdminSellerVerification />
-                    </ProtectedRoute>
-                  } />
-                  <Route path="/admin/blogs" element={
-                    <ProtectedRoute allowedRoles={['admin']}>
-                      <AdminBlogs />
-                    </ProtectedRoute>
-                  } />
-                  <Route path="/admin/blogs/new" element={
-                    <ProtectedRoute allowedRoles={['admin']}>
-                      <AdminBlogEditor />
-                    </ProtectedRoute>
-                  } />
-                  <Route path="/admin/blogs/edit/:id" element={
-                    <ProtectedRoute allowedRoles={['admin']}>
-                      <AdminBlogEditor />
-                    </ProtectedRoute>
-                  } />
-                  <Route path="/admin/violations" element={
-                    <ProtectedRoute allowedRoles={['admin']}>
-                      <AdminViolations />
-                    </ProtectedRoute>
-                  } />
-                  <Route path="/admin/seller-reports" element={
-                    <ProtectedRoute allowedRoles={['admin']}>
-                      <AdminSellerReports />
-                    </ProtectedRoute>
-                  } />
-                  <Route path="/admin/finance" element={
-                    <ProtectedRoute allowedRoles={['admin']}>
-                      <FinanceDashboard />
-                    </ProtectedRoute>
-                  } />
-                  <Route path="/admin/pos" element={
-                    <ProtectedRoute allowedRoles={['admin']}>
-                      <POS />
-                    </ProtectedRoute>
-                  } />
-                  <Route path="/admin/notifications" element={
-                    <ProtectedRoute allowedRoles={['admin']}>
-                      <AdminNotifications />
-                    </ProtectedRoute>
-                  } />
-                  <Route path="/admin/abonnes" element={
-                    <ProtectedRoute allowedRoles={['admin']}>
-                      <AdminAbonne />
-                    </ProtectedRoute>
-                  } />
-
-                  <Route path="/seller/notifications" element={
-                    <ProtectedRoute allowedRoles={['seller', 'admin']}>
-                      <SellerNotifications />
-                    </ProtectedRoute>
-                  } />
 
                 </Routes>
               </Router>

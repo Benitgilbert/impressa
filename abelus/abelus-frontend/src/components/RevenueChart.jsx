@@ -6,7 +6,7 @@ import axios from "../utils/axiosInstance";
 
 ChartJS.register(LineElement, PointElement, CategoryScale, LinearScale, Tooltip, Legend, Filler);
 
-function RevenueChart() {
+function RevenueChart({ refreshKey }) {
   const [chartData, setChartData] = useState(null);
   const [timeRange, setTimeRange] = useState("Month");
 
@@ -38,7 +38,7 @@ function RevenueChart() {
         ],
       });
     });
-  }, [timeRange]);
+  }, [timeRange, refreshKey]);
 
   const options = {
     responsive: true,

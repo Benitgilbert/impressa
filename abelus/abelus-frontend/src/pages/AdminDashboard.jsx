@@ -13,7 +13,6 @@ import PendingApprovalsWidget from "../components/PendingApprovalsWidget";
 import OrderStatusChart from "../components/OrderStatusChart";
 
 function AdminDashboard() {
-  const [sidebarOpen, setSidebarOpen] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
 
   useEffect(() => {
@@ -25,17 +24,9 @@ function AdminDashboard() {
   }, []);
 
   return (
-    <div className="min-h-screen bg-cream-100 dark:bg-charcoal-900 transition-colors duration-300">
-      {/* Sidebar */}
-      <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
-
-      {/* Main Content Area */}
-      <div className="lg:ml-64 min-h-screen flex flex-col transition-all duration-300">
-        {/* Topbar */}
-        <Topbar onMenuClick={() => setSidebarOpen(true)} title="Dashboard Overview" />
-
-        {/* Dashboard Content */}
-        <main className="flex-1 p-4 lg:p-6 max-w-[1600px] w-full mx-auto">
+    <div className="min-h-screen flex flex-col transition-all duration-300">
+      {/* Dashboard Content */}
+      <main className="flex-1 p-4 lg:p-6 max-w-[1600px] w-full mx-auto">
 
           {/* Metrics Cards */}
           <section className="mb-8">
@@ -49,10 +40,10 @@ function AdminDashboard() {
             </h2>
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               <div className="bg-white dark:bg-charcoal-800 rounded-2xl p-6 shadow-sm border border-cream-200 dark:border-charcoal-700 hover:shadow-lg transition-shadow">
-                <RevenueChart />
+                <RevenueChart refreshKey={refreshKey} />
               </div>
               <div className="bg-white dark:bg-charcoal-800 rounded-2xl p-6 shadow-sm border border-cream-200 dark:border-charcoal-700 hover:shadow-lg transition-shadow">
-                <WeeklyProfitChart />
+                <WeeklyProfitChart refreshKey={refreshKey} />
               </div>
             </div>
           </section>
@@ -64,13 +55,13 @@ function AdminDashboard() {
             </h2>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               <div className="bg-white dark:bg-charcoal-800 rounded-2xl p-6 shadow-sm border border-cream-200 dark:border-charcoal-700 hover:shadow-lg transition-shadow">
-                <TopSellersWidget />
+                <TopSellersWidget refreshKey={refreshKey} />
               </div>
               <div className="bg-white dark:bg-charcoal-800 rounded-2xl p-6 shadow-sm border border-cream-200 dark:border-charcoal-700 hover:shadow-lg transition-shadow">
-                <PendingApprovalsWidget />
+                <PendingApprovalsWidget refreshKey={refreshKey} />
               </div>
               <div className="bg-white dark:bg-charcoal-800 rounded-2xl p-6 shadow-sm border border-cream-200 dark:border-charcoal-700 hover:shadow-lg transition-shadow md:col-span-2 lg:col-span-1">
-                <OrderStatusChart />
+                <OrderStatusChart refreshKey={refreshKey} />
               </div>
             </div>
           </section>
@@ -79,7 +70,7 @@ function AdminDashboard() {
           <section className="mb-8">
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               <div className="bg-white dark:bg-charcoal-800 rounded-2xl p-6 shadow-sm border border-cream-200 dark:border-charcoal-700 hover:shadow-lg transition-shadow">
-                <LowStockWidget />
+                <LowStockWidget refreshKey={refreshKey} />
               </div>
               <div className="bg-white dark:bg-charcoal-800 rounded-2xl p-6 shadow-sm border border-cream-200 dark:border-charcoal-700 hover:shadow-lg transition-shadow">
                 <RecentOrderTable refreshKey={refreshKey} />
@@ -91,16 +82,15 @@ function AdminDashboard() {
           <section>
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               <div className="bg-white dark:bg-charcoal-800 rounded-2xl p-6 shadow-sm border border-cream-200 dark:border-charcoal-700 hover:shadow-lg transition-shadow">
-                <TopOrderedProductsTable />
+                <TopOrderedProductsTable refreshKey={refreshKey} />
               </div>
               <div className="bg-white dark:bg-charcoal-800 rounded-2xl p-6 shadow-sm border border-cream-200 dark:border-charcoal-700 hover:shadow-lg transition-shadow">
-                <CustomizationDemandTable />
+                <CustomizationDemandTable refreshKey={refreshKey} />
               </div>
             </div>
           </section>
 
         </main>
-      </div>
     </div>
   );
 }

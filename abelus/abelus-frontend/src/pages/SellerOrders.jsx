@@ -2,8 +2,6 @@ import { useState, useEffect, useCallback } from "react";
 import { Link } from "react-router-dom";
 import { FaEye, FaFilter, FaBox } from "react-icons/fa";
 import api from "../utils/axiosInstance";
-import SellerSidebar from "../components/SellerSidebar";
-import Header from "../components/Header";
 
 const SellerOrders = () => {
     const [orders, setOrders] = useState([]);
@@ -52,11 +50,7 @@ const SellerOrders = () => {
         : orders.filter(o => o.status === filterStatus);
 
     return (
-        <div className="flex h-screen bg-gray-50 dark:bg-gray-900 transition-colors duration-200 overflow-hidden">
-            <SellerSidebar />
-            <div className="flex-1 flex flex-col min-w-0 h-full overflow-hidden">
-                <Header />
-                <main className="flex-1 overflow-y-auto p-8">
+        <main className="flex-1 overflow-y-auto p-8">
                     <div className="max-w-7xl mx-auto">
                         {/* Page Header */}
                         <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
@@ -146,9 +140,7 @@ const SellerOrders = () => {
                             </div>
                         )}
                     </div>
-                </main>
-            </div>
-        </div>
+        </main>
     );
 };
 

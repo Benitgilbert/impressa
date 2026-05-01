@@ -5,13 +5,10 @@ import {
     FaFileAlt, FaChartLine, FaBox, FaIdCard, FaBuilding, FaDownload,
     FaExclamationCircle, FaCheck, FaEnvelope
 } from 'react-icons/fa';
-import Sidebar from '../components/Sidebar';
-import Topbar from '../components/Topbar';
 import api from '../utils/axiosInstance';
 const BASE_URL = (process.env.REACT_APP_API_URL || 'http://localhost:5000/api').replace(/\/api$/, '');
 
 export default function AdminSellers() {
-    const [sidebarOpen, setSidebarOpen] = useState(false);
     const [sellers, setSellers] = useState([]);
     const [stats, setStats] = useState({ total: 0, pending: 0, active: 0, rejected: 0, pendingVerification: 0 });
     const [loading, setLoading] = useState(true);
@@ -178,12 +175,7 @@ export default function AdminSellers() {
     }, [error, success]);
 
     return (
-        <div className="min-h-screen bg-cream-100 dark:bg-charcoal-900 transition-colors duration-300">
-            <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
-
-            <div className="lg:ml-64 min-h-screen flex flex-col transition-all duration-300">
-                <Topbar onMenuClick={() => setSidebarOpen(true)} title="Seller Management" />
-
+        <div className="min-h-screen flex flex-col transition-all duration-300">
                 <main className="flex-1 p-4 lg:p-6 max-w-[1600px] w-full mx-auto">
                     {/* Page Header */}
                     <div className="mb-6">
@@ -577,6 +569,5 @@ export default function AdminSellers() {
                     )}
                 </main>
             </div>
-        </div>
     );
 }

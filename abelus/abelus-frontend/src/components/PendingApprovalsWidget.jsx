@@ -3,7 +3,7 @@ import api from "../utils/axiosInstance";
 import { FaUserPlus, FaCheck, FaEye } from "react-icons/fa";
 import { Link } from "react-router-dom";
 
-function PendingApprovalsWidget() {
+function PendingApprovalsWidget({ refreshKey }) {
     const [approvals, setApprovals] = useState([]);
     const [stats, setStats] = useState({ pending: 0, total: 0, active: 0 });
     const [loading, setLoading] = useState(true);
@@ -21,7 +21,7 @@ function PendingApprovalsWidget() {
             }
         };
         fetchData();
-    }, []);
+    }, [refreshKey]);
 
     const formatDate = (date) => {
         return new Date(date).toLocaleDateString('en-US', {

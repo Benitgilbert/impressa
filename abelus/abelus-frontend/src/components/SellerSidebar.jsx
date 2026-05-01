@@ -91,6 +91,10 @@ function SellerSidebar({ isOpen, onClose }) {
                             <FaUserFriends className="text-lg opacity-70 group-hover:opacity-100" />
                             <span>Client Abonnés</span>
                         </Link>
+                        <Link to="/seller/shifts" className={getLinkClass('/seller/shifts')} onClick={onClose}>
+                            <FaHistory className="text-lg opacity-70 group-hover:opacity-100 text-indigo-400" />
+                            <span className="text-indigo-400">Shift History</span>
+                        </Link>
                         
                         {!isCashier && (
                             <>

@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import api from "../utils/axiosInstance";
 import { FaStore, FaMedal, FaChartLine } from "react-icons/fa";
 
-function TopSellersWidget() {
+function TopSellersWidget({ refreshKey }) {
     const [sellers, setSellers] = useState([]);
     const [loading, setLoading] = useState(true);
 
@@ -18,7 +18,7 @@ function TopSellersWidget() {
             }
         };
         fetchData();
-    }, []);
+    }, [refreshKey]);
 
     const getMedalColor = (index) => {
         switch (index) {

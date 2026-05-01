@@ -5,7 +5,7 @@ import { Chart as ChartJS, ArcElement, Tooltip, Legend } from "chart.js";
 
 ChartJS.register(ArcElement, Tooltip, Legend);
 
-function OrderStatusChart() {
+function OrderStatusChart({ refreshKey }) {
     const [data, setData] = useState(null);
     const [loading, setLoading] = useState(true);
 
@@ -45,7 +45,7 @@ function OrderStatusChart() {
             }
         };
         fetchData();
-    }, []);
+    }, [refreshKey]);
 
     const options = {
         responsive: true,
