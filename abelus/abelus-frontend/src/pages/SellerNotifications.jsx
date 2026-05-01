@@ -3,7 +3,6 @@ import api from "../utils/axiosInstance";
 import { FaCheck, FaCheckDouble, FaTrash, FaBell, FaInfoCircle, FaBox, FaMoneyBillWave, FaUserCheck, FaExclamationTriangle } from "react-icons/fa";
 
 const SellerNotifications = () => {
-    const [sidebarOpen, setSidebarOpen] = useState(false);
     const [notifications, setNotifications] = useState([]);
     const [loading, setLoading] = useState(true);
     const [filter, setFilter] = useState("all");

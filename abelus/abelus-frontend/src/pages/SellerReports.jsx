@@ -4,7 +4,6 @@ import { supabase } from "../utils/supabaseClient";
 import { FaDownload, FaFilePdf, FaFileCsv, FaHistory, FaCheckCircle, FaExclamationTriangle, FaMoneyBillWave, FaTimes } from "react-icons/fa";
 
 function SellerReports() {
-  const [sidebarOpen, setSidebarOpen] = useState(false);
   const [type, setType] = useState("daily");
   const [format, setFormat] = useState("pdf");
   const [from, setFrom] = useState(new Date().toISOString().slice(0, 10));

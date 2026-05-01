@@ -4,7 +4,6 @@ import { supabase } from "../utils/supabaseClient";
 import { FaDownload, FaFileAlt, FaFilePdf, FaFileCsv, FaHistory, FaSearch } from "react-icons/fa";
 
 function AdminReports() {
-  const [sidebarOpen, setSidebarOpen] = useState(false);
   const [type, setType] = useState("monthly");
   const [format, setFormat] = useState("pdf");
   const [from, setFrom] = useState("");

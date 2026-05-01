@@ -2,9 +2,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import api from "../utils/axiosInstance";
 import assetUrl from "../utils/assetUrl";
 import { FaSearch, FaShoppingCart, FaTrash, FaPlus, FaMinus, FaMoneyBillWave, FaMobileAlt, FaBoxOpen, FaStore, FaBarcode, FaTimes } from "react-icons/fa";
-import Header from "../components/Header";
 import Receipt from "../components/Receipt";
-import SellerSidebar from "../components/SellerSidebar";
 
 // Beep sound for successful scan
 const playBeep = () => {
