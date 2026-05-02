@@ -37,7 +37,8 @@ function ProductCreateEditModal({ product, onClose, onSaved }) {
       ...v,
       attributes: v.attributes || {},
       price: v.price || "",
-      stock: v.stock || ""
+      stock: v.stock || "",
+      conversionFactor: v.conversionFactor || 1
     }));
   };
 
@@ -198,6 +199,7 @@ function ProductCreateEditModal({ product, onClose, onSaved }) {
         attributes: combo,
         price: form.price,
         stock: form.stock, // Default to main stock
+        conversionFactor: 1,
         sku: sku,
         image: null
       };
@@ -296,6 +298,7 @@ function ProductCreateEditModal({ product, onClose, onSaved }) {
         attributes: v.attributes,
         price: Number(v.price),
         stock: Number(v.stock),
+        conversionFactor: Number(v.conversionFactor) || 1,
         sku: v.sku
         // Handling images would require separate FormData logic or existing logic
       }));
@@ -723,6 +726,17 @@ function ProductCreateEditModal({ product, onClose, onSaved }) {
                         onChange={(e) => handleVariationChange(idx, "stock", e.target.value)}
                         className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-1 focus:ring-indigo-500 bg-white dark:bg-gray-700 dark:text-white text-sm"
                       />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1 uppercase tracking-wide">Conversion Factor</label>
+                      <input
+                        type="number"
+                        placeholder="e.g. 50"
+                        value={v.conversionFactor}
+                        onChange={(e) => handleVariationChange(idx, "conversionFactor", e.target.value)}
+                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-1 focus:ring-indigo-500 bg-white dark:bg-gray-700 dark:text-white text-sm"
+                      />
+                      <p className="text-[10px] text-gray-400 mt-1">1 Box = X Pieces</p>
                     </div>
                   </div>
                 </div>

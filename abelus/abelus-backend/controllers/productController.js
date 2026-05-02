@@ -278,6 +278,7 @@ export const createProduct = async (req, res) => {
               stock: Number(v.stock) || 0,
               image: v.image || null,
               attributes: v.attributes || {},
+              conversionFactor: Number(v.conversionFactor) || 1,
               isActive: v.isActive !== false
             }))
           }
@@ -649,6 +650,7 @@ export const updateProduct = async (req, res) => {
             stock: Number(v.stock) || 0,
             image: v.image || null,
             attributes: v.attributes || {},
+            conversionFactor: Number(v.conversionFactor) || 1,
             isActive: v.isActive !== false
           }))
         },

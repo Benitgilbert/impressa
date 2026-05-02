@@ -213,6 +213,7 @@ model ProductVariation {
   attributes  Json     // Map of attribute name to value
   price       Float
   stock       Int      @default(0)
+  conversionFactor Int @default(1)
   image       String?
   isActive    Boolean  @default(true)
 

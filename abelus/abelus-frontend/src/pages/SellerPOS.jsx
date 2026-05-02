@@ -270,19 +270,32 @@ export default function SellerPOS() {
     };
 
     const addVariationToCart = (variation) => {
-        if (variation.stock <= 0) return;
+        const factor = variation.conversionFactor || 1;
+        // If variation.stock is 0, we assume it's using the shared parent stock.
+        // If variation.stock is > 0, we treat it as independent stock (unless factor > 1).
+        const availableInUnits = variation.stock > 0 && factor === 1
+            ? variation.stock 
+            : Math.floor((selectedProductForVariation.stock || 0) / factor);
+
+        if (availableInUnits <= 0) {
+            alert("Out of stock for this unit");
+            return;
+        }
+
         let attrString = "";
         if (variation.attributes) {
             const attrs = typeof variation.attributes === 'object' ? Object.values(variation.attributes) : [];
             attrString = attrs.join(" / ");
         }
+
         const productToAdd = {
             ...selectedProductForVariation,
             id: selectedProductForVariation.id, 
             variationId: variation.sku, 
             name: `${selectedProductForVariation.name} - ${attrString}`,
             price: variation.price,
-            stock: variation.stock,
+            stock: availableInUnits, // Reflect units available
+            conversionFactor: factor,
             image: variation.image || selectedProductForVariation.image
         };
         addToCart(productToAdd, true); 
@@ -320,6 +333,24 @@ export default function SellerPOS() {
                     // Skip stock check for services
                     if (item.type !== 'service' && newQty > (item.stock || 0)) return item;
                     return { ...item, quantity: newQty };
+                }
+                return item;
+            })
+        );
+    };
+
+    const setSpecificQuantity = (uniqueId, value) => {
+        const qty = parseInt(value);
+        if (isNaN(qty)) return; 
+        
+        setCart(prev =>
+            prev.map((item) => {
+                if ((item.uniqueId || item.id) === uniqueId) {
+                    let finalQty = Math.max(1, qty);
+                    if (item.type !== 'service' && finalQty > (item.stock || 0)) {
+                        finalQty = item.stock || 0;
+                    }
+                    return { ...item, quantity: finalQty };
                 }
                 return item;
             })
@@ -1022,7 +1053,13 @@ export default function SellerPOS() {
                                             >
                                                 <FaMinus size={10} />
                                             </button>
-                                            <span className="w-6 text-center text-sm font-bold text-gray-800 dark:text-white">{item.quantity}</span>
+                                            <input 
+                                                type="number"
+                                                min="1"
+                                                value={item.quantity}
+                                                onChange={(e) => setSpecificQuantity(item.uniqueId || item.id || item.id, e.target.value)}
+                                                className="w-8 text-center text-sm font-bold text-gray-800 dark:text-white bg-transparent outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                            />
                                             <button
                                                 onClick={() => updateQuantity(item.uniqueId || item.id || item.id, 1)}
                                                 className="w-7 h-7 flex items-center justify-center rounded bg-white dark:bg-gray-700 text-gray-600 dark:text-gray-300 shadow-sm hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors"

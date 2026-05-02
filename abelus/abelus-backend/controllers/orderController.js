@@ -154,6 +154,7 @@ export const createOrder = async (req, res) => {
           const variation = product.variations.find(v => v.sku === item.variationId);
           if (!variation) throw new Error(`Variation ${item.variationId} not found`);
 
+          const decrementQty = Number(item.quantity) * (variation.conversionFactor || 1);
           const updatedVariation = await tx.productVariation.updateMany({
             where: { id: variation.id, stock: { gte: Number(item.quantity) } },
             data: { stock: { decrement: Number(item.quantity) } }
@@ -162,7 +163,7 @@ export const createOrder = async (req, res) => {
 
           await tx.product.update({
             where: { id: product.id },
-            data: { stock: { decrement: Number(item.quantity) }, salesCount: { increment: Number(item.quantity) } }
+            data: { stock: { decrement: decrementQty }, salesCount: { increment: decrementQty } }
           });
         } else {
           const updated = await tx.product.updateMany({
@@ -636,6 +637,7 @@ export const createPOSOrder = async (req, res) => {
           
           // Only check/decrement stock for physical products (atomic)
           if (product.type !== 'service') {
+            const decrementQty = Number(item.quantity) * (variation.conversionFactor || 1);
             const updatedVariation = await tx.productVariation.updateMany({
               where: { id: variation.id, stock: { gte: Number(item.quantity) } },
               data: { stock: { decrement: Number(item.quantity) } }
@@ -658,11 +660,14 @@ export const createPOSOrder = async (req, res) => {
 
         // Update product sales count (and stock for variations, since updateMany above only handles non-variation)
         if (item.variationId || product.type === 'service') {
+          const variation = item.variationId ? product.variations.find(v => v.sku === item.variationId) : null;
+          const decrementQty = Number(item.quantity) * (variation?.conversionFactor || 1);
+          
           await tx.product.update({
             where: { id: product.id },
             data: {
-              ...(product.type !== 'service' && item.variationId && { stock: { decrement: Number(item.quantity) } }),
-              salesCount: { increment: Number(item.quantity) }
+              ...(product.type !== 'service' && item.variationId && { stock: { decrement: decrementQty } }),
+              salesCount: { increment: decrementQty }
             }
           });
         }
