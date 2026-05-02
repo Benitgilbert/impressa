@@ -63,6 +63,7 @@ const app = express();
 const allowedOrigins = [
   process.env.FRONTEND_URL,
   "https://pastorbonus.vercel.app",
+  "https://pastorbonuss.vercel.app",
   "https://abelus.com",
   "https://www.abelus.com",
   "https://abeluss-backend.vercel.app",
