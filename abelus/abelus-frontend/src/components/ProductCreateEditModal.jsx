@@ -246,12 +246,14 @@ function ProductCreateEditModal({ product, onClose, onSaved }) {
         }
 
         // 2. Calculate Total Stock from Variations
-        const variationStocks = form.variations
-          .map(v => Number(v.stock))
-          .filter(s => !isNaN(s));
-
-        if (variationStocks.length > 0) {
-          finalStock = variationStocks.reduce((a, b) => a + b, 0);
+        // If conversion factors are used, we look for the "Base Unit" (Factor 1)
+        // as the master stock. If multiple variations have factor 1, we sum them.
+        // If no factor 1 exists, we sum (stock * factor).
+        const baseVariations = form.variations.filter(v => (v.conversionFactor || 1) === 1);
+        if (baseVariations.length > 0) {
+          finalStock = baseVariations.reduce((a, b) => a + Number(b.stock || 0), 0);
+        } else {
+          finalStock = form.variations.reduce((a, b) => a + (Number(b.stock || 0) * (b.conversionFactor || 1)), 0);
         }
       }
 

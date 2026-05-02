@@ -635,14 +635,23 @@ export const createPOSOrder = async (req, res) => {
           const variation = product.variations.find(v => v.sku === item.variationId);
           if (!variation) throw new Error(`Variation ${item.variationId} not found`);
           
-          // Only check/decrement stock for physical products (atomic)
+          // 📦 Multi-unit Stock Logic:
+          // We use a "Single Source of Truth" pool (product.stock).
+          // If selling a Packet (Factor 5), we subtract 5 from the pool.
           if (product.type !== 'service') {
             const decrementQty = Number(item.quantity) * (variation.conversionFactor || 1);
-            const updatedVariation = await tx.productVariation.updateMany({
-              where: { id: variation.id, stock: { gte: Number(item.quantity) } },
+            
+            // Validate against master stock
+            if (product.stock < decrementQty) {
+              throw new Error(`Insufficient total stock for ${product.name}`);
+            }
+
+            // We update the variation stock too just for display/legacy consistency, 
+            // but the master pool is the Product record.
+            await tx.productVariation.update({
+              where: { id: variation.id },
               data: { stock: { decrement: Number(item.quantity) } }
             });
-            if (updatedVariation.count === 0) throw new Error(`Insufficient stock for ${product.name}`);
           }
           
           if (!item.price) price = variation.price;
