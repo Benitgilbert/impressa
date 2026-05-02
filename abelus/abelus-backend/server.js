@@ -63,6 +63,8 @@ const app = express();
 const allowedOrigins = [
   process.env.FRONTEND_URL,
   "https://pastorbonus.vercel.app",
+  "https://abelus.com",
+  "https://www.abelus.com",
   "https://abeluss-backend.vercel.app",
   "http://localhost:5000",
   "http://localhost:3000",
@@ -70,15 +72,25 @@ const allowedOrigins = [
 
 app.use(cors({
   origin: function (origin, callback) {
-    if (!origin || allowedOrigins.includes(origin) || origin.endsWith('.vercel.app')) {
+    // Allow requests with no origin (like mobile apps or curl)
+    if (!origin) return callback(null, true);
+    
+    const isAllowed = allowedOrigins.includes(origin) || 
+                      origin.endsWith('.vercel.app') || 
+                      origin.endsWith('.amplifyapp.com');
+                      
+    if (isAllowed) {
       callback(null, true);
     } else {
+      logger.warn(`CORS blocked for origin: ${origin}`);
       callback(new Error('Not allowed by CORS'));
     }
   },
   credentials: true,
   methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-  allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With", "Accept"],
+  allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With", "Accept", "X-Refresh-Token"],
+  preflightContinue: false,
+  optionsSuccessStatus: 204
 }));
 
 // 2. ✅ Other Global Middleware
