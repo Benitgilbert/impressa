@@ -1027,7 +1027,7 @@ export default function SellerPOS() {
                                         <div
                                             key={product.id || product.id}
                                             onClick={() => handleProductClick(product)}
-                                            className={`group bg-white dark:bg-gray-700 rounded-xl border border-gray-100 dark:border-gray-600 overflow-hidden cursor-pointer hover:shadow-lg transition-all transform hover:-translate-y-1 relative ${product.stock <= 0 && product.type !== 'variable' ? 'opacity-60 pointer-events-none grayscale' : ''
+                                            className={`group bg-white dark:bg-gray-700 rounded-xl border border-gray-100 dark:border-gray-600 overflow-hidden cursor-pointer hover:shadow-lg transition-all transform hover:-translate-y-1 relative ${(product.stock <= 0 && product.type !== 'variable' && (!product.bundleConfigurations || product.bundleConfigurations.length === 0)) ? 'opacity-60 pointer-events-none grayscale' : ''
                                                 }`}
                                         >
                                             <div className="aspect-square bg-gray-100 dark:bg-gray-600 relative overflow-hidden">
@@ -1047,7 +1047,7 @@ export default function SellerPOS() {
                                                         <span className="bg-red-600 text-white text-xs font-bold px-2 py-1 rounded shadow-sm transform -rotate-12">OUT OF STOCK</span>
                                                     </div>
                                                 )}
-                                                {product.type === 'variable' && (
+                                                {(product.type === 'variable' || (product.bundleConfigurations && product.bundleConfigurations.length > 0)) && (
                                                     <div className="absolute top-2 right-2 bg-indigo-600 text-white text-[10px] font-bold px-2 py-1 rounded-full shadow-sm">
                                                         OPTIONS
                                                     </div>
@@ -1058,7 +1058,7 @@ export default function SellerPOS() {
                                                 <div className="flex justify-between items-center">
                                                     <span className="text-indigo-600 dark:text-indigo-400 font-bold text-sm">RWF {getItemPrice(product).toLocaleString()}</span>
                                                     <span className="text-xs text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-gray-600 px-1.5 py-0.5 rounded">
-                                                        {product.type === 'variable' ? 'Var' : `${product.stock} left`}
+                                                        {(product.type === 'variable' || (product.bundleConfigurations && product.bundleConfigurations.length > 0)) ? 'Units' : `${product.stock} left`}
                                                     </span>
                                                 </div>
                                             </div>
