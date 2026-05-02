@@ -4,6 +4,7 @@ import { supabase } from "./supabaseClient";
 const instance = axios.create({
   baseURL: process.env.REACT_APP_API_URL || "/api",
   withCredentials: true,
+  timeout: 20000, // 20 seconds
 });
 
 /**

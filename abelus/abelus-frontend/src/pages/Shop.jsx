@@ -136,7 +136,7 @@ export default function Shop() {
 
         if (sortBy === "featured") {
           const { data } = await api.get("/products/featured/list");
-          const productList = Array.isArray(data) ? data : (data.products || []);
+          const productList = Array.isArray(data) ? data : (data.data || data.products || []);
           setProducts(productList);
           setLoading(false);
           return;
@@ -175,7 +175,7 @@ export default function Shop() {
         if (sortBy && sortBy !== "newest") params.append("sort", sortBy);
 
         const { data } = await api.get(`/products?${params.toString()}`);
-        let productList = Array.isArray(data) ? data : (data.products || []);
+        let productList = Array.isArray(data) ? data : (data.data || data.products || []);
 
         if (sortBy === "price-asc") {
           productList = [...productList].sort((a, b) => a.price - b.price);

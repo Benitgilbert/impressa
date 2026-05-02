@@ -1096,7 +1096,7 @@ export const lookupByBarcode = async (req, res) => {
 
     const product = await prisma.product.findFirst({
       where,
-      select: { id: true, name: true, price: true, stock: true, barcode: true, sku: true, image: true, sellerId: true }
+      select: { id: true, name: true, price: true, stock: true, barcode: true, sku: true, image: true, sellerId: true, bundleConfigurations: true }
     });
 
     if (!product) return res.status(404).json({ message: "Product not found" });
@@ -1121,7 +1121,7 @@ export const getSellerPOSProducts = async (req, res) => {
           { type: 'variable' }
         ]
       },
-      select: { id: true, name: true, price: true, stock: true, image: true, sku: true, type: true, variations: true },
+      select: { id: true, name: true, price: true, stock: true, image: true, sku: true, type: true, variations: true, bundleConfigurations: true },
       orderBy: { name: 'asc' }
     });
     res.json({ success: true, data: products });
@@ -1136,7 +1136,7 @@ export const getAdminPOSProducts = async (req, res) => {
     const adminIds = admins.map(a => a.id);
     const products = await prisma.product.findMany({
       where: { sellerId: { in: adminIds }, stock: { gt: 0 } },
-      select: { id: true, name: true, price: true, stock: true, image: true, sku: true, type: true, variations: true },
+      select: { id: true, name: true, price: true, stock: true, image: true, sku: true, type: true, variations: true, bundleConfigurations: true },
       orderBy: { name: 'asc' }
     });
     res.json({ success: true, data: products });

@@ -26,7 +26,7 @@ const POS = () => {
     const fetchProducts = async () => {
         try {
             const { data } = await api.get("/products");
-            setProducts(data.products || data);
+            setProducts(data.data || data.products || data);
         } catch (error) {
             toast.error("Failed to load products");
         } finally {

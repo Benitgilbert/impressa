@@ -191,6 +191,7 @@ const isTest = process.env.NODE_ENV === 'test';
 if (!isVercel && !isTest) {
   const startServer = async () => {
     try {
+      logger.info("Starting server initialization...");
       await prisma.$connect();
       logger.info("✅ Prisma connected to Supabase");
 
@@ -199,9 +200,14 @@ if (!isVercel && !isTest) {
         logger.info(`🚀 Server running on port ${PORT}`);
       });
 
+      server.on("error", (err) => {
+        logger.error({ err }, "Server handle error");
+      });
+
       const gracefulShutdown = async (signal) => {
         logger.info(`${signal} received, shutting down...`);
         server.close(async () => {
+          logger.info("Server closed, disconnecting Prisma...");
           await prisma.$disconnect();
           process.exit(0);
         });
@@ -209,8 +215,14 @@ if (!isVercel && !isTest) {
 
       process.on("SIGTERM", () => gracefulShutdown("SIGTERM"));
       process.on("SIGINT", () => gracefulShutdown("SIGINT"));
+
+      // Safety: Log if the event loop is empty
+      process.on('exit', (code) => {
+        logger.info(`Process exiting with code: ${code}`);
+      });
+      
     } catch (err) {
-      logger.fatal({ err }, "❌ Failed to start server");
+      logger.fatal({ err }, "❌ Failed to start server during initialization");
       process.exit(1);
     }
   };

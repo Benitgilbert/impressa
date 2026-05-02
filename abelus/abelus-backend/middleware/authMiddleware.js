@@ -8,22 +8,38 @@ export const authMiddleware = (requiredRoles = []) => {
     const token = req.headers.authorization?.split(" ")[1];
     if (!token) return res.status(401).json({ message: "No token provided" });
 
+    const startTime = Date.now();
     try {
-      // 1. Verify token with Supabase
-      const { data: { user: sbUser }, error: sbError } = await supabase.auth.getUser(token);
+      // 1. Verify token with Supabase (with a safety timeout)
+      const authPromise = supabase.auth.getUser(token);
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error("Supabase Auth Timeout")), 8000)
+      );
+
+      const { data: { user: sbUser }, error: sbError } = await Promise.race([authPromise, timeoutPromise]);
       
+      const authTime = Date.now() - startTime;
+      if (authTime > 2000) {
+        console.warn(`[AUTH] Slow Supabase Auth: ${authTime}ms`);
+      }
+
       if (sbError || !sbUser) {
         console.warn("Supabase Auth Error:", sbError?.message || "No user found for token");
         return res.status(401).json({ message: "Invalid or expired token" });
       }
 
       // 2. Fetch user from our public table to get role and other metadata
+      const dbStartTime = Date.now();
       let user = await prisma.user.findUnique({
         where: { id: sbUser.id }
       });
+      const dbTime = Date.now() - dbStartTime;
+      
+      if (dbTime > 1000) {
+        console.warn(`[AUTH] Slow DB Lookup: ${dbTime}ms for user ${sbUser.email}`);
+      }
 
       // SELF-HEALING: If user exists in Auth but not in our public table, create them now.
-      // This prevents "User not found" errors if the DB trigger failed or was delayed.
       if (!user) {
         console.warn(`User ${sbUser.id} missing from public.User table. Attempting to heal...`);
         try {
@@ -54,11 +70,19 @@ export const authMiddleware = (requiredRoles = []) => {
         });
       }
 
+      const totalTime = Date.now() - startTime;
+      if (totalTime > 3000) {
+        console.warn(`[AUTH] Total middleware time high: ${totalTime}ms`);
+      }
+
       next();
     } catch (err) {
-      console.error("CRITICAL: Auth Middleware Crash:", err.message, err.stack);
-      res.status(500).json({ 
-        message: "Authentication server error",
+      const totalTime = Date.now() - startTime;
+      console.error(`CRITICAL: Auth Middleware Crash (${totalTime}ms):`, err.message, err.stack);
+      
+      const statusCode = err.message === "Supabase Auth Timeout" ? 408 : 500;
+      res.status(statusCode).json({ 
+        message: err.message === "Supabase Auth Timeout" ? "Authentication timed out" : "Authentication server error",
         debug: process.env.NODE_ENV === 'development' ? err.message : undefined 
       });
     }
