@@ -260,19 +260,26 @@ export default function SellerPOS() {
     };
 
     const [selectedProductForVariation, setSelectedProductForVariation] = useState(null);
+    const [selectedProductForBundle, setSelectedProductForBundle] = useState(null);
+    const [selectedVariationForBundle, setSelectedVariationForBundle] = useState(null);
 
     const handleProductClick = (product) => {
         if (product.type === 'variable' && product.variations && product.variations.length > 0) {
             setSelectedProductForVariation(product);
+        } else if (product.bundleConfigurations && product.bundleConfigurations.length > 0) {
+            setSelectedProductForBundle(product);
         } else {
             addToCart(product);
         }
     };
 
     const addVariationToCart = (variation) => {
+        if (selectedProductForVariation.bundleConfigurations && selectedProductForVariation.bundleConfigurations.length > 0) {
+            setSelectedVariationForBundle(variation);
+            return;
+        }
+
         const factor = variation.conversionFactor || 1;
-        // If variation.stock is 0, we assume it's using the shared parent stock.
-        // If variation.stock is > 0, we treat it as independent stock (unless factor > 1).
         const availableInUnits = variation.stock > 0 && factor === 1
             ? variation.stock 
             : Math.floor((selectedProductForVariation.stock || 0) / factor);
@@ -294,11 +301,52 @@ export default function SellerPOS() {
             variationId: variation.sku, 
             name: `${selectedProductForVariation.name} - ${attrString}`,
             price: variation.price,
-            stock: availableInUnits, // Reflect units available
+            stock: availableInUnits,
             conversionFactor: factor,
             image: variation.image || selectedProductForVariation.image
         };
         addToCart(productToAdd, true); 
+        setSelectedProductForVariation(null);
+    };
+
+    const addBundleToCart = (bundle) => {
+        const product = selectedProductForBundle || selectedProductForVariation;
+        const variation = selectedVariationForBundle;
+        
+        const factor = bundle.pcsPerUnit || 1;
+        // If variation exists, check if it has its own stock pool (factor 1)
+        const parentStock = variation 
+            ? (variation.stock > 0 && (variation.conversionFactor || 1) === 1 ? variation.stock : (product.stock || 0)) 
+            : (product.stock || 0);
+            
+        const availableInUnits = Math.floor(parentStock / factor);
+
+        if (availableInUnits <= 0) {
+            alert("Out of stock for this unit");
+            return;
+        }
+
+        let name = product.name;
+        let attrString = "";
+        if (variation && variation.attributes) {
+             const attrs = typeof variation.attributes === 'object' ? Object.values(variation.attributes) : [];
+             attrString = attrs.join(" / ");
+             name = `${product.name} - ${attrString}`;
+        }
+        
+        const productToAdd = {
+            ...product,
+            variationId: variation ? variation.sku : product.id,
+            name: `${name} (${bundle.unitType})`,
+            price: bundle.price,
+            stock: availableInUnits,
+            conversionFactor: factor,
+            image: (variation && variation.image) || product.image
+        };
+
+        addToCart(productToAdd, true);
+        setSelectedProductForBundle(null);
+        setSelectedVariationForBundle(null);
         setSelectedProductForVariation(null);
     };
 
@@ -386,7 +434,8 @@ export default function SellerPOS() {
                     product: item.id,
                     quantity: item.quantity,
                     variationId: item.variationId,
-                    price: getItemPrice(item)
+                    price: getItemPrice(item),
+                    conversionFactor: item.conversionFactor || 1
                 })),
                 paymentMethod: method,
                 phone: phone,
@@ -701,7 +750,7 @@ export default function SellerPOS() {
                         </div>
                     )}
 
-                    {selectedProductForVariation && (
+                    {selectedProductForVariation && !selectedVariationForBundle && (
                         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
                             <div className="bg-white dark:bg-gray-800 p-8 rounded-2xl shadow-2xl max-w-lg w-full animate-in fade-in zoom-in duration-200">
                                 <div className="flex justify-between items-start mb-6">
@@ -718,6 +767,13 @@ export default function SellerPOS() {
 
                                 <div className="space-y-3 max-h-96 overflow-y-auto pr-2">
                                     {selectedProductForVariation.variations.map((v, idx) => {
+                                        const factor = v.conversionFactor || 1;
+                                        // Shared Stock Logic: If v.stock is 0, we check the parent product stock
+                                        const unitsAvailable = v.stock > 0 && factor === 1
+                                            ? v.stock 
+                                            : Math.floor((selectedProductForVariation.stock || 0) / factor);
+                                        const isAvailable = unitsAvailable > 0;
+
                                         let attrDisplay = "";
                                         if (v.attributes && typeof v.attributes === 'object') {
                                             attrDisplay = Object.values(v.attributes).join(" / ");
@@ -726,8 +782,8 @@ export default function SellerPOS() {
                                         return (
                                             <div
                                                 key={idx}
-                                                onClick={() => addVariationToCart(v)}
-                                                className={`p-4 rounded-xl border-2 flex justify-between items-center cursor-pointer transition-all ${v.stock > 0
+                                                onClick={() => isAvailable && addVariationToCart(v)}
+                                                className={`p-4 rounded-xl border-2 flex justify-between items-center cursor-pointer transition-all ${isAvailable
                                                     ? 'border-gray-200 dark:border-gray-700 hover:border-indigo-500 hover:bg-indigo-50 dark:hover:bg-indigo-900/20'
                                                     : 'border-gray-100 dark:border-gray-800 opacity-50 cursor-not-allowed bg-gray-50 dark:bg-gray-900'
                                                     }`}
@@ -738,8 +794,73 @@ export default function SellerPOS() {
                                                 </div>
                                                 <div className="text-right">
                                                     <p className="font-bold text-indigo-600 dark:text-indigo-400">RWF {v.price.toLocaleString()}</p>
-                                                    <p className={`text-xs font-bold ${v.stock > 0 ? 'text-green-600' : 'text-red-500'}`}>
-                                                        {v.stock > 0 ? `${v.stock} in stock` : 'Out of Stock'}
+                                                    <p className={`text-xs font-bold ${isAvailable ? 'text-green-600' : 'text-red-500'}`}>
+                                                        {isAvailable ? `${unitsAvailable} in stock` : 'Out of Stock'}
+                                                    </p>
+                                                </div>
+                                            </div>
+                                        )
+                                    })}
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {(selectedProductForBundle || selectedVariationForBundle) && (
+                        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+                            <div className="bg-white dark:bg-gray-800 p-8 rounded-2xl shadow-2xl max-w-lg w-full animate-in fade-in zoom-in duration-200">
+                                <div className="flex justify-between items-start mb-6">
+                                    <h3 className="text-2xl font-bold text-gray-800 dark:text-white">
+                                        Select Packaging Unit
+                                    </h3>
+                                    <button onClick={() => { setSelectedProductForBundle(null); setSelectedVariationForBundle(null); }} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200">
+                                        <FaTimes size={24} />
+                                    </button>
+                                </div>
+                                <p className="text-gray-500 dark:text-gray-400 mb-6 font-medium">
+                                    Choose a unit for <span className="font-bold text-gray-900 dark:text-white">
+                                        {selectedVariationForBundle 
+                                            ? `${selectedProductForVariation.name} - ${Object.values(selectedVariationForBundle.attributes).join(" / ")}`
+                                            : selectedProductForBundle.name
+                                        }
+                                    </span>
+                                </p>
+
+                                <div className="space-y-3 max-h-96 overflow-y-auto pr-2">
+                                    {(selectedVariationForBundle ? selectedProductForVariation : selectedProductForBundle).bundleConfigurations.map((bundle, idx) => {
+                                        const factor = bundle.pcsPerUnit || 1;
+                                        const product = selectedVariationForBundle ? selectedProductForVariation : selectedProductForBundle;
+                                        const variation = selectedVariationForBundle;
+                                        
+                                        const parentStock = variation 
+                                            ? (variation.stock > 0 && (variation.conversionFactor || 1) === 1 ? variation.stock : (product.stock || 0)) 
+                                            : (product.stock || 0);
+                                            
+                                        const unitsAvailable = Math.floor(parentStock / factor);
+                                        const isAvailable = unitsAvailable > 0;
+
+                                        return (
+                                            <div
+                                                key={idx}
+                                                onClick={() => isAvailable && addBundleToCart(bundle)}
+                                                className={`p-5 rounded-2xl border-2 flex justify-between items-center cursor-pointer transition-all ${isAvailable
+                                                    ? 'border-gray-100 dark:border-gray-700 hover:border-indigo-500 hover:bg-indigo-50 dark:hover:bg-indigo-900/10'
+                                                    : 'border-gray-50 dark:border-gray-800 opacity-50 cursor-not-allowed bg-gray-50 dark:bg-gray-900'
+                                                    }`}
+                                            >
+                                                <div className="flex items-center gap-4">
+                                                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${isAvailable ? 'bg-indigo-100 text-indigo-600' : 'bg-gray-200 text-gray-400'}`}>
+                                                        <FaBoxOpen />
+                                                    </div>
+                                                    <div>
+                                                        <p className="font-bold text-gray-900 dark:text-white">{bundle.unitType}</p>
+                                                        <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">{factor} Pcs per unit</p>
+                                                    </div>
+                                                </div>
+                                                <div className="text-right">
+                                                    <p className="font-bold text-indigo-600 dark:text-indigo-400">RWF {bundle.price.toLocaleString()}</p>
+                                                    <p className={`text-[10px] font-black uppercase tracking-tighter ${isAvailable ? 'text-sage-600' : 'text-red-500'}`}>
+                                                        {isAvailable ? `${unitsAvailable} Available` : 'Out of Stock'}
                                                     </p>
                                                 </div>
                                             </div>

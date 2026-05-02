@@ -42,6 +42,14 @@ function ProductCreateEditModal({ product, onClose, onSaved }) {
     }));
   };
 
+  const parseBundles = (bundles) => {
+    if (!bundles) return [];
+    if (typeof bundles === 'string') {
+      try { return JSON.parse(bundles); } catch { return []; }
+    }
+    return Array.isArray(bundles) ? bundles : [];
+  };
+
   const [form, setForm] = useState({
     name: product?.name || "",
     description: product?.description || "",
@@ -60,6 +68,7 @@ function ProductCreateEditModal({ product, onClose, onSaved }) {
     shippingClass: product?.shippingClass || "",
     attributes: parseAttributes(product?.attributes),
     variations: parseVariations(product?.variations),
+    bundleConfigurations: parseBundles(product?.bundleConfigurations),
   });
 
   useEffect(() => {
@@ -139,6 +148,29 @@ function ProductCreateEditModal({ product, onClose, onSaved }) {
     const updated = [...form.attributes];
     updated.splice(index, 1);
     setForm((prev) => ({ ...prev, attributes: updated }));
+  };
+
+  // Bundles Logic
+  const handleAddBundle = () => {
+    setForm(prev => ({
+      ...prev,
+      bundleConfigurations: [
+        ...prev.bundleConfigurations,
+        { unitType: "Piece", pcsPerUnit: 1, price: prev.price || 0 }
+      ]
+    }));
+  };
+
+  const handleBundleChange = (index, field, value) => {
+    const updated = [...form.bundleConfigurations];
+    updated[index][field] = field === 'unitType' ? value : Number(value);
+    setForm(prev => ({ ...prev, bundleConfigurations: updated }));
+  };
+
+  const handleRemoveBundle = (index) => {
+    const updated = [...form.bundleConfigurations];
+    updated.splice(index, 1);
+    setForm(prev => ({ ...prev, bundleConfigurations: updated }));
   };
 
   // Variations Logic
@@ -270,6 +302,7 @@ function ProductCreateEditModal({ product, onClose, onSaved }) {
       fd.append("featured", String(form.featured));
       fd.append("isDigital", String(form.isDigital));
       fd.append("downloadLink", form.downloadLink);
+      fd.append("bundleConfigurations", JSON.stringify(form.bundleConfigurations));
 
       // Transform attributes for backend
       // Group them first to ensure we send clean data
@@ -348,24 +381,24 @@ function ProductCreateEditModal({ product, onClose, onSaved }) {
         </div>
 
         {/* Tabs */}
-        <div className="flex px-6 border-b border-gray-100 dark:border-gray-700 overflow-x-auto scrollbar-hide bg-white dark:bg-gray-800 transition-colors">
-          {["general", "attributes", "variations", "linked products", "shipping"].map((tab) => {
-            if (tab === "variations" && form.type !== "variable") return null;
-            if (tab === "shipping" && form.type === "service") return null;
-            if (tab === "attributes" && form.type === "service") return null; // Simple services don't need attributes usually
-            return (
-              <button
-                key={tab}
-                className={`py-3 mr-6 text-sm font-medium border-b-2 transition-colors whitespace-nowrap focus:outline-none ${activeTab === tab
-                  ? "border-indigo-600 text-indigo-600 dark:text-indigo-400 dark:border-indigo-400"
-                  : "border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:border-gray-200 dark:hover:border-gray-600"
-                  }`}
-                onClick={() => setActiveTab(tab)}
-              >
-                {tab.charAt(0).toUpperCase() + tab.slice(1)}
-              </button>
-            );
-          })}
+        <div className="flex items-center gap-2 overflow-x-auto no-scrollbar border-b border-gray-200 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-900/30 px-6 pt-2">
+          {["general", "attributes", "packaging", "variations", "linked products", "shipping"].map((tab) => (
+            <button
+              key={tab}
+              type="button"
+              onClick={() => setActiveTab(tab)}
+              className={`px-4 py-3 text-xs font-black uppercase tracking-widest transition-all relative ${
+                activeTab === tab
+                  ? "text-indigo-600 dark:text-indigo-400"
+                  : "text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300"
+              }`}
+            >
+              {tab}
+              {activeTab === tab && (
+                <div className="absolute bottom-0 left-0 right-0 h-1 bg-indigo-600 dark:bg-indigo-400 rounded-t-full shadow-[0_-2px_10px_rgba(79,70,229,0.4)]" />
+              )}
+            </button>
+          ))}
         </div>
 
         {/* Content Body */}
@@ -598,68 +631,133 @@ function ProductCreateEditModal({ product, onClose, onSaved }) {
                         <label className="block text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1 uppercase tracking-wide">Key</label>
                         <input
                           type="text"
-                          placeholder="e.g. Color"
                           value={attr.key}
                           onChange={(e) => handleAttributeChange(index, "key", e.target.value)}
-                          list={`global-attributes-${index}`}
-                          className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 bg-white dark:bg-gray-700 dark:text-white text-sm"
+                          placeholder="e.g. Color"
+                          className="w-full px-3 py-2 border border-gray-200 dark:border-gray-600 rounded-lg text-sm bg-gray-50 dark:bg-gray-700 dark:text-white focus:ring-1 focus:ring-indigo-500"
                         />
-                        <datalist id={`global-attributes-${index}`}>
-                          {globalAttributes.map(ga => <option key={ga.id} value={ga.name} />)}
-                        </datalist>
                       </div>
                       <div className="md:col-span-3">
-                        <label className="block text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1 uppercase tracking-wide">Value(s) <span className="text-[10px] normal-case font-normal">(comma separated for variations)</span></label>
-                        {globalAttr && globalAttr.values && globalAttr.values.length > 0 ? (
-                          <div className="relative">
-                            <input
-                              type="text"
-                              placeholder={`e.g. Red, Blue, Green`}
-                              value={attr.value}
-                              onChange={(e) => handleAttributeChange(index, "value", e.target.value)}
-                              list={`attr-values-${index}`}
-                              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 bg-white dark:bg-gray-700 dark:text-white text-sm"
-                            />
-                            <datalist id={`attr-values-${index}`}>
-                              {globalAttr.values.map(val => (
-                                <option key={val.id} value={val.name} />
-                              ))}
-                            </datalist>
-                          </div>
-                        ) : (
-                          <input
-                            type="text"
-                            placeholder="e.g. Red, Blue"
-                            value={attr.value}
-                            onChange={(e) => handleAttributeChange(index, "value", e.target.value)}
-                            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 bg-white dark:bg-gray-700 dark:text-white text-sm"
-                          />
+                        <label className="block text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1 uppercase tracking-wide">Values (comma separated)</label>
+                        <input
+                          type="text"
+                          value={attr.value}
+                          onChange={(e) => handleAttributeChange(index, "value", e.target.value)}
+                          placeholder="e.g. Red, Blue, Green"
+                          className="w-full px-3 py-2 border border-gray-200 dark:border-gray-600 rounded-lg text-sm bg-gray-50 dark:bg-gray-700 dark:text-white focus:ring-1 focus:ring-indigo-500"
+                          list={`attr-values-${index}`}
+                        />
+                        {globalAttr && (
+                          <datalist id={`attr-values-${index}`}>
+                            {globalAttr.values.map(val => (
+                              <option key={val.id} value={val.name} />
+                            ))}
+                          </datalist>
                         )}
                       </div>
                       <div className="md:col-span-1 flex items-center h-[42px]">
-                        <label className="flex items-center space-x-2 cursor-pointer">
+                        <label className="flex items-center space-x-2 cursor-pointer group">
                           <input
                             type="checkbox"
                             checked={attr.isVariation}
                             onChange={(e) => handleAttributeChange(index, "isVariation", e.target.checked)}
                             className="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
                           />
-                          <span className="text-xs text-gray-600 dark:text-gray-300">Variation?</span>
+                          <span className="text-xs text-gray-600 dark:text-gray-300 group-hover:text-indigo-600 transition-colors">Variation?</span>
                         </label>
                       </div>
                       <div className="md:col-span-1">
                         <button
                           type="button"
                           onClick={() => handleRemoveAttribute(index)}
-                          className="w-full py-2 text-red-500 hover:text-red-700 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 border border-transparent hover:border-red-100 dark:hover:border-red-800 rounded-md text-sm font-medium transition-colors"
+                          className="w-full py-2 flex items-center justify-center text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-all"
                         >
-                          Remove
+                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                          </svg>
                         </button>
                       </div>
                     </div>
                   </div>
                 );
               })}
+            </div>
+          )}
+
+          {activeTab === "packaging" && (
+            <div className="space-y-6">
+              <div className="flex flex-col md:flex-row justify-between items-start md:items-center bg-indigo-50/50 dark:bg-indigo-900/10 p-5 rounded-2xl border border-indigo-100 dark:border-indigo-900/30 gap-4">
+                <div>
+                  <h4 className="font-bold text-gray-900 dark:text-white">Packaging & Bundles</h4>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Define units like Pieces, Packets, or Boxes that share the same stock.</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleAddBundle}
+                  className="bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold px-4 py-2.5 rounded-xl transition-all shadow-lg shadow-indigo-600/20 flex items-center gap-2"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/></svg>
+                  Add Packaging Unit
+                </button>
+              </div>
+
+              {form.bundleConfigurations.length === 0 && (
+                <div className="text-center py-12 border-2 border-dashed border-gray-100 dark:border-gray-700 rounded-3xl">
+                  <div className="w-16 h-16 bg-gray-50 dark:bg-gray-700/50 rounded-full flex items-center justify-center mx-auto mb-4">
+                     <svg className="w-8 h-8 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg>
+                  </div>
+                  <p className="text-sm text-gray-400 dark:text-gray-500 font-medium">No packaging units configured.</p>
+                  <button type="button" onClick={handleAddBundle} className="text-indigo-600 text-xs font-bold mt-2 hover:underline">Configure your first unit</button>
+                </div>
+              )}
+
+              <div className="space-y-4">
+                {form.bundleConfigurations.map((bundle, index) => (
+                  <div key={index} className="group p-5 bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 rounded-2xl shadow-sm hover:shadow-md transition-all">
+                    <div className="grid grid-cols-1 md:grid-cols-12 gap-5 items-center">
+                      <div className="md:col-span-4">
+                        <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5 ml-1">Unit Type</label>
+                        <input
+                          type="text"
+                          value={bundle.unitType}
+                          onChange={(e) => handleBundleChange(index, "unitType", e.target.value)}
+                          placeholder="e.g. Packet"
+                          className="w-full px-4 py-2.5 bg-gray-50 dark:bg-gray-700 border border-gray-100 dark:border-gray-600 rounded-xl text-sm font-bold dark:text-white outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
+                        />
+                      </div>
+                      <div className="md:col-span-3">
+                        <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5 ml-1">Pcs Per Unit</label>
+                        <input
+                          type="number"
+                          value={bundle.pcsPerUnit}
+                          onChange={(e) => handleBundleChange(index, "pcsPerUnit", e.target.value)}
+                          placeholder="1"
+                          className="w-full px-4 py-2.5 bg-gray-50 dark:bg-gray-700 border border-gray-100 dark:border-gray-600 rounded-xl text-sm font-bold dark:text-white outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
+                        />
+                      </div>
+                      <div className="md:col-span-4">
+                        <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5 ml-1">Selling Price (RWF)</label>
+                        <input
+                          type="number"
+                          value={bundle.price}
+                          onChange={(e) => handleBundleChange(index, "price", e.target.value)}
+                          placeholder="0"
+                          className="w-full px-4 py-2.5 bg-gray-50 dark:bg-gray-700 border border-gray-100 dark:border-gray-600 rounded-xl text-sm font-bold text-indigo-600 dark:text-indigo-400 outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
+                        />
+                      </div>
+                      <div className="md:col-span-1 flex justify-center pt-5 md:pt-0">
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveBundle(index)}
+                          className="w-10 h-10 flex items-center justify-center bg-red-50 dark:bg-red-900/20 text-red-500 rounded-xl hover:bg-red-100 transition-all opacity-0 group-hover:opacity-100"
+                        >
+                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
           )}
 

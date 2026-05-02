@@ -181,6 +181,8 @@ model Product {
   approvalNote      String?
   approvedAt        DateTime?
   
+  bundleConfigurations Json?          @default("[]") // Array of { unitType, pcsPerUnit, price }
+  
   sellerId          String
   seller            User               @relation("SellerProducts", fields: [sellerId], references: [id])
 
