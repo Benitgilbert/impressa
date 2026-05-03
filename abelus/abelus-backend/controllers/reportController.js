@@ -110,13 +110,19 @@ export const generateReport = async (req, res) => {
         const verificationAmount = Number(req.query.verificationAmount) || 0;
         const cashDiscrepancy = verificationAmount > 0 ? (verificationAmount - summary.cashRevenue) : 0;
 
+        const performanceTitle = (filters.month && filters.year) 
+            ? `Monthly Performance Statement` 
+            : `Daily Performance Statement`;
+
         const doc = createabelusPDF({
-            title: monthTitle,
-            companyName: user.storeName || "abelus Custom Solutions",
-            subtitle: user.title || `Performance Statement – Generated on ${new Date().toLocaleDateString()}`,
+            title: performanceTitle,
+            companyName: "ABELUS",
+            subtitle: "Custom Solutions",
             contentBuilder: (pdfDoc, helpers) => {
                 // 1. Strategic AI Insights (Top)
-                helpers.infoBox("Strategic AI Insights", aiSummary);
+                if (aiSummary) {
+                    helpers.infoBox("Strategic AI Insights", aiSummary);
+                }
 
                 // 2. Financial Summary (Metric Cards)
                 helpers.metricCards([

@@ -9,39 +9,39 @@ export const createabelusPDF = ({ title, companyName, subtitle }) => {
     const innerWidth = pageWidth - left - right;
 
     // Header Branding (Left)
-    doc.fillColor("#1E3A8A").fontSize(24).font("Helvetica-Bold")
-       .text((companyName || "ABELUS").toUpperCase(), left, top, { lineBreak: false });
+    doc.fillColor("#1E3A8A").fontSize(26).font("Helvetica-Bold")
+       .text((companyName || "ABELUS").toUpperCase(), left, top);
     
-    doc.fillColor("#6B7280").fontSize(10).font("Helvetica")
-       .text("Custom Solutions", left, top + 26);
+    doc.fillColor("#6B7280").fontSize(11).font("Helvetica")
+       .text(subtitle || "Custom Solutions", left, top + 28);
 
     // Header Title (Right)
     doc.fillColor("#6B7280").fontSize(14).font("Helvetica")
-       .text(title || "Daily Performance Statement", left, top + 5, { align: "right", width: innerWidth });
+       .text(title || "Performance Statement", left, top + 5, { align: "right", width: innerWidth });
     
     doc.fillColor("#9CA3AF").fontSize(9)
        .text(`Generated: ${new Date().toLocaleDateString()}`, left, top + 25, { align: "right", width: innerWidth });
 
     // Accent Line
-    doc.moveTo(left, top + 50).lineTo(left + innerWidth, top + 50)
+    doc.moveTo(left, top + 55).lineTo(left + innerWidth, top + 55)
        .strokeColor("#1E3A8A").lineWidth(2).stroke();
     
-    doc.y = top + 65;
+    doc.y = top + 75;
   };
 
   const drawFooter = (pageNumber, totalPages) => {
-    const { left, right, bottom } = doc.page.margins;
+    const { left, right } = doc.page.margins;
     const innerWidth = pageWidth - left - right;
-    const footerY = doc.page.height - bottom - 20;
+    const footerY = doc.page.height - 45; // Move closer to bottom
 
     doc.save();
     doc.moveTo(left, footerY).lineTo(left + innerWidth, footerY)
        .strokeColor("#E5E7EB").lineWidth(0.5).stroke();
 
-    doc.fillColor("#9CA3AF").fontSize(8).font("Helvetica");
+    doc.fillColor("#94A3B8").fontSize(8).font("Helvetica");
     const footerText = "abelus Custom Solutions | Kigali, Rwanda | info@abelus.rw | +250 788 000 000";
-    doc.text(footerText, left, footerY + 10, { width: innerWidth, align: "center" });
-    doc.text(`Page ${pageNumber} of ${totalPages}`, left, footerY + 22, { width: innerWidth, align: "center" });
+    doc.text(footerText, left, footerY + 8, { width: innerWidth, align: "center" });
+    doc.text(`Page ${pageNumber} of ${totalPages}`, left, footerY + 18, { width: innerWidth, align: "center" });
     doc.restore();
   };
 
