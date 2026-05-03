@@ -120,15 +120,15 @@ export const generateReport = async (req, res) => {
 
                 // 2. Financial Summary (Metric Cards)
                 helpers.metricCards([
-                    { label: "Total Revenue", value: `RWF ${summary.totalRevenue?.toLocaleString()}`, color: "#1E40AF" },
+                    { label: "Total Revenue", value: `RWF ${summary.totalRevenue?.toLocaleString()}`, color: "#1E3A8A" },
                     { label: "Total Expenses", value: `RWF ${summary.totalExpenses?.toLocaleString()}`, color: "#1F2937" },
                     { label: "Net Profit", value: `RWF ${summary.netProfit?.toLocaleString()}`, color: "#059669" }
                 ]);
 
-                // 3. Discrepancy Note (Alert Box)
+                // 3. Discrepancy Note (Styled Alert)
                 if (verificationAmount > 0) {
                     helpers.alert(
-                        `Discrepancy Note: There is a difference of ${cashDiscrepancy.toLocaleString()} RWF between your physical drawer (RWF ${verificationAmount.toLocaleString()}) and recorded cash sales.`,
+                        `There is a difference of ${Math.abs(cashDiscrepancy).toLocaleString()} RWF between your physical drawer (RWF ${verificationAmount.toLocaleString()}) and recorded cash sales.`,
                         cashDiscrepancy === 0 ? "success" : "warning"
                     );
                 }
@@ -142,11 +142,11 @@ export const generateReport = async (req, res) => {
                             { header: "Period (Start - End)", key: "period", width: 170 },
                             { header: "Opening Cash", key: "opening", width: 100 },
                             { header: "Closing Cash", key: "closing", width: 100 },
-                            { header: "Status", key: "status", width: 70 }
+                            { header: "Status", key: "status", width: 70, align: "center" }
                         ],
                         rows: filters.shifts.map((shift, idx) => ({
                             index: idx + 1,
-                            period: `${new Date(shift.startTime).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit', second:'2-digit'})} - ${shift.endTime ? new Date(shift.endTime).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit', second:'2-digit'}) : "Still Open"}`,
+                            period: `${new Date(shift.startTime).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})} - ${shift.endTime ? new Date(shift.endTime).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : "STILL OPEN"}`,
                             opening: `RWF ${shift.startingDrawerAmount?.toLocaleString()}`,
                             closing: `RWF ${(shift.actualEndingDrawerAmount || shift.expectedEndingDrawerAmount)?.toLocaleString()}`,
                             status: shift.status
@@ -166,10 +166,10 @@ export const generateReport = async (req, res) => {
                     columns: [
                         { header: "Date", key: "orderDate", width: 60 },
                         { header: "Item Name", key: "productName", width: 140 },
-                        { header: "Qty", key: "quantity", width: 30 },
-                        { header: "P/U", key: "price", width: 60 },
-                        { header: "Cash (RWF)", key: "cashTotal", width: 80 },
-                        { header: "Momo (RWF)", key: "momoTotal", width: 80 }
+                        { header: "Qty", key: "quantity", width: 30, align: "center" },
+                        { header: "P/U", key: "price", width: 60, align: "right" },
+                        { header: "Cash (RWF)", key: "cashTotal", width: 80, align: "right" },
+                        { header: "Momo (RWF)", key: "momoTotal", width: 80, align: "right" }
                     ],
                     rows: flattenedItems.map(i => {
                         const isCash = i.paymentMethod.includes("cash");
@@ -179,17 +179,13 @@ export const generateReport = async (req, res) => {
                             cashTotal: isCash ? i.subtotal.toLocaleString() : "0",
                             momoTotal: !isCash ? i.subtotal.toLocaleString() : "0"
                         }
-                    })
+                    }),
+                    totals: {
+                        price: "TOTALS",
+                        cashTotal: `RWF ${summary.cashRevenue.toLocaleString()}`,
+                        momoTotal: `RWF ${summary.momoRevenue.toLocaleString()}`
+                    }
                 });
-
-                // Totals Summary
-                pdfDoc.moveDown(0.2);
-                pdfDoc.fontSize(9).font("Helvetica-Bold").fillColor("#1E293B");
-                const summaryX = pdfDoc.page.margins.left + 290;
-                pdfDoc.text("TOTALS", summaryX - 60, pdfDoc.y, { width: 50, align: "right" });
-                pdfDoc.text(`RWF ${summary.cashRevenue.toLocaleString()}`, summaryX, pdfDoc.y - 12, { width: 80, align: "left" });
-                pdfDoc.text(`RWF ${summary.momoRevenue.toLocaleString()}`, summaryX + 80, pdfDoc.y - 12, { width: 80, align: "left" });
-                pdfDoc.moveDown(1.5);
 
                 // 6. Expenses Breakdown
                 if (filters.expenses && filters.expenses.length > 0) {
@@ -199,7 +195,7 @@ export const generateReport = async (req, res) => {
                             { header: "Description", key: "description", width: 180 },
                             { header: "Category", key: "category", width: 100 },
                             { header: "Date", key: "date", width: 100 },
-                            { header: "Amount", key: "amount", width: 100 }
+                            { header: "Amount", key: "amount", width: 100, align: "right" }
                         ],
                         rows: filters.expenses.map(e => ({
                             description: e.description,
@@ -210,7 +206,7 @@ export const generateReport = async (req, res) => {
                     });
                 }
 
-                // 7. Approval & Authorization (Signatory Block)
+                // 7. Approval & Authorization
                 pdfDoc.moveDown(2);
                 helpers.section("Approval & Authorization");
                 pdfDoc.save().moveTo(pdfDoc.page.margins.left, pdfDoc.y).lineTo(pdfDoc.page.width - pdfDoc.page.margins.right, pdfDoc.y).strokeColor("#E2E8F0").lineWidth(0.5).stroke().restore();
@@ -222,21 +218,26 @@ export const generateReport = async (req, res) => {
                 pdfDoc.font("Helvetica-Bold").fillColor("#1E293B").text(`Title: `, { lineBreak: false });
                 pdfDoc.font("Helvetica").fillColor("#475569").text(user.role?.toUpperCase() || "ADMIN");
 
-                // Signatures and Stamps
-                const sigY = pdfDoc.y + 40;
-                pdfDoc.save().moveTo(pdfDoc.page.margins.left, sigY).lineTo(pdfDoc.page.margins.left + 150, sigY).strokeColor("#1E293B").lineWidth(1).stroke().restore();
-                pdfDoc.fontSize(8).text("Signature", pdfDoc.page.margins.left, sigY + 5);
+                // Signature & Stamp Layout
+                const sigAreaY = pdfDoc.y + 40;
+                const leftM = pdfDoc.page.margins.left;
+                const rightM = pdfDoc.page.width - pdfDoc.page.margins.right;
+
+                // Signature Line
+                pdfDoc.save().moveTo(leftM, sigAreaY).lineTo(leftM + 150, sigAreaY).strokeColor("#1E293B").lineWidth(1).stroke().restore();
+                pdfDoc.fontSize(8).text("Signature", leftM, sigAreaY + 5);
+
+                // Official Stamp Box (Dashed)
+                const stampW = 100;
+                const stampX = rightM - stampW;
+                pdfDoc.save().rect(stampX, sigAreaY - 60, stampW, 60).dash(3, {space: 3}).strokeColor("#CBD5E1").stroke().restore();
+                pdfDoc.fillColor("#94A3B8").fontSize(8).text("Official Stamp", stampX, sigAreaY - 30, { width: stampW, align: "center" });
 
                 if (user.signatureImage) {
-                    try { pdfDoc.image(user.signatureImage, pdfDoc.page.margins.left, sigY - 45, { width: 100, height: 40 }); } catch (e) {}
+                    try { pdfDoc.image(user.signatureImage, leftM, sigAreaY - 45, { width: 100, height: 40 }); } catch (e) {}
                 }
-
-                const stampX = pdfDoc.page.width - pdfDoc.page.margins.right - 120;
-                pdfDoc.save().rect(stampX, sigY - 60, 100, 60).dash(2, {space: 2}).strokeColor("#CBD5E1").stroke().restore();
-                pdfDoc.fillColor("#94A3B8").fontSize(8).text("Official Stamp", stampX, sigY - 30, { width: 100, align: "center" });
-
                 if (user.stampImage) {
-                    try { pdfDoc.image(user.stampImage, stampX + 10, sigY - 55, { width: 80, height: 50 }); } catch (e) {}
+                    try { pdfDoc.image(user.stampImage, stampX + 10, sigAreaY - 55, { width: 80, height: 50 }); } catch (e) {}
                 }
             },
             signatory: {
