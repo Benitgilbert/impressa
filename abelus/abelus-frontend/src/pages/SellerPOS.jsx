@@ -586,31 +586,7 @@ export default function SellerPOS() {
         <div className="flex flex-col min-w-0 h-full overflow-hidden">
             <main className="flex-1 p-4 md:p-6 overflow-hidden grid grid-cols-1 md:grid-cols-12 gap-6 relative">
 
-                    <div className="absolute top-4 right-4 z-20 flex gap-2">
-                        {activeShift ? (
-                            <button
-                                onClick={() => setShowCloseShiftModal(true)}
-                                className="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-xl shadow-lg text-sm font-bold flex items-center gap-2 transition-all active:scale-95"
-                            >
-                                <FaTimes /> End Shift
-                            </button>
-                        ) : (
-                            <button
-                                onClick={() => setShowStartShiftModal(true)}
-                                className="bg-sage-600 hover:bg-sage-700 text-white px-4 py-2 rounded-xl shadow-lg text-sm font-bold flex items-center gap-2 transition-all active:scale-95"
-                            >
-                                <FaPlus /> Start Shift
-                            </button>
-                        )}
-                        {activeShift && (
-                            <button
-                                onClick={() => setShowExpenseModal(true)}
-                                className="bg-amber-500 hover:bg-amber-600 text-white px-4 py-2 rounded-xl shadow-lg text-sm font-bold flex items-center gap-2 transition-all active:scale-95"
-                            >
-                                <FaWallet /> Expense
-                            </button>
-                        )}
-                    </div>
+                    {/* Shift Management moved to Cart Header for better visibility */}
 
                     {showStartShiftModal && (
                         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-md">
@@ -1201,15 +1177,42 @@ export default function SellerPOS() {
                     </div>
 
                     <div className="md:col-span-4 flex flex-col h-full bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 overflow-hidden">
-                        <div className="p-5 border-b border-gray-100 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-800/80">
-                            <div className="flex justify-between items-center mb-4">
-                                <h2 className="font-bold text-gray-800 dark:text-white flex items-center gap-2">
-                                    <FaShoppingCart className="text-indigo-600" /> Current Sale
-                                </h2>
-                                <span className="bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 text-xs font-bold px-2.5 py-1 rounded-full">
-                                    {cart.length} items
-                                </span>
-                            </div>
+                             <div className="flex justify-between items-start mb-4">
+                                 <div>
+                                    <h2 className="font-bold text-gray-800 dark:text-white flex items-center gap-2">
+                                        <FaShoppingCart className="text-indigo-600" /> Current Sale
+                                    </h2>
+                                    <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-1 block">
+                                        {cart.length} items in cart
+                                    </span>
+                                 </div>
+                                 
+                                 <div className="flex flex-col gap-2 items-end">
+                                    {activeShift ? (
+                                        <div className="flex gap-2">
+                                            <button
+                                                onClick={() => setShowExpenseModal(true)}
+                                                className="bg-amber-500 hover:bg-amber-600 text-white px-3 py-1.5 rounded-lg shadow-sm text-xs font-black flex items-center gap-1.5 transition-all active:scale-95"
+                                            >
+                                                <FaWallet /> Expense
+                                            </button>
+                                            <button
+                                                onClick={() => setShowCloseShiftModal(true)}
+                                                className="bg-red-500 hover:bg-red-600 text-white px-3 py-1.5 rounded-lg shadow-sm text-xs font-black flex items-center gap-1.5 transition-all active:scale-95"
+                                            >
+                                                <FaTimes /> End Shift
+                                            </button>
+                                        </div>
+                                    ) : (
+                                        <button
+                                            onClick={() => setShowStartShiftModal(true)}
+                                            className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-xl shadow-lg text-sm font-black flex items-center gap-2 transition-all active:scale-95"
+                                        >
+                                            <FaPlus /> Start Shift
+                                        </button>
+                                    )}
+                                 </div>
+                             </div>
 
                             <div className="space-y-3">
                                 <div className="flex gap-2 p-1 bg-gray-100 dark:bg-gray-900 rounded-xl">
