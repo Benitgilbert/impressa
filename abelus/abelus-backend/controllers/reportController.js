@@ -103,48 +103,76 @@ export const generateReport = async (req, res) => {
         }
 
         // Export as PDF
-        const logoBuffer = await getLogoBuffer(settings?.logo || "assets/logo.png");
+        const logoBuffer = await getLogoBuffer(user.storeLogo || settings?.logo || "assets/logo.png");
 
         const monthTitle = (filters.month && filters.year) 
             ? `Monthly Business Report – ${new Date(parseInt(filters.year), parseInt(filters.month) - 1, 1).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}` 
             : `${type.charAt(0).toUpperCase() + type.slice(1)} Report`;
 
+        const verificationAmount = Number(req.query.verificationAmount) || 0;
+        const cashDiscrepancy = verificationAmount > 0 ? (verificationAmount - summary.cashRevenue) : 0;
+
         const doc = createabelusPDF({
             title: monthTitle,
+            companyName: user.storeName || "abelus Custom Solutions",
+            subtitle: user.title || `Performance Statement – Generated on ${new Date().toLocaleDateString()}`,
             contentBuilder: (pdfDoc, helpers) => {
                 // Header Summary section
                 helpers.section("Business Summary");
                 helpers.keyValue({
                     "Total Orders": orders.length,
-                    "Gross Revenue": `RWF ${summary.totalRevenue?.toLocaleString()}`,
+                    "Total Revenue": `RWF ${summary.totalRevenue?.toLocaleString()}`,
                     "Total Expenses": `RWF ${summary.totalExpenses?.toLocaleString()}`,
                     "Net Profit": `RWF ${summary.netProfit?.toLocaleString()}`,
                     "Top Product": summary.topSellingProduct?.name || summary.topProduct || "N/A"
                 });
 
                 pdfDoc.moveDown(1);
+
+                // Financial Reconciliation
+                helpers.section("Financial Reconciliation (Cash vs Momo)");
+                helpers.keyValue({
+                    "System Cash Total": `RWF ${summary.cashRevenue?.toLocaleString()}`,
+                    "System Momo Total": `RWF ${summary.momoRevenue?.toLocaleString()}`,
+                    "Physical Drawer": verificationAmount > 0 ? `RWF ${verificationAmount.toLocaleString()}` : "Not Verified",
+                    "Cash Discrepancy": verificationAmount > 0 ? `${cashDiscrepancy >= 0 ? '+' : ''} RWF ${cashDiscrepancy.toLocaleString()}` : "N/A"
+                });
+
+                if (verificationAmount > 0 && Math.abs(cashDiscrepancy) > 0) {
+                    pdfDoc.fontSize(8).fillColor(cashDiscrepancy < 0 ? "#DC2626" : "#059669").text(
+                        `Note: There is a difference of ${Math.abs(cashDiscrepancy).toLocaleString()} Rwf between your physical drawer and recorded cash sales.`
+                    );
+                }
+
+                pdfDoc.moveDown(1);
                 
-                // Orders Table
-                helpers.section("Orders Breakdown");
+                // Detailed Itemized Table
+                helpers.section("Itemized Sales Detail");
+                const flattenedItems = orders.flatMap(o => o.items.map(i => ({
+                    ...i,
+                    orderDate: new Date(o.createdAt).toLocaleDateString(),
+                    paymentMethod: o.paymentMethod || "Cash"
+                })));
+
                 helpers.table({
                     columns: [
-                        { header: "Public ID", key: "publicId", width: 100 },
-                        { header: "Customer", key: "customerName", width: 120 },
-                        { header: "Date", key: "createdAt", width: 100 },
-                        { header: "Status", key: "status", width: 80 },
-                        { header: "Total", key: "grandTotal", width: 100 }
+                        { header: "Date", key: "orderDate", width: 80 },
+                        { header: "Item Name", key: "productName", width: 180 },
+                        { header: "Qty", key: "quantity", width: 40 },
+                        { header: "PU (Rwf)", key: "price", width: 70 },
+                        { header: "Pay Type", key: "paymentMethod", width: 70 },
+                        { header: "Total", key: "subtotal", width: 80 }
                     ],
-                    rows: orders.map(o => ({
-                        ...o,
-                        customerName: o.customer?.name || (o.guestInfo ? (typeof o.guestInfo === 'string' ? JSON.parse(o.guestInfo).name : o.guestInfo.name) : "Guest"),
-                        createdAt: new Date(o.createdAt).toLocaleDateString(),
-                        grandTotal: `RWF ${o.grandTotal.toLocaleString()}`
+                    rows: flattenedItems.map(i => ({
+                        ...i,
+                        price: i.price.toLocaleString(),
+                        subtotal: i.subtotal.toLocaleString()
                     }))
                 });
 
                 pdfDoc.moveDown(1);
 
-                // Expenses Table (New)
+                // Expenses Table
                 if (filters.expenses && filters.expenses.length > 0) {
                     helpers.section("Expenses Breakdown");
                     helpers.table({

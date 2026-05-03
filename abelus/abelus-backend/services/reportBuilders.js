@@ -48,12 +48,17 @@ const getRangeReport = async (start, end, sellerId) => {
   let totalRevenue = 0;
   let totalDebtCollected = 0;
   let totalExpenses = 0;
+  let cashRevenue = 0;
+  let momoRevenue = 0;
 
   expenses.forEach(exp => {
     totalExpenses += (exp.amount || 0);
   });
 
   orders.forEach(order => {
+    let orderCash = 0;
+    let orderMomo = 0;
+
     order.items.forEach(item => {
         // If filtering by seller, only count this seller's items
         if (sellerId && item.sellerId !== sellerId) return;
@@ -61,17 +66,29 @@ const getRangeReport = async (start, end, sellerId) => {
         const name = item.product?.name || item.productName;
         if (name) productCount[name] = (productCount[name] || 0) + item.quantity;
         
-        totalRevenue += (item.subtotal || 0);
+        const itemRevenue = (item.subtotal || 0);
+        totalRevenue += itemRevenue;
+
+        // Categorize revenue by payment method
+        const method = (order.paymentMethod || "cash").toLowerCase();
+        if (method.includes("cash")) orderCash += itemRevenue;
+        else if (method.includes("momo") || method.includes("mobile")) orderMomo += itemRevenue;
 
         const cust = item.customizations || {};
         if (cust.customText) customizationCount.customText++;
         if (cust.customFile) customizationCount.customFile++;
         if (cust.cloudLink) customizationCount.cloudLink++;
     });
+
+    cashRevenue += orderCash;
+    momoRevenue += orderMomo;
   });
 
   abonneTransactions.forEach(tx => {
-    totalDebtCollected += (tx.amountPaid || 0);
+    const amount = (tx.amountPaid || 0);
+    totalDebtCollected += amount;
+    // Debt collection is usually cash in hand
+    cashRevenue += amount;
   });
 
   totalRevenue += totalDebtCollected;
@@ -82,6 +99,8 @@ const getRangeReport = async (start, end, sellerId) => {
   const summary = {
     total: orders.length,
     totalRevenue,
+    cashRevenue,
+    momoRevenue,
     totalDebtCollected,
     totalExpenses,
     netProfit: totalRevenue - totalExpenses,

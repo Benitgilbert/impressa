@@ -1,6 +1,6 @@
 import PDFDocument from "pdfkit";
 
-export const createabelusPDF = ({ title, contentBuilder, signatory, logoPath }) => {
+export const createabelusPDF = ({ title, contentBuilder, signatory, logoPath, companyName, subtitle }) => {
   const doc = new PDFDocument({ margin: 50, size: 'A4', bufferPages: true });
   const pageWidth = doc.page.width;
 
@@ -20,7 +20,7 @@ export const createabelusPDF = ({ title, contentBuilder, signatory, logoPath }) 
     // Company name and title centered - use explicit Y positions
     const headerStartY = top + (logoPath ? 70 : 20);
     doc.fillColor("#111827").fontSize(16).font("Helvetica-Bold");
-    doc.text("abelus Custom Solutions", left, headerStartY, {
+    doc.text(companyName || "abelus Custom Solutions", left, headerStartY, {
       width: innerWidth,
       align: "center",
       lineBreak: false
@@ -34,7 +34,7 @@ export const createabelusPDF = ({ title, contentBuilder, signatory, logoPath }) 
     });
     
     doc.fontSize(9).fillColor("#6B7280");
-    doc.text(`Generated: ${new Date().toLocaleDateString()}`, left, headerStartY + 38, {
+    doc.text(subtitle || `Generated: ${new Date().toLocaleDateString()}`, left, headerStartY + 38, {
       width: innerWidth,
       align: "center",
       lineBreak: false
@@ -64,7 +64,7 @@ export const createabelusPDF = ({ title, contentBuilder, signatory, logoPath }) 
 
     // Footer content - use lineBreak: false to prevent doc.y changes
     doc.fillColor("#6B7280").fontSize(8);
-    doc.text("abelus Custom Solutions | Kigali, Rwanda", left, footerY + 5, {
+    doc.text((companyName || "abelus") + " | Kigali, Rwanda", left, footerY + 5, {
       width: innerWidth / 3,
       align: "left",
       lineBreak: false
