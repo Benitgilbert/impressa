@@ -77,7 +77,7 @@ const SellerProfile = () => {
             if (formData.profileImage) data.append("profileImage", formData.profileImage);
             if (formData.storeLogo) data.append("storeLogo", formData.storeLogo);
 
-            await api.put("/auth/profile", data, {
+            await api.put("/auth/me", data, {
                 headers: { "Content-Type": "multipart/form-data" }
             });
 
