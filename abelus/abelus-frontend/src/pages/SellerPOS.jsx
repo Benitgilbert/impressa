@@ -1177,6 +1177,7 @@ export default function SellerPOS() {
                     </div>
 
                     <div className="md:col-span-4 flex flex-col h-full bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 overflow-hidden">
+                        <div className="p-5 border-b border-gray-100 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-800/80">
                              <div className="flex justify-between items-start mb-4">
                                  <div>
                                     <h2 className="font-bold text-gray-800 dark:text-white flex items-center gap-2">
