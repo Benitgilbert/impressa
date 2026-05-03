@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { FaHistory, FaCalendarAlt, FaArrowRight, FaTimes, FaClock, FaClipboardList, FaUser } from "react-icons/fa";
+import { FaHistory, FaCalendarAlt, FaArrowRight, FaTimes, FaClock, FaClipboardList, FaUser, FaWallet } from "react-icons/fa";
 import api from "../../utils/axiosInstance";
 
 const AdminShifts = () => {
@@ -184,6 +184,13 @@ const AdminShifts = () => {
                                         </div>
                                     </div>
 
+                                    {shiftReport.expenses && shiftReport.expenses.length > 0 && (
+                                        <div className="p-5 bg-red-50 dark:bg-red-900/20 rounded-2xl border border-red-100 dark:border-red-800/30">
+                                            <p className="text-[10px] font-bold text-red-600 dark:text-red-400 uppercase tracking-wider mb-2">Total Expenses (Deducted from Drawer)</p>
+                                            <p className="text-xl font-black text-gray-900 dark:text-white">{formatCurrency(shiftReport.expenses.reduce((sum, e) => sum + e.amount, 0))}</p>
+                                        </div>
+                                    )}
+
                                     <div className="bg-gray-50 dark:bg-gray-900/30 rounded-3xl p-6 border border-gray-100 dark:border-gray-700/50">
                                         <h3 className="font-black text-gray-900 dark:text-white mb-4 text-sm uppercase tracking-widest text-center">Audit Verification</h3>
                                         <div className="space-y-3">
@@ -204,6 +211,25 @@ const AdminShifts = () => {
                                         <div className="p-6 bg-amber-50 dark:bg-amber-900/20 rounded-2xl border border-amber-100 dark:border-amber-800/30">
                                             <p className="text-[10px] font-bold text-amber-600 dark:text-amber-400 uppercase tracking-wider mb-2 text-center">Cashier Notes</p>
                                             <p className="text-sm text-gray-700 dark:text-gray-300 italic text-center">"{shiftReport.notes}"</p>
+                                        </div>
+                                    )}
+
+                                    {shiftReport.expenses && shiftReport.expenses.length > 0 && (
+                                        <div>
+                                            <h3 className="font-black text-gray-900 dark:text-white mb-4 text-sm uppercase tracking-widest flex items-center gap-2">
+                                                <FaWallet className="text-amber-500" /> Expense Detail Log
+                                            </h3>
+                                            <div className="space-y-2 max-h-40 overflow-y-auto pr-2 custom-scrollbar">
+                                                {shiftReport.expenses.map(expense => (
+                                                    <div key={expense.id} className="flex justify-between items-center p-3 bg-gray-50 dark:bg-gray-700/50 rounded-xl border border-gray-100 dark:border-gray-600">
+                                                        <div>
+                                                            <p className="font-bold text-xs dark:text-white">{expense.description}</p>
+                                                            <p className="text-[10px] text-gray-400 uppercase font-bold">{expense.category} | {new Date(expense.date).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}</p>
+                                                        </div>
+                                                        <p className="font-black text-red-500">- {formatCurrency(expense.amount)}</p>
+                                                    </div>
+                                                ))}
+                                            </div>
                                         </div>
                                     )}
 

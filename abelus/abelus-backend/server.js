@@ -53,6 +53,7 @@ import uploadRoutes from "./routes/uploadRoutes.js";
 import violationRoutes from "./routes/violationRoutes.js";
 import chatbotRoutes from "./routes/chatbotRoutes.js";
 import staffRoutes from "./routes/staffRoutes.js";
+import expenseRoutes from "./routes/expenseRoutes.js";
 
 dotenv.config();
 
@@ -178,6 +179,7 @@ app.use("/api/upload", uploadRoutes);
 app.use("/api/violations", violationRoutes);
 app.use("/api/chatbot", chatbotRoutes);
 app.use("/api/staff", staffRoutes);
+app.use("/api/expenses", expenseRoutes);
 
 app.get("/api", (req, res) => {
   res.json({

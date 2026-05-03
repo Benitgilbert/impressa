@@ -104,6 +104,9 @@ export const getShiftReport = async (req, res) => {
                 abonneTransactions: {
                     include: { client: true }
                 },
+                expenses: {
+                    include: { user: { select: { name: true } } }
+                },
                 user: { select: { id: true, name: true, email: true } }
             }
         });

@@ -1,7 +1,8 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import api from "../utils/axiosInstance";
+import toast from "react-hot-toast";
 import assetUrl from "../utils/assetUrl";
-import { FaSearch, FaShoppingCart, FaTrash, FaPlus, FaMinus, FaMoneyBillWave, FaMobileAlt, FaBoxOpen, FaStore, FaBarcode, FaTimes, FaCheckCircle } from "react-icons/fa";
+import { FaSearch, FaShoppingCart, FaTrash, FaPlus, FaMinus, FaMoneyBillWave, FaMobileAlt, FaBoxOpen, FaStore, FaBarcode, FaTimes, FaCheckCircle, FaWallet, FaReceipt } from "react-icons/fa";
 import Receipt from "../components/Receipt";
 
 // Beep sound for successful scan
@@ -49,6 +50,15 @@ export default function SellerPOS() {
     const [shiftReport, setShiftReport] = useState(null);
     const [showAbonneSplitModal, setShowAbonneSplitModal] = useState(false);
     const [abonneUpfrontCash, setAbonneUpfrontCash] = useState("");
+
+    // Expenses
+    const [showExpenseModal, setShowExpenseModal] = useState(false);
+    const [expenseData, setExpenseData] = useState({
+        description: "",
+        amount: "",
+        category: "General",
+        paymentMethod: "cash"
+    });
 
     const handleAbonneCheckout = async () => {
         if (!selectedClient) return alert("Select a Client first");
@@ -544,6 +554,26 @@ export default function SellerPOS() {
         }
     };
 
+    const handleRecordExpense = async () => {
+        if (!expenseData.description || !expenseData.amount) return alert("Enter description and amount");
+        if (!activeShift) return alert("No active shift found");
+
+        try {
+            const res = await api.post("/expenses", {
+                ...expenseData,
+                shiftId: activeShift.id
+            });
+            if (res.data.success) {
+                toast.success("Expense recorded");
+                setShowExpenseModal(false);
+                setExpenseData({ description: "", amount: "", category: "General", paymentMethod: "cash" });
+                fetchActiveShift(); // Refresh shift stats
+            }
+        } catch (err) {
+            alert(err.response?.data?.message || "Failed to record expense");
+        }
+    };
+
     const filteredProducts = products.filter((p) =>
         p.name.toLowerCase().includes(searchTerm.toLowerCase()) &&
         (selectedCategory === "All" || p.categories?.some(c => c.name === selectedCategory))
@@ -570,6 +600,14 @@ export default function SellerPOS() {
                                 className="bg-sage-600 hover:bg-sage-700 text-white px-4 py-2 rounded-xl shadow-lg text-sm font-bold flex items-center gap-2 transition-all active:scale-95"
                             >
                                 <FaPlus /> Start Shift
+                            </button>
+                        )}
+                        {activeShift && (
+                            <button
+                                onClick={() => setShowExpenseModal(true)}
+                                className="bg-amber-500 hover:bg-amber-600 text-white px-4 py-2 rounded-xl shadow-lg text-sm font-bold flex items-center gap-2 transition-all active:scale-95"
+                            >
+                                <FaWallet /> Expense
                             </button>
                         )}
                     </div>
@@ -679,6 +717,74 @@ export default function SellerPOS() {
                         </div>
                     )}
 
+                    {showExpenseModal && (
+                        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-md">
+                            <div className="bg-white dark:bg-gray-800 p-8 rounded-3xl shadow-2xl max-w-md w-full animate-in fade-in zoom-in duration-300 border border-white/20">
+                                <div className="text-center mb-6">
+                                    <div className="w-16 h-16 bg-amber-100 dark:bg-amber-900/30 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                                        <FaWallet className="text-2xl text-amber-600" />
+                                    </div>
+                                    <h2 className="text-2xl font-black text-gray-900 dark:text-white">Record Expense</h2>
+                                    <p className="text-gray-500 dark:text-gray-400 mt-1 text-sm">Money spent from the drawer</p>
+                                </div>
+
+                                <div className="space-y-4">
+                                    <div className="space-y-1">
+                                        <label className="text-xs font-bold text-gray-500 uppercase ml-1">Description</label>
+                                        <input
+                                            type="text"
+                                            className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-700/50 border border-gray-200 dark:border-gray-600 rounded-xl focus:border-amber-500 outline-none transition-all dark:text-white font-bold"
+                                            placeholder="e.g. Transport, Packaging, Lunch"
+                                            value={expenseData.description}
+                                            onChange={(e) => setExpenseData({...expenseData, description: e.target.value})}
+                                        />
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div className="space-y-1">
+                                            <label className="text-xs font-bold text-gray-500 uppercase ml-1">Amount (RWF)</label>
+                                            <input
+                                                type="number"
+                                                className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-700/50 border border-gray-200 dark:border-gray-600 rounded-xl focus:border-amber-500 outline-none transition-all dark:text-white font-black"
+                                                placeholder="0"
+                                                value={expenseData.amount}
+                                                onChange={(e) => setExpenseData({...expenseData, amount: e.target.value})}
+                                            />
+                                        </div>
+                                        <div className="space-y-1">
+                                            <label className="text-xs font-bold text-gray-500 uppercase ml-1">Category</label>
+                                            <select
+                                                className="w-full px-4 py-3 bg-gray-50 dark:bg-gray-700/50 border border-gray-200 dark:border-gray-600 rounded-xl focus:border-amber-500 outline-none transition-all dark:text-white font-bold appearance-none"
+                                                value={expenseData.category}
+                                                onChange={(e) => setExpenseData({...expenseData, category: e.target.value})}
+                                            >
+                                                <option value="General">General</option>
+                                                <option value="Transport">Transport</option>
+                                                <option value="Packaging">Packaging</option>
+                                                <option value="Staff">Staff</option>
+                                                <option value="Maintenance">Maintenance</option>
+                                            </select>
+                                        </div>
+                                    </div>
+
+                                    <div className="flex gap-3 pt-4">
+                                        <button
+                                            onClick={() => setShowExpenseModal(false)}
+                                            className="flex-1 py-3 bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 rounded-xl font-bold transition-all"
+                                        >
+                                            Cancel
+                                        </button>
+                                        <button
+                                            onClick={handleRecordExpense}
+                                            className="flex-2 py-3 bg-amber-500 hover:bg-amber-600 text-white rounded-xl font-black shadow-lg shadow-amber-500/20 transition-all active:scale-[0.98]"
+                                        >
+                                            Save Expense
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
                     {shiftReport && (
                         <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/70 backdrop-blur-lg p-4">
                             <div className="bg-white dark:bg-gray-800 rounded-3xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-hidden flex flex-col border border-white/10">
@@ -713,7 +819,32 @@ export default function SellerPOS() {
                                             <p className="text-xs font-bold text-indigo-600 dark:text-indigo-400 uppercase tracking-wider mb-2">Grand Total</p>
                                             <p className="text-2xl font-black text-gray-900 dark:text-white">RWF {(shiftReport.totalCashSales + shiftReport.totalMomoSales + shiftReport.totalOtherSales).toLocaleString()}</p>
                                         </div>
+                                        {shiftReport.expenses && shiftReport.expenses.length > 0 && (
+                                            <div className="p-6 bg-red-50 dark:bg-red-900/20 rounded-3xl border border-red-100 dark:border-red-800/30 sm:col-span-3">
+                                                <p className="text-xs font-bold text-red-600 dark:text-red-400 uppercase tracking-wider mb-2">Total Expenses</p>
+                                                <p className="text-2xl font-black text-gray-900 dark:text-white">RWF {shiftReport.expenses.reduce((sum, e) => sum + e.amount, 0).toLocaleString()}</p>
+                                            </div>
+                                        )}
                                     </div>
+
+                                    {shiftReport.expenses && shiftReport.expenses.length > 0 && (
+                                        <div>
+                                            <h3 className="font-black text-gray-900 dark:text-white mb-4 text-sm uppercase tracking-widest flex items-center gap-2">
+                                                <FaWallet className="text-amber-500" /> Expenses Log
+                                            </h3>
+                                            <div className="space-y-2 max-h-40 overflow-y-auto pr-2 custom-scrollbar">
+                                                {shiftReport.expenses.map(expense => (
+                                                    <div key={expense.id} className="flex justify-between items-center p-3 bg-gray-50 dark:bg-gray-700/50 rounded-xl border border-gray-100 dark:border-gray-600">
+                                                        <div>
+                                                            <p className="font-bold text-xs dark:text-white">{expense.description}</p>
+                                                            <p className="text-[10px] text-gray-400 uppercase font-bold">{expense.category} | {new Date(expense.date).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}</p>
+                                                        </div>
+                                                        <p className="font-black text-red-500">- RWF {expense.amount.toLocaleString()}</p>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
 
                                     <div className="p-8 bg-gray-50 dark:bg-gray-900/30 rounded-3xl border border-gray-100 dark:border-gray-700/50">
                                         <h3 className="font-black text-gray-900 dark:text-white mb-6 flex items-center gap-2">
