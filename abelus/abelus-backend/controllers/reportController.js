@@ -124,20 +124,15 @@ export const generateReport = async (req, res) => {
                     helpers.infoBox("Strategic AI Insights", aiSummary);
                 }
 
-                // 2. Financial Summary (Metric Cards)
+                // 2. Financial Summary (4 Metric Cards)
                 helpers.metricCards([
                     { label: "Total Revenue", value: `RWF ${summary.totalRevenue?.toLocaleString()}`, color: "#1E3A8A" },
                     { label: "Total Expenses", value: `RWF ${summary.totalExpenses?.toLocaleString()}`, color: "#1F2937" },
-                    { label: "Net Profit", value: `RWF ${summary.netProfit?.toLocaleString()}`, color: "#059669" }
+                    { label: "Drawer Amount", value: `RWF ${verificationAmount.toLocaleString()}`, color: "#3B82F6" },
+                    { label: "Difference", value: `RWF ${Math.abs(cashDiscrepancy).toLocaleString()}`, color: cashDiscrepancy === 0 ? "#059669" : "#B91C1C" }
                 ]);
 
-                // 3. Discrepancy Note (Styled Alert)
-                if (verificationAmount > 0) {
-                    helpers.alert(
-                        `There is a difference of ${Math.abs(cashDiscrepancy).toLocaleString()} RWF between your physical drawer (RWF ${verificationAmount.toLocaleString()}) and recorded cash sales.`,
-                        cashDiscrepancy === 0 ? "success" : "warning"
-                    );
-                }
+                // 3. (Alert box removed as requested)
 
                 // 4. Shift Activity Overview
                 if (type === "daily" && filters.shifts && filters.shifts.length > 0) {
@@ -212,39 +207,13 @@ export const generateReport = async (req, res) => {
                     });
                 }
 
-                // 7. Approval & Authorization
-                pdfDoc.moveDown(2);
-                helpers.section("Approval & Authorization");
+                // 7. Signatory Section (Streamlined)
+                pdfDoc.moveDown(3);
                 pdfDoc.save().moveTo(pdfDoc.page.margins.left, pdfDoc.y).lineTo(pdfDoc.page.width - pdfDoc.page.margins.right, pdfDoc.y).strokeColor("#E2E8F0").lineWidth(0.5).stroke().restore();
                 pdfDoc.moveDown(1);
                 
                 pdfDoc.fillColor("#1E293B").fontSize(10).font("Helvetica-Bold").text(`Prepared by: `, { lineBreak: false });
                 pdfDoc.font("Helvetica").fillColor("#475569").text(user.name);
-                
-                pdfDoc.font("Helvetica-Bold").fillColor("#1E293B").text(`Title: `, { lineBreak: false });
-                pdfDoc.font("Helvetica").fillColor("#475569").text(user.role?.toUpperCase() || "ADMIN");
-
-                // Signature & Stamp Layout
-                const sigAreaY = pdfDoc.y + 40;
-                const leftM = pdfDoc.page.margins.left;
-                const rightM = pdfDoc.page.width - pdfDoc.page.margins.right;
-
-                // Signature Line
-                pdfDoc.save().moveTo(leftM, sigAreaY).lineTo(leftM + 150, sigAreaY).strokeColor("#1E293B").lineWidth(1).stroke().restore();
-                pdfDoc.fontSize(8).text("Signature", leftM, sigAreaY + 5);
-
-                // Official Stamp Box (Dashed)
-                const stampW = 100;
-                const stampX = rightM - stampW;
-                pdfDoc.save().rect(stampX, sigAreaY - 60, stampW, 60).dash(3, {space: 3}).strokeColor("#CBD5E1").stroke().restore();
-                pdfDoc.fillColor("#94A3B8").fontSize(8).text("Official Stamp", stampX, sigAreaY - 30, { width: stampW, align: "center" });
-
-                if (user.signatureImage) {
-                    try { pdfDoc.image(user.signatureImage, leftM, sigAreaY - 45, { width: 100, height: 40 }); } catch (e) {}
-                }
-                if (user.stampImage) {
-                    try { pdfDoc.image(user.stampImage, stampX + 10, sigAreaY - 55, { width: 80, height: 50 }); } catch (e) {}
-                }
             },
             signatory: {
                 name: user.name,
