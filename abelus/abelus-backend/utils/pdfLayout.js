@@ -110,6 +110,34 @@ export const createabelusPDF = ({ title, contentBuilder, signatory, logoPath, co
       });
       doc.moveDown(0.4);
     },
+    infoBox: (label, text) => {
+      const { left, right } = doc.page.margins;
+      const innerWidth = doc.page.width - left - right;
+      const padding = 15;
+      
+      doc.font("Helvetica-Bold").fontSize(9);
+      const labelWidth = doc.widthOfString(`${label}: `);
+      const textHeight = doc.heightOfString(`${label}: ${text}`, { width: innerWidth - (padding * 2) - 10 });
+      const boxHeight = textHeight + (padding * 2);
+
+      doc.save();
+      // Background
+      doc.roundedRect(left, doc.y, innerWidth, boxHeight, 4).fill("#F9FAFB");
+      // Left border accent
+      doc.rect(left, doc.y, 4, boxHeight).fill("#1E40AF");
+      doc.restore();
+
+      doc.fillColor("#1F2937").fontSize(9).font("Helvetica-Bold")
+         .text(`${label}: `, left + padding + 5, doc.y + padding, { lineBreak: false });
+      
+      doc.font("Helvetica").fillColor("#4B5563")
+         .text(text, left + padding + 5 + labelWidth, doc.y + padding, { 
+            width: innerWidth - (padding * 2) - 15 - labelWidth,
+            align: "left"
+         });
+      
+      doc.y += boxHeight + 15;
+    },
     metricCards: (metrics) => {
       const { left, right } = doc.page.margins;
       const innerWidth = doc.page.width - left - right;

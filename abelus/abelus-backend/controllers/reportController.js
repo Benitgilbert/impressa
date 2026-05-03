@@ -115,7 +115,32 @@ export const generateReport = async (req, res) => {
             companyName: user.storeName || "abelus Custom Solutions",
             subtitle: user.title || `Performance Statement – Generated on ${new Date().toLocaleDateString()}`,
             contentBuilder: (pdfDoc, helpers) => {
-                // Shift Details Table
+                // 1. Strategic AI Insights (Top of report as requested)
+                helpers.infoBox("Strategic AI Insights", aiSummary);
+
+                // 2. Financial Summary Blocks (Premium Cards)
+                helpers.section("Financial Summary");
+                helpers.metricCards([
+                    { label: "Total Revenue", value: `RWF ${summary.totalRevenue?.toLocaleString()}`, color: "#2563EB" },
+                    { label: "Total Expenses", value: `RWF ${summary.totalExpenses?.toLocaleString()}`, color: "#DC2626" },
+                    { label: "Net Profit", value: `RWF ${summary.netProfit?.toLocaleString()}`, color: "#059669" }
+                ]);
+
+                // 3. Discrepancy Alert & Verification (If verified)
+                if (verificationAmount > 0) {
+                    helpers.alert(
+                        `Discrepancy Note: There is a difference of ${cashDiscrepancy.toLocaleString()} RWF between your physical drawer (RWF ${verificationAmount.toLocaleString()}) and recorded cash sales.`,
+                        cashDiscrepancy === 0 ? "success" : "warning"
+                    );
+                    
+                    helpers.card({
+                        "Physical Drawer Count": `RWF ${verificationAmount.toLocaleString()}`,
+                        "System Cash Expected": `RWF ${summary.cashRevenue?.toLocaleString()}`,
+                        "Cash Difference": `${cashDiscrepancy >= 0 ? '+' : ''} RWF ${cashDiscrepancy.toLocaleString()}`
+                    }, { title: "Drawer Audit Detail", columns: 3 });
+                }
+
+                // 4. Shift Activity Table
                 if (type === "daily" && filters.shifts && filters.shifts.length > 0) {
                     helpers.section("Shift Activity Overview");
                     helpers.table({
@@ -123,7 +148,7 @@ export const generateReport = async (req, res) => {
                             { header: "Shift #", key: "index", width: 50 },
                             { header: "Period (Start - End)", key: "period", width: 170 },
                             { header: "Opening Cash", key: "opening", width: 100 },
-                            { header: "Closing/Current", key: "closing", width: 100 },
+                            { header: "Closing Cash", key: "closing", width: 100 },
                             { header: "Status", key: "status", width: 70 }
                         ],
                         rows: filters.shifts.map((shift, idx) => ({
@@ -134,40 +159,15 @@ export const generateReport = async (req, res) => {
                             status: shift.status.toUpperCase()
                         }))
                     });
-                    pdfDoc.moveDown(0.5);
                 }
 
-                // Financial Summary Blocks (Premium Design)
-                helpers.section("Financial Summary");
-                helpers.metricCards([
-                    { label: "Total Revenue", value: `RWF ${summary.totalRevenue?.toLocaleString()}`, color: "#2563EB" }, // Blue
-                    { label: "Total Expenses", value: `RWF ${summary.totalExpenses?.toLocaleString()}`, color: "#DC2626" }, // Red
-                    { label: "Net Profit", value: `RWF ${summary.netProfit?.toLocaleString()}`, color: "#059669" }  // Green
-                ]);
-
-                // Audit Verification Block
-                helpers.card({
-                    "Physical Drawer Count": verificationAmount > 0 ? `RWF ${verificationAmount.toLocaleString()}` : "Not Provided",
-                    "Expected Cash (System)": `RWF ${summary.cashRevenue?.toLocaleString()}`,
-                    "Shift Difference": verificationAmount > 0 ? `${cashDiscrepancy >= 0 ? '+' : ''} RWF ${cashDiscrepancy.toLocaleString()}` : "N/A"
-                }, { title: "Drawer Reconciliation Detail", columns: 3 });
-
-                // Discrepancy Alert
-                if (verificationAmount > 0 && Math.abs(cashDiscrepancy) > 0) {
-                    helpers.alert(
-                        `Difference Note: There is a difference of ${cashDiscrepancy.toLocaleString()} Rwf between your physical drawer and recorded cash sales.`,
-                        cashDiscrepancy < 0 ? "error" : "success"
-                    );
-                }
-
-                pdfDoc.moveDown(1);
-                
-                // Detailed Transaction Table
+                // 5. Transaction Detail Table
                 helpers.section("Transaction Detail");
                 const flattenedItems = orders.flatMap(o => o.items.map(i => ({
                     ...i,
                     orderDate: new Date(o.createdAt).toLocaleDateString(),
-                    paymentMethod: (o.paymentMethod || "Cash").toLowerCase()
+                    paymentMethod: (o.paymentMethod || "Cash").toLowerCase(),
+                    publicId: o.publicId
                 })));
 
                 helpers.table({
@@ -176,8 +176,8 @@ export const generateReport = async (req, res) => {
                         { header: "Item Name", key: "productName", width: 140 },
                         { header: "Qty", key: "quantity", width: 30 },
                         { header: "P/U", key: "price", width: 60 },
-                        { header: "Cash (Rwf)", key: "cashTotal", width: 80 },
-                        { header: "Momo (Rwf)", key: "momoTotal", width: 80 }
+                        { header: "Cash (RWF)", key: "cashTotal", width: 80 },
+                        { header: "Momo (RWF)", key: "momoTotal", width: 80 }
                     ],
                     rows: flattenedItems.map(i => {
                         const isCash = i.paymentMethod.includes("cash");
@@ -190,16 +190,16 @@ export const generateReport = async (req, res) => {
                     })
                 });
 
-                // Total Row for Transaction Table
+                // Totals aligned with table columns
                 pdfDoc.moveDown(0.2);
-                pdfDoc.fontSize(9).font("Helvetica-Bold").fillColor("#374151")
-                    .text(`TOTALS:  Cash: RWF ${summary.cashRevenue.toLocaleString()}  |  Momo: RWF ${summary.momoRevenue.toLocaleString()}`, { align: "right" });
-                pdfDoc.fontSize(9).font("Helvetica-Bold").fillColor("#111827")
-                    .text(`Total Transaction Value: RWF ${summary.totalRevenue.toLocaleString()}`, { align: "right" });
-
+                pdfDoc.fontSize(9).font("Helvetica-Bold").fillColor("#111827");
+                const startX = pdfDoc.page.margins.left + 290; // Align with Cash/Momo columns
+                pdfDoc.text("TOTALS", startX - 50, pdfDoc.y, { width: 50, align: "right" });
+                pdfDoc.text(`RWF ${summary.cashRevenue.toLocaleString()}`, startX, pdfDoc.y - 12, { width: 80, align: "left" });
+                pdfDoc.text(`RWF ${summary.momoRevenue.toLocaleString()}`, startX + 80, pdfDoc.y - 12, { width: 80, align: "left" });
                 pdfDoc.moveDown(1);
 
-                // Expenses Table
+                // 6. Expenses Breakdown
                 if (filters.expenses && filters.expenses.length > 0) {
                     helpers.section("Expenses Breakdown");
                     helpers.table({
@@ -216,13 +216,7 @@ export const generateReport = async (req, res) => {
                             amount: `RWF ${e.amount.toLocaleString()}`
                         }))
                     });
-                    pdfDoc.moveDown(1);
                 }
-                
-                // AI Insights
-                helpers.section("Strategic AI Insights");
-                pdfDoc.fillColor("#4B5563").fontSize(10).font("Helvetica-Oblique");
-                pdfDoc.text(aiSummary, { lineGap: 4 });
             },
             signatory: {
                 name: user.name,
