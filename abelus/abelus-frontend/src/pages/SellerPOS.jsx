@@ -1081,7 +1081,7 @@ export default function SellerPOS() {
                         <div className="p-6 border-b border-gray-100 dark:border-gray-700 flex flex-col sm:flex-row justify-between items-center gap-4 bg-white dark:bg-gray-800 z-10">
                             <div>
                                 <h1 className="text-xl font-bold text-gray-800 dark:text-white flex items-center gap-2">
-                                    <FaStore className="text-indigo-600" /> {seller?.storeName || 'My Store'} POS
+                                    <FaStore className="text-indigo-600" /> {seller?.storeName || 'My Store'} POS <span className="text-[10px] bg-gray-100 dark:bg-gray-700 px-2 py-0.5 rounded text-gray-400">v1.1</span>
                                 </h1>
                                 <p className="text-sm text-gray-500 dark:text-gray-400 mt-1 flex items-center gap-1">
                                     <FaBarcode /> Scan barcode or select products
@@ -1189,13 +1189,13 @@ export default function SellerPOS() {
                                  </div>
                                  
                                  <div className="flex flex-col gap-2 items-end">
-                                    {activeShift ? (
+                                    {(activeShift && activeShift.id) ? (
                                         <div className="flex gap-2">
                                             <button
                                                 onClick={() => setShowExpenseModal(true)}
                                                 className="bg-amber-500 hover:bg-amber-600 text-white px-3 py-1.5 rounded-lg shadow-sm text-xs font-black flex items-center gap-1.5 transition-all active:scale-95"
                                             >
-                                                <FaWallet /> Expense
+                                                <FaWallet /> Record Expense
                                             </button>
                                             <button
                                                 onClick={() => setShowCloseShiftModal(true)}
@@ -1205,12 +1205,15 @@ export default function SellerPOS() {
                                             </button>
                                         </div>
                                     ) : (
-                                        <button
-                                            onClick={() => setShowStartShiftModal(true)}
-                                            className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-xl shadow-lg text-sm font-black flex items-center gap-2 transition-all active:scale-95"
-                                        >
-                                            <FaPlus /> Start Shift
-                                        </button>
+                                        <div className="flex flex-col items-end gap-1">
+                                            <button
+                                                onClick={() => setShowStartShiftModal(true)}
+                                                className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-xl shadow-lg text-sm font-black flex items-center gap-2 transition-all active:scale-95"
+                                            >
+                                                <FaPlus /> Start Shift
+                                            </button>
+                                            <span className="text-[9px] font-black text-red-500 uppercase animate-pulse">Required to Record Expenses</span>
+                                        </div>
                                     )}
                                  </div>
                              </div>
