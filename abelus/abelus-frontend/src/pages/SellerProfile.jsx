@@ -123,11 +123,17 @@ const SellerProfile = () => {
                                     {/* Profile Image Upload */}
                                     <div className="flex-shrink-0 mx-auto md:mx-0">
                                         <div className="relative group w-32 h-32 rounded-full overflow-hidden border-4 border-gray-100 dark:border-gray-700 shadow-sm">
-                                            <img
-                                                src={previews.profileImage || "https://via.placeholder.com/150"}
-                                                alt="Profile"
-                                                className="w-full h-full object-cover"
-                                            />
+                                            {previews.profileImage ? (
+                                                <img
+                                                    src={previews.profileImage}
+                                                    alt="Profile"
+                                                    className="w-full h-full object-cover"
+                                                />
+                                            ) : (
+                                                <div className="w-full h-full bg-gray-100 dark:bg-gray-700 flex items-center justify-center text-gray-400">
+                                                    <FaUser size={48} />
+                                                </div>
+                                            )}
                                             <label htmlFor="profileImage" className="absolute inset-0 bg-black/50 flex items-center justify-center text-white opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer">
                                                 <div className="flex flex-col items-center text-xs font-medium">
                                                     <FaCamera className="mb-1 text-lg" />

@@ -137,12 +137,16 @@ const SellerProducts = () => {
                                             <tr key={product.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors group">
                                                 <td className="px-6 py-4">
                                                     <div className="flex items-center gap-4">
-                                                        <div className="h-12 w-12 rounded-lg border border-gray-200 dark:border-gray-600 overflow-hidden bg-gray-50 dark:bg-gray-700 flex-shrink-0">
-                                                            <img
-                                                                src={product.image || "https://via.placeholder.com/50"}
-                                                                alt={product.name}
-                                                                className="h-full w-full object-cover"
-                                                            />
+                                                        <div className="h-12 w-12 rounded-lg border border-gray-200 dark:border-gray-600 overflow-hidden bg-gray-50 dark:bg-gray-700 flex-shrink-0 flex items-center justify-center text-gray-400">
+                                                            {product.image ? (
+                                                                <img
+                                                                    src={product.image}
+                                                                    alt={product.name}
+                                                                    className="h-full w-full object-cover"
+                                                                />
+                                                            ) : (
+                                                                <FaBoxOpen size={24} />
+                                                            )}
                                                         </div>
                                                         <div>
                                                             <div className="font-medium text-gray-900 dark:text-white">{product.name}</div>

@@ -208,14 +208,20 @@ export default function DailyDeals() {
                                             </div>
                                         )}
 
-                                        <Link to={`/product/${product.id}`} className="block aspect-square overflow-hidden bg-cream-100 dark:bg-charcoal-900">
-                                            <img
-                                                src={imageUrl}
-                                                alt={product.name}
-                                                className={`w-full h-full object-cover transition-transform duration-700 group-hover:scale-110 ${!isAvailable ? 'grayscale opacity-50' : ''}`}
-                                                onError={(e) => e.target.src = 'https://via.placeholder.com/300'}
-                                            />
-                                        </Link>
+                                            <Link to={`/product/${product.id}`} className="block aspect-square overflow-hidden bg-cream-100 dark:bg-charcoal-900 flex items-center justify-center relative">
+                                                <img
+                                                    src={imageUrl}
+                                                    alt={product.name}
+                                                    className={`w-full h-full object-cover transition-transform duration-700 group-hover:scale-110 ${!isAvailable ? 'grayscale opacity-50' : ''}`}
+                                                    onError={(e) => {
+                                                        e.target.style.display = 'none';
+                                                        e.target.nextSibling.style.display = 'flex';
+                                                    }}
+                                                />
+                                                <div className="absolute inset-0 hidden items-center justify-center text-charcoal-400">
+                                                    <FaBoxOpen size={64} />
+                                                </div>
+                                            </Link>
                                     </div>
 
                                     <div className="p-6 flex flex-col flex-grow">

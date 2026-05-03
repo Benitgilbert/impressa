@@ -82,15 +82,14 @@ function LowStockWidget({ refreshKey }) {
                                             alt={product.name}
                                             className="w-full h-full object-cover"
                                             onError={(e) => {
-                                                e.target.onerror = null;
-                                                e.target.src = "https://via.placeholder.com/150?text=No+Img";
+                                                e.target.style.display = 'none';
+                                                e.target.nextSibling.style.display = 'flex';
                                             }}
                                         />
-                                    ) : (
-                                        <div className="w-full h-full flex items-center justify-center text-gray-400">
-                                            <FaBox />
-                                        </div>
-                                    )}
+                                    ) : null}
+                                    <div className={`w-full h-full items-center justify-center text-gray-400 ${product.image ? 'hidden' : 'flex'}`}>
+                                        <FaBox />
+                                    </div>
                                 </div>
                                 <div className="min-w-0">
                                     <p className="text-sm font-semibold text-charcoal-800 dark:text-white truncate max-w-[120px] sm:max-w-[150px]">
