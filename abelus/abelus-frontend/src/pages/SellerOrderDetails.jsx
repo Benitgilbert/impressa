@@ -65,20 +65,14 @@ const SellerOrderDetails = () => {
     };
 
     if (loading) return (
-        <div className="flex h-screen bg-gray-50 dark:bg-gray-900">
-            <SellerSidebar />
-            <div className="flex-1 flex flex-col items-center justify-center">
-                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
-            </div>
+        <div className="flex-1 flex flex-col items-center justify-center min-h-[400px]">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
         </div>
     );
 
     if (!order) return (
-        <div className="flex h-screen bg-gray-50 dark:bg-gray-900">
-            <SellerSidebar />
-            <div className="flex-1 flex flex-col items-center justify-center text-red-500">
-                Order not found
-            </div>
+        <div className="flex-1 flex flex-col items-center justify-center text-red-500 min-h-[400px]">
+            Order not found
         </div>
     );
 
