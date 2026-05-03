@@ -24,6 +24,16 @@ const getRangeReport = async (start, end, sellerId) => {
     include: { user: { select: { name: true } } }
   });
 
+  // Fetch Shifts in the same range
+  const shiftWhere = { startTime: { gte: start, lt: end } };
+  if (sellerId) {
+    shiftWhere.userId = sellerId;
+  }
+  const shifts = await prisma.shift.findMany({
+    where: shiftWhere,
+    orderBy: { startTime: 'asc' }
+  });
+
   // Fetch Abonne Debt Collections in the same range
   const abonneWhere = { createdAt: { gte: start, lt: end } };
   if (sellerId) {
@@ -111,7 +121,7 @@ const getRangeReport = async (start, end, sellerId) => {
     topCustomization,
   };
 
-  return { orders, summary, expenses };
+  return { orders, summary, expenses, shifts };
 };
 
 /**

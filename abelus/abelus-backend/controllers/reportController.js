@@ -61,10 +61,8 @@ export const generateReport = async (req, res) => {
             const result = await buildReportData(type, filters);
             orders = result.orders;
             summary = result.summary;
-            const expenses = result.expenses; // Extract expenses
-            
-            // Pass expenses to doc generation if needed
-            filters.expenses = expenses; 
+            filters.expenses = result.expenses; 
+            filters.shifts = result.shifts;
         } catch (buildError) {
             console.error("buildReportData error:", buildError);
             return res.status(500).json({ message: `Failed to build report data: ${buildError.message}` });
@@ -117,25 +115,34 @@ export const generateReport = async (req, res) => {
             companyName: user.storeName || "abelus Custom Solutions",
             subtitle: user.title || `Performance Statement – Generated on ${new Date().toLocaleDateString()}`,
             contentBuilder: (pdfDoc, helpers) => {
+                // Shift Context
+                if (type === "daily" && filters.shifts && filters.shifts.length > 0) {
+                    helpers.section("Shift Details");
+                    filters.shifts.forEach((shift, idx) => {
+                        const start = new Date(shift.startTime).toLocaleTimeString();
+                        const end = shift.endTime ? new Date(shift.endTime).toLocaleTimeString() : "STILL OPENED";
+                        
+                        pdfDoc.fontSize(10).fillColor("#374151").font("Helvetica-Bold")
+                            .text(`Shift #${idx + 1}: ${start} - ${end}`);
+                        
+                        helpers.keyValue({
+                            "Opening Cash": `RWF ${shift.startingDrawerAmount?.toLocaleString()}`,
+                            "Closing/Current Cash": `RWF ${(shift.actualEndingDrawerAmount || shift.expectedEndingDrawerAmount)?.toLocaleString()}`,
+                            "Status": shift.status.toUpperCase()
+                        });
+                        pdfDoc.moveDown(0.5);
+                    });
+                    pdfDoc.moveDown(0.5);
+                }
+
                 // Header Summary section
-                helpers.section("Business Summary");
+                helpers.section("Financial Summary");
                 helpers.keyValue({
-                    "Total Orders": orders.length,
                     "Total Revenue": `RWF ${summary.totalRevenue?.toLocaleString()}`,
                     "Total Expenses": `RWF ${summary.totalExpenses?.toLocaleString()}`,
                     "Net Profit": `RWF ${summary.netProfit?.toLocaleString()}`,
-                    "Top Product": summary.topSellingProduct?.name || summary.topProduct || "N/A"
-                });
-
-                pdfDoc.moveDown(1);
-
-                // Financial Reconciliation
-                helpers.section("Financial Reconciliation (Cash vs Momo)");
-                helpers.keyValue({
-                    "System Cash Total": `RWF ${summary.cashRevenue?.toLocaleString()}`,
-                    "System Momo Total": `RWF ${summary.momoRevenue?.toLocaleString()}`,
                     "Physical Drawer": verificationAmount > 0 ? `RWF ${verificationAmount.toLocaleString()}` : "Not Verified",
-                    "Cash Discrepancy": verificationAmount > 0 ? `${cashDiscrepancy >= 0 ? '+' : ''} RWF ${cashDiscrepancy.toLocaleString()}` : "N/A"
+                    "Discrepancy": verificationAmount > 0 ? `${cashDiscrepancy >= 0 ? '+' : ''} RWF ${cashDiscrepancy.toLocaleString()}` : "N/A"
                 });
 
                 if (verificationAmount > 0 && Math.abs(cashDiscrepancy) > 0) {
@@ -146,29 +153,38 @@ export const generateReport = async (req, res) => {
 
                 pdfDoc.moveDown(1);
                 
-                // Detailed Itemized Table
-                helpers.section("Itemized Sales Detail");
+                // Detailed Transaction Table
+                helpers.section("Transaction Detail");
                 const flattenedItems = orders.flatMap(o => o.items.map(i => ({
                     ...i,
                     orderDate: new Date(o.createdAt).toLocaleDateString(),
-                    paymentMethod: o.paymentMethod || "Cash"
+                    paymentMethod: (o.paymentMethod || "Cash").toLowerCase()
                 })));
 
                 helpers.table({
                     columns: [
-                        { header: "Date", key: "orderDate", width: 80 },
-                        { header: "Item Name", key: "productName", width: 180 },
-                        { header: "Qty", key: "quantity", width: 40 },
-                        { header: "PU (Rwf)", key: "price", width: 70 },
-                        { header: "Pay Type", key: "paymentMethod", width: 70 },
-                        { header: "Total", key: "subtotal", width: 80 }
+                        { header: "Date", key: "orderDate", width: 60 },
+                        { header: "Item Name", key: "productName", width: 140 },
+                        { header: "Qty", key: "quantity", width: 30 },
+                        { header: "P/U", key: "price", width: 60 },
+                        { header: "Cash (Rwf)", key: "cashTotal", width: 80 },
+                        { header: "Momo (Rwf)", key: "momoTotal", width: 80 }
                     ],
-                    rows: flattenedItems.map(i => ({
-                        ...i,
-                        price: i.price.toLocaleString(),
-                        subtotal: i.subtotal.toLocaleString()
-                    }))
+                    rows: flattenedItems.map(i => {
+                        const isCash = i.paymentMethod.includes("cash");
+                        return {
+                            ...i,
+                            price: i.price.toLocaleString(),
+                            cashTotal: isCash ? i.subtotal.toLocaleString() : "0",
+                            momoTotal: !isCash ? i.subtotal.toLocaleString() : "0"
+                        }
+                    })
                 });
+
+                // Total Row for Transaction Table
+                pdfDoc.moveDown(0.2);
+                pdfDoc.fontSize(9).font("Helvetica-Bold").fillColor("#374151")
+                    .text(`Total Transaction Value: RWF ${summary.totalRevenue.toLocaleString()}`, { align: "right" });
 
                 pdfDoc.moveDown(1);
 
