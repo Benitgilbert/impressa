@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import api from "../utils/axiosInstance";
 import toast from "react-hot-toast";
 import assetUrl from "../utils/assetUrl";
-import { FaSearch, FaShoppingCart, FaTrash, FaPlus, FaMinus, FaMoneyBillWave, FaMobileAlt, FaBoxOpen, FaStore, FaBarcode, FaTimes, FaCheckCircle, FaWallet, FaReceipt } from "react-icons/fa";
+import { FaSearch, FaShoppingCart, FaTrash, FaPlus, FaMinus, FaMoneyBillWave, FaMobileAlt, FaBoxOpen, FaStore, FaBarcode, FaTimes, FaCheckCircle, FaWallet } from "react-icons/fa";
 import Receipt from "../components/Receipt";
 
 // Beep sound for successful scan
