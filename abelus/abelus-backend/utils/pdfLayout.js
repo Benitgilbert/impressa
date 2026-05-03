@@ -45,7 +45,7 @@ export const createabelusPDF = ({ title, companyName, subtitle, contentBuilder }
        .strokeColor("#E5E7EB").lineWidth(0.5).stroke();
 
     doc.fillColor("#94A3B8").fontSize(8).font("Helvetica");
-    const footerText = "abelus Custom Solutions | Kigali, Rwanda | info@abelus.rw | +250 788 000 000";
+    const footerText = "uwanyirigiraeleora@gmail.com | +250 788 819 878 | Building near Bank of Kigali Gicumbi Branch";
     doc.text(footerText, left, footerY + 10, { width: innerWidth, align: "center" });
     doc.text(`Page ${pageNumber} of ${totalPages}`, left, footerY + 20, { width: innerWidth, align: "center" });
     doc.restore();
@@ -54,10 +54,12 @@ export const createabelusPDF = ({ title, companyName, subtitle, contentBuilder }
   // Setup helpers
   const helpers = {
     section: (label) => {
+      const { left, right } = doc.page.margins;
+      const innerWidth = doc.page.width - left - right;
       if (doc.y > doc.page.height - 100) doc.addPage();
       doc.moveDown(1.5);
       doc.fillColor("#1E3A8A").fontSize(12).font("Helvetica-Bold")
-         .text(label.toUpperCase());
+         .text(label.toUpperCase(), left, doc.y, { align: "center", width: innerWidth });
       doc.moveDown(0.5);
     },
     infoBox: (label, text) => {
@@ -121,6 +123,9 @@ export const createabelusPDF = ({ title, companyName, subtitle, contentBuilder }
     alert: (text, type = "warning") => {
       const { left, right } = doc.page.margins;
       const innerWidth = doc.page.width - left - right;
+      const alertWidth = innerWidth * 0.85; // Reduce width to 85%
+      const alertX = left + (innerWidth - alertWidth) / 2; // Center horizontally
+
       const styles = {
         warning: { bg: "#FFFBEB", border: "#FDE68A", text: "#92400E", label: "Discrepancy Note" },
         error: { bg: "#FEF2F2", border: "#FECACA", text: "#B91C1C", label: "Error" },
@@ -129,22 +134,22 @@ export const createabelusPDF = ({ title, companyName, subtitle, contentBuilder }
       const style = styles[type] || styles.warning;
       const padding = 12;
       const label = style.label + ": ";
-      const textHeight = doc.heightOfString(label + text, { width: innerWidth - (padding * 2) });
+      const textHeight = doc.heightOfString(label + text, { width: alertWidth - (padding * 2) });
       const boxHeight = textHeight + (padding * 2);
 
       if (doc.y + boxHeight > doc.page.height - 70) doc.addPage();
 
       const currentY = doc.y;
       doc.save();
-      doc.roundedRect(left, currentY, innerWidth, boxHeight, 4).fill(style.bg);
-      doc.roundedRect(left, currentY, innerWidth, boxHeight, 4).lineWidth(0.5).strokeColor(style.border).stroke();
+      doc.roundedRect(alertX, currentY, alertWidth, boxHeight, 4).fill(style.bg);
+      doc.roundedRect(alertX, currentY, alertWidth, boxHeight, 4).lineWidth(0.5).strokeColor(style.border).stroke();
       doc.restore();
 
       doc.fillColor(style.text).fontSize(9).font("Helvetica-Bold")
-         .text(label, left + padding, currentY + padding, { lineBreak: false });
+         .text(label, alertX + padding, currentY + padding, { lineBreak: false });
       
       const labelWidth = doc.widthOfString(label);
-      doc.font("Helvetica").text(text, left + padding + labelWidth, currentY + padding, { width: innerWidth - (padding * 2) - labelWidth });
+      doc.font("Helvetica").text(text, alertX + padding + labelWidth, currentY + padding, { width: alertWidth - (padding * 2) - labelWidth });
       
       doc.y = currentY + boxHeight + 20;
     },
