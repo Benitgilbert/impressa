@@ -61,7 +61,7 @@ export const generateReport = async (req, res) => {
             const result = await buildReportData(type, filters);
             orders = result.orders;
             summary = result.summary;
-            filters.expenses = result.expenses; 
+            filters.expenses = result.expenses;
             filters.shifts = result.shifts;
         } catch (buildError) {
             console.error("buildReportData error:", buildError);
@@ -103,21 +103,21 @@ export const generateReport = async (req, res) => {
         // Export as PDF
         const logoBuffer = await getLogoBuffer(user.storeLogo || settings?.logo || "assets/logo.png");
 
-        const monthTitle = (filters.month && filters.year) 
-            ? `Monthly Business Report – ${new Date(parseInt(filters.year), parseInt(filters.month) - 1, 1).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}` 
+        const monthTitle = (filters.month && filters.year)
+            ? `Monthly Business Report – ${new Date(parseInt(filters.year), parseInt(filters.month) - 1, 1).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}`
             : `${type.charAt(0).toUpperCase() + type.slice(1)} Report`;
 
         const verificationAmount = Number(req.query.verificationAmount) || 0;
         const cashDiscrepancy = verificationAmount > 0 ? (verificationAmount - summary.cashRevenue) : 0;
 
-        const performanceTitle = (filters.month && filters.year) 
-            ? `Monthly Performance Statement` 
+        const performanceTitle = (filters.month && filters.year)
+            ? `Monthly Performance Statement`
             : `Daily Performance Statement`;
 
         const doc = createabelusPDF({
             title: performanceTitle,
-            companyName: "ABELUS",
-            subtitle: "Custom Solutions",
+            companyName: "PAPETERIE ABELUS",
+            subtitle: "PASTORT BONUS CO.LTD",
             contentBuilder: (pdfDoc, helpers) => {
                 // 1. Strategic AI Insights (Top)
                 if (aiSummary) {
@@ -147,7 +147,7 @@ export const generateReport = async (req, res) => {
                         ],
                         rows: filters.shifts.map((shift, idx) => ({
                             index: idx + 1,
-                            period: `${new Date(shift.startTime).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})} - ${shift.endTime ? new Date(shift.endTime).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : "STILL OPEN"}`,
+                            period: `${new Date(shift.startTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} - ${shift.endTime ? new Date(shift.endTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : "STILL OPEN"}`,
                             opening: `RWF ${shift.startingDrawerAmount?.toLocaleString()}`,
                             closing: `RWF ${(shift.actualEndingDrawerAmount || shift.expectedEndingDrawerAmount)?.toLocaleString()}`,
                             status: shift.status
@@ -211,7 +211,7 @@ export const generateReport = async (req, res) => {
                 pdfDoc.moveDown(3);
                 pdfDoc.save().moveTo(pdfDoc.page.margins.left, pdfDoc.y).lineTo(pdfDoc.page.width - pdfDoc.page.margins.right, pdfDoc.y).strokeColor("#E2E8F0").lineWidth(0.5).stroke().restore();
                 pdfDoc.moveDown(1);
-                
+
                 pdfDoc.fillColor("#1E293B").fontSize(10).font("Helvetica-Bold").text(`Prepared by: `, { lineBreak: false });
                 pdfDoc.font("Helvetica").fillColor("#475569").text(user.name);
             },

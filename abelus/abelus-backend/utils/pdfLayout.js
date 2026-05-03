@@ -13,41 +13,49 @@ export const createabelusPDF = ({ title, companyName, subtitle, contentBuilder }
     const pageWidth = doc.page.width;
     const innerWidth = pageWidth - left - right;
 
-    // Fixed Branding - Match Template Exactly
-    doc.fillColor("#1E3A8A").fontSize(26).font("Helvetica-Bold")
-       .text("ABELUS", left, top);
+    // Fixed Branding - Match User's Request Exactly
+    doc.fillColor("#1E3A8A").fontSize(22).font("Helvetica-Bold")
+       .text((companyName || "PAPETERIE ABELUS").toUpperCase(), left, top);
     
-    doc.fillColor("#64748B").fontSize(11).font("Helvetica")
-       .text("Custom Solutions", left, top + 28);
+    doc.fillColor("#64748B").fontSize(10).font("Helvetica")
+       .text(subtitle || "PASTORT BONUS CO.LTD", left, top + 26);
 
     // Header Title (Right)
-    doc.fillColor("#64748B").fontSize(14).font("Helvetica")
+    doc.fillColor("#64748B").fontSize(13).font("Helvetica")
        .text(title || "Performance Statement", left, top + 5, { align: "right", width: innerWidth });
     
-    doc.fillColor("#94A3B8").fontSize(9)
-       .text(`Generated: ${new Date().toLocaleDateString()}`, left, top + 25, { align: "right", width: innerWidth });
+    doc.fillColor("#94A3B8").fontSize(8)
+       .text(`Generated: ${new Date().toLocaleDateString()}`, left, top + 22, { align: "right", width: innerWidth });
 
     // Navy Accent Line
-    doc.moveTo(left, top + 55).lineTo(left + innerWidth, top + 55)
+    doc.moveTo(left, top + 50).lineTo(left + innerWidth, top + 50)
        .strokeColor("#1E3A8A").lineWidth(2).stroke();
     
-    doc.y = top + 80;
+    doc.y = top + 75;
   };
 
   const drawFooter = (pageNumber, totalPages) => {
-    const { left, right } = doc.page.margins;
+    const { left } = doc.page.margins;
     const pageWidth = doc.page.width;
-    const innerWidth = pageWidth - left - right;
-    const footerY = doc.page.height - 45;
+    const pageHeight = doc.page.height;
+    const innerWidth = pageWidth - (doc.page.margins.left + doc.page.margins.right);
+    
+    // Hard-set absolute Y to prevent it appearing at the top
+    const absoluteFooterY = pageHeight - 50;
 
     doc.save();
-    doc.moveTo(left, footerY).lineTo(left + innerWidth, footerY)
+    // Line
+    doc.moveTo(left, absoluteFooterY).lineTo(left + innerWidth, absoluteFooterY)
        .strokeColor("#E5E7EB").lineWidth(0.5).stroke();
 
-    doc.fillColor("#94A3B8").fontSize(8).font("Helvetica");
-    const footerText = "uwanyirigiraeleora@gmail.com | +250 788 819 878 | Building near Bank of Kigali Gicumbi Branch";
-    doc.text(footerText, left, footerY + 10, { width: innerWidth, align: "center" });
-    doc.text(`Page ${pageNumber} of ${totalPages}`, left, footerY + 20, { width: innerWidth, align: "center" });
+    // Contact Info
+    doc.fillColor("#94A3B8").fontSize(7.5).font("Helvetica")
+       .text("uwanyirigiraeleora@gmail.com | +250 788 819 878 | Building near Bank of Kigali Gicumbi Branch", 
+             left, absoluteFooterY + 8, { width: innerWidth, align: "center" });
+    
+    // Page Number
+    doc.text(`Page ${pageNumber} of ${totalPages}`, 
+             left, absoluteFooterY + 18, { width: innerWidth, align: "center" });
     doc.restore();
   };
 
