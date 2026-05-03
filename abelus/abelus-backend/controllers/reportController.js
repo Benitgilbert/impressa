@@ -115,35 +115,37 @@ export const generateReport = async (req, res) => {
             companyName: user.storeName || "abelus Custom Solutions",
             subtitle: user.title || `Performance Statement – Generated on ${new Date().toLocaleDateString()}`,
             contentBuilder: (pdfDoc, helpers) => {
-                // Shift Context
+                // Shift Details Table
                 if (type === "daily" && filters.shifts && filters.shifts.length > 0) {
-                    helpers.section("Shift Details");
-                    filters.shifts.forEach((shift, idx) => {
-                        const start = new Date(shift.startTime).toLocaleTimeString();
-                        const end = shift.endTime ? new Date(shift.endTime).toLocaleTimeString() : "STILL OPENED";
-                        
-                        pdfDoc.fontSize(10).fillColor("#374151").font("Helvetica-Bold")
-                            .text(`Shift #${idx + 1}: ${start} - ${end}`);
-                        
-                        helpers.keyValue({
-                            "Opening Cash": `RWF ${shift.startingDrawerAmount?.toLocaleString()}`,
-                            "Closing/Current Cash": `RWF ${(shift.actualEndingDrawerAmount || shift.expectedEndingDrawerAmount)?.toLocaleString()}`,
-                            "Status": shift.status.toUpperCase()
-                        });
-                        pdfDoc.moveDown(0.5);
+                    helpers.section("Shift Activity Overview");
+                    helpers.table({
+                        columns: [
+                            { header: "Shift #", key: "index", width: 50 },
+                            { header: "Period (Start - End)", key: "period", width: 170 },
+                            { header: "Opening Cash", key: "opening", width: 100 },
+                            { header: "Closing/Current", key: "closing", width: 100 },
+                            { header: "Status", key: "status", width: 70 }
+                        ],
+                        rows: filters.shifts.map((shift, idx) => ({
+                            index: idx + 1,
+                            period: `${new Date(shift.startTime).toLocaleTimeString()} - ${shift.endTime ? new Date(shift.endTime).toLocaleTimeString() : "STILL OPENED"}`,
+                            opening: `RWF ${shift.startingDrawerAmount?.toLocaleString()}`,
+                            closing: `RWF ${(shift.actualEndingDrawerAmount || shift.expectedEndingDrawerAmount)?.toLocaleString()}`,
+                            status: shift.status.toUpperCase()
+                        }))
                     });
                     pdfDoc.moveDown(0.5);
                 }
 
-                // Header Summary section
-                helpers.section("Financial Summary");
-                helpers.keyValue({
+                // Financial Summary Card
+                helpers.section("Financial Performance");
+                helpers.card({
                     "Total Revenue": `RWF ${summary.totalRevenue?.toLocaleString()}`,
                     "Total Expenses": `RWF ${summary.totalExpenses?.toLocaleString()}`,
                     "Net Profit": `RWF ${summary.netProfit?.toLocaleString()}`,
                     "Physical Drawer": verificationAmount > 0 ? `RWF ${verificationAmount.toLocaleString()}` : "Not Verified",
                     "Difference": verificationAmount > 0 ? `${cashDiscrepancy >= 0 ? '+' : ''} RWF ${cashDiscrepancy.toLocaleString()}` : "N/A"
-                });
+                }, { backgroundColor: "#F9FAFB", borderColor: "#E5E7EB", columns: 2 });
 
                 if (verificationAmount > 0 && Math.abs(cashDiscrepancy) > 0) {
                     pdfDoc.fontSize(8).fillColor(cashDiscrepancy < 0 ? "#DC2626" : "#059669").text(

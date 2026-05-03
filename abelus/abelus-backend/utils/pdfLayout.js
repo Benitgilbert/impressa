@@ -112,6 +112,61 @@ export const createabelusPDF = ({ title, contentBuilder, signatory, logoPath, co
       });
       doc.moveDown(0.4);
     },
+    card: (items = {}, options = {}) => {
+      const { 
+        backgroundColor = "#F9FAFB", 
+        borderColor = "#E5E7EB",
+        title = null,
+        columns = 2
+      } = options;
+
+      const { left, right } = doc.page.margins;
+      const innerWidth = doc.page.width - left - right;
+      const padding = 15;
+      const startX = left;
+      const startY = doc.y;
+      
+      const entryCount = Object.keys(items).length;
+      const rows = Math.ceil(entryCount / columns);
+      const rowHeight = 18;
+      const titleHeight = title ? 25 : 0;
+      const cardHeight = (rows * rowHeight) + titleHeight + 20;
+
+      // Draw background and border
+      doc.save()
+         .roundedRect(startX, startY, innerWidth, cardHeight, 6)
+         .fillAndStroke(backgroundColor, borderColor);
+      doc.restore();
+
+      let currentY = startY + 12;
+
+      if (title) {
+        doc.fillColor("#111827").fontSize(10).font("Helvetica-Bold")
+           .text(title, startX + padding, currentY, { lineBreak: false });
+        currentY += titleHeight;
+      }
+
+      doc.fontSize(9).font("Helvetica");
+      const colWidth = (innerWidth - (padding * 2)) / columns;
+      
+      Object.entries(items).forEach(([k, v], idx) => {
+        const col = idx % columns;
+        const row = Math.floor(idx / columns);
+        const x = startX + padding + (col * colWidth);
+        const y = currentY + (row * rowHeight);
+        
+        const val = typeof v === "number" ? v.toLocaleString() : (v ?? "-");
+        
+        // Label
+        doc.fillColor("#4B5563").font("Helvetica").text(`${k}: `, x, y, { lineBreak: false });
+        // Value (bold)
+        const labelWidth = doc.widthOfString(`${k}: `);
+        doc.fillColor("#111827").font("Helvetica-Bold").text(val, x + labelWidth, y, { lineBreak: false });
+      });
+
+      doc.y = startY + cardHeight + 10;
+      doc.font("Helvetica");
+    },
     table: ({ columns, rows }) => {
       if (!rows || rows.length === 0) return;
       
