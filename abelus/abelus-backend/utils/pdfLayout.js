@@ -14,24 +14,24 @@ export const createabelusPDF = ({ title, companyName, subtitle, contentBuilder }
     const innerWidth = pageWidth - left - right;
 
     // Fixed Branding - Match User's Request Exactly
-    doc.fillColor("#1E3A8A").fontSize(22).font("Helvetica-Bold")
+    doc.fillColor("#1E3A8A").fontSize(20).font("Helvetica-Bold")
        .text((companyName || "PAPETERIE ABELUS").toUpperCase(), left, top);
     
-    doc.fillColor("#64748B").fontSize(10).font("Helvetica")
-       .text(subtitle || "PASTORT BONUS CO.LTD", left, top + 26);
+    doc.fillColor("#64748B").fontSize(9).font("Helvetica")
+       .text(subtitle || "PASTORT BONUS CO.LTD", left, top + 24);
 
     // Header Title (Right)
-    doc.fillColor("#64748B").fontSize(13).font("Helvetica")
+    doc.fillColor("#64748B").fontSize(12).font("Helvetica")
        .text(title || "Performance Statement", left, top + 5, { align: "right", width: innerWidth });
     
-    doc.fillColor("#94A3B8").fontSize(8)
-       .text(`Generated: ${new Date().toLocaleDateString()}`, left, top + 22, { align: "right", width: innerWidth });
+    doc.fillColor("#94A3B8").fontSize(7.5)
+       .text(`Generated: ${new Date().toLocaleDateString()}`, left, top + 20, { align: "right", width: innerWidth });
 
     // Navy Accent Line
-    doc.moveTo(left, top + 50).lineTo(left + innerWidth, top + 50)
+    doc.moveTo(left, top + 45).lineTo(left + innerWidth, top + 45)
        .strokeColor("#1E3A8A").lineWidth(2).stroke();
     
-    doc.y = top + 75;
+    doc.y = top + 70;
   };
 
   const drawFooter = (pageNumber, totalPages) => {
@@ -40,20 +40,17 @@ export const createabelusPDF = ({ title, companyName, subtitle, contentBuilder }
     const pageHeight = doc.page.height;
     const innerWidth = pageWidth - (doc.page.margins.left + doc.page.margins.right);
     
-    // Hard-set absolute Y to prevent it appearing at the top
-    const absoluteFooterY = pageHeight - 50;
+    // Move up slightly to stay inside safe area and avoid extra pages
+    const absoluteFooterY = pageHeight - 60;
 
     doc.save();
-    // Line
     doc.moveTo(left, absoluteFooterY).lineTo(left + innerWidth, absoluteFooterY)
        .strokeColor("#E5E7EB").lineWidth(0.5).stroke();
 
-    // Contact Info
     doc.fillColor("#94A3B8").fontSize(7.5).font("Helvetica")
        .text("uwanyirigiraeleora@gmail.com | +250 788 819 878 | Building near Bank of Kigali Gicumbi Branch", 
              left, absoluteFooterY + 8, { width: innerWidth, align: "center" });
     
-    // Page Number
     doc.text(`Page ${pageNumber} of ${totalPages}`, 
              left, absoluteFooterY + 18, { width: innerWidth, align: "center" });
     doc.restore();

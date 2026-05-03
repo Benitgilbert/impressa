@@ -224,8 +224,11 @@ export const generateReport = async (req, res) => {
             logoPath: logoBuffer
         });
 
+        const dateStr = new Date().toISOString().split('T')[0];
+        const filename = `${performanceTitle.replace(/\s+/g, '_')}_${dateStr}.pdf`;
+
         res.setHeader("Content-Type", "application/pdf");
-        res.setHeader("Content-Disposition", `inline; filename=${type}-report.pdf`);
+        res.setHeader("Content-Disposition", `inline; filename="${filename}"`);
         doc.pipe(res);
         doc.end();
 
