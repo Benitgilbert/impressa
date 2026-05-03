@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import Header from '../components/Header';
 import LandingFooter from '../components/LandingFooter';
-import { FaClock, FaFire, FaShoppingCart, FaPercent, FaStar } from 'react-icons/fa';
+import { FaClock, FaFire, FaShoppingCart, FaPercent, FaStar, FaBoxOpen } from 'react-icons/fa';
 import { formatRwf } from '../utils/currency';
 import { useCart } from '../context/CartContext';
 import axiosInstance from '../utils/axiosInstance';
