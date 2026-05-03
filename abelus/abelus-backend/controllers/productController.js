@@ -27,7 +27,7 @@ export const getProductRecommendations = async (req, res) => {
     const orders = await prisma.order.findMany({
       where: { status: "delivered" },
       orderBy: { createdAt: 'desc' },
-      take: 1000,
+      take: 200, // Reduced from 1000 to prevent event loop blocking
       select: { items: { select: { productId: true } } }
     });
 
@@ -469,7 +469,8 @@ export const getTrendingProducts = async (req, res) => {
       where: {
         order: { createdAt: { gte: since } }
       },
-      select: { productId: true }
+      select: { productId: true },
+      take: 500 // Limit items processed for trending to prevent timeouts
     });
 
     const counts = items.reduce((acc, item) => {

@@ -73,21 +73,29 @@ const allowedOrigins = [
 
 app.use(cors({
   origin: function (origin, callback) {
+    // Allow requests with no origin (like mobile apps or curl)
     if (!origin) return callback(null, true);
     
     const normalizedOrigin = origin.toLowerCase().trim();
+    
+    // Check if origin is in whitelist or is a vercel sub-domain
     const isAllowed = allowedOrigins.some(ao => ao && ao.toLowerCase() === normalizedOrigin) || 
                       normalizedOrigin.endsWith('.vercel.app') || 
                       normalizedOrigin.endsWith('.vercel.dev') ||
                       normalizedOrigin.endsWith('.amplifyapp.com');
                       
-    callback(null, isAllowed || true); // Default to true for now to unblock
+    if (isAllowed) {
+      callback(null, true);
+    } else {
+      // In production, be strict. In development, allow.
+      const isDev = process.env.NODE_ENV !== 'production';
+      callback(null, isDev);
+    }
   },
   credentials: true,
   methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
   allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With", "Accept", "X-Refresh-Token", "Origin"],
   exposedHeaders: ["Set-Cookie"],
-  preflightContinue: false,
   optionsSuccessStatus: 204
 }));
 

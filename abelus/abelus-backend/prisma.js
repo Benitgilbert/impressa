@@ -9,19 +9,17 @@ const { PrismaClient } = pkg;
 // Use a global variable to prevent multiple instances of Prisma Client in development/serverless
 // Prisma singleton pattern for serverless environments
 // This prevents exhausting database connections during hot reloads and lambda warm starts
-let prisma;
+// Use a global variable to prevent multiple instances of Prisma Client in development/serverless
+// This prevents exhausting database connections during hot reloads and lambda warm starts
+const prisma = global.prisma || new PrismaClient({
+  log: process.env.NODE_ENV === 'production' ? ['error', 'warn'] : ['query', 'error', 'warn'],
+});
 
-if (process.env.NODE_ENV === 'production') {
-  prisma = new PrismaClient({
-    log: ['error', 'warn'],
-  });
-} else {
-  if (!global.prisma) {
-    global.prisma = new PrismaClient({
-      log: ['query', 'error', 'warn'],
-    });
-  }
-  prisma = global.prisma;
+if (process.env.NODE_ENV !== 'production') {
+  global.prisma = prisma;
+} else if (process.env.VERCEL) {
+  // On Vercel, we still want to reuse the instance if the lambda stays warm
+  global.prisma = prisma;
 }
 
 // Initialize Supabase Admin client for backend verification
