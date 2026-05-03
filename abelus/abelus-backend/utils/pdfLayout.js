@@ -62,20 +62,17 @@ export const createabelusPDF = ({ title, contentBuilder, signatory, logoPath, co
     doc.moveTo(left, footerY).lineTo(left + innerWidth, footerY)
        .strokeColor("#E5E7EB").lineWidth(1).stroke();
 
-    // Footer content - use lineBreak: false to prevent doc.y changes
+    // Footer content - single centered line as requested
     doc.fillColor("#6B7280").fontSize(8);
-    doc.text((companyName || "abelus") + " | Kigali, Rwanda", left, footerY + 5, {
-      width: innerWidth / 3,
-      align: "left",
-      lineBreak: false
-    });
-    doc.text("info@abelus.rw | +250 788 000 000", left + innerWidth / 3, footerY + 5, {
-      width: innerWidth / 3,
+    const footerText = "abelus Custom Solutions | Kigali, Rwanda | info@abelus.rw | +250 788 000 000";
+    doc.text(footerText, left, footerY + 5, {
+      width: innerWidth,
       align: "center",
       lineBreak: false
     });
-    doc.text(`Page ${doc.page.number || 1}`, left + (2 * innerWidth / 3), footerY + 5, {
-      width: innerWidth / 3,
+    
+    doc.text(`Page ${doc.page.number || 1}`, left, footerY + 15, {
+      width: innerWidth,
       align: "right",
       lineBreak: false
     });
@@ -100,9 +97,10 @@ export const createabelusPDF = ({ title, contentBuilder, signatory, logoPath, co
   // Helpers available to content builders
   const helpers = {
     section: (label) => {
-      doc.moveDown(0.6);
-      doc.fillColor("#111827").fontSize(12).text(label, { underline: true });
-      doc.moveDown(0.4);
+      doc.moveDown(1);
+      doc.fillColor("#374151").fontSize(9).font("Helvetica-Bold")
+         .text(label.toUpperCase(), { lineGap: 4 });
+      doc.font("Helvetica");
     },
     keyValue: (items = {}) => {
       doc.fillColor("#111827").fontSize(10);
@@ -111,6 +109,58 @@ export const createabelusPDF = ({ title, contentBuilder, signatory, logoPath, co
         doc.text(`${k}: ${val}`);
       });
       doc.moveDown(0.4);
+    },
+    metricCards: (metrics) => {
+      const { left, right } = doc.page.margins;
+      const innerWidth = doc.page.width - left - right;
+      const cardCount = metrics.length;
+      const spacing = 10;
+      const cardWidth = (innerWidth - (spacing * (cardCount - 1))) / cardCount;
+      const cardHeight = 60;
+      const startX = left;
+      const startY = doc.y;
+
+      metrics.forEach((m, idx) => {
+        const x = startX + (idx * (cardWidth + spacing));
+        const bg = m.color || "#3B82F6";
+        
+        doc.save();
+        doc.roundedRect(x, startY, cardWidth, cardHeight, 8).fill(bg + "1A"); 
+        doc.roundedRect(x, startY, cardWidth, cardHeight, 8).lineWidth(0.5).strokeColor(bg).stroke();
+        doc.restore();
+
+        doc.fillColor(bg).fontSize(7).font("Helvetica-Bold")
+           .text(m.label.toUpperCase(), x + 10, startY + 12, { width: cardWidth - 20, align: "left" });
+        
+        doc.fillColor("#111827").fontSize(14).font("Helvetica-Bold")
+           .text(m.value, x + 10, startY + 28, { width: cardWidth - 20, align: "left" });
+      });
+
+      doc.y = startY + cardHeight + 20;
+    },
+    alert: (text, type = "warning") => {
+      const { left, right } = doc.page.margins;
+      const innerWidth = doc.page.width - left - right;
+      const colors = {
+        warning: { bg: "#FFF7ED", border: "#FED7AA", text: "#9A3412" },
+        success: { bg: "#F0FDF4", border: "#BBF7D0", text: "#166534" },
+        error: { bg: "#FEF2F2", border: "#FECACA", text: "#991B1B" }
+      };
+      const theme = colors[type] || colors.warning;
+      
+      const padding = 10;
+      const textHeight = doc.heightOfString(text, { width: innerWidth - (padding * 2) });
+      const boxHeight = textHeight + (padding * 2);
+
+      doc.save();
+      doc.roundedRect(left, doc.y, innerWidth, boxHeight, 8).fill(theme.bg);
+      doc.roundedRect(left, doc.y, innerWidth, boxHeight, 8).lineWidth(0.5).strokeColor(theme.border).stroke();
+      doc.restore();
+
+      doc.fillColor(theme.text).fontSize(8).font("Helvetica-Bold")
+         .text(text, left + padding, doc.y + padding, { width: innerWidth - (padding * 2) });
+      
+      doc.y += boxHeight + 15;
     },
     card: (items = {}, options = {}) => {
       const { 
@@ -132,7 +182,6 @@ export const createabelusPDF = ({ title, contentBuilder, signatory, logoPath, co
       const titleHeight = title ? 25 : 0;
       const cardHeight = (rows * rowHeight) + titleHeight + 20;
 
-      // Draw background and border
       doc.save()
          .roundedRect(startX, startY, innerWidth, cardHeight, 6)
          .fillAndStroke(backgroundColor, borderColor);
@@ -157,9 +206,7 @@ export const createabelusPDF = ({ title, contentBuilder, signatory, logoPath, co
         
         const val = typeof v === "number" ? v.toLocaleString() : (v ?? "-");
         
-        // Label
         doc.fillColor("#4B5563").font("Helvetica").text(`${k}: `, x, y, { lineBreak: false });
-        // Value (bold)
         const labelWidth = doc.widthOfString(`${k}: `);
         doc.fillColor("#111827").font("Helvetica-Bold").text(val, x + labelWidth, y, { lineBreak: false });
       });

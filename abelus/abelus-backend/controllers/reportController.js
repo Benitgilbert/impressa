@@ -137,19 +137,26 @@ export const generateReport = async (req, res) => {
                     pdfDoc.moveDown(0.5);
                 }
 
-                // Financial Summary Card
-                helpers.section("Financial Performance");
-                helpers.card({
-                    "Total Revenue": `RWF ${summary.totalRevenue?.toLocaleString()}`,
-                    "Total Expenses": `RWF ${summary.totalExpenses?.toLocaleString()}`,
-                    "Net Profit": `RWF ${summary.netProfit?.toLocaleString()}`,
-                    "Physical Drawer": verificationAmount > 0 ? `RWF ${verificationAmount.toLocaleString()}` : "Not Verified",
-                    "Difference": verificationAmount > 0 ? `${cashDiscrepancy >= 0 ? '+' : ''} RWF ${cashDiscrepancy.toLocaleString()}` : "N/A"
-                }, { backgroundColor: "#F9FAFB", borderColor: "#E5E7EB", columns: 2 });
+                // Financial Summary Blocks (Premium Design)
+                helpers.section("Financial Summary");
+                helpers.metricCards([
+                    { label: "Total Revenue", value: `RWF ${summary.totalRevenue?.toLocaleString()}`, color: "#2563EB" }, // Blue
+                    { label: "Total Expenses", value: `RWF ${summary.totalExpenses?.toLocaleString()}`, color: "#DC2626" }, // Red
+                    { label: "Net Profit", value: `RWF ${summary.netProfit?.toLocaleString()}`, color: "#059669" }  // Green
+                ]);
 
+                // Audit Verification Block
+                helpers.card({
+                    "Physical Drawer Count": verificationAmount > 0 ? `RWF ${verificationAmount.toLocaleString()}` : "Not Provided",
+                    "Expected Cash (System)": `RWF ${summary.cashRevenue?.toLocaleString()}`,
+                    "Shift Difference": verificationAmount > 0 ? `${cashDiscrepancy >= 0 ? '+' : ''} RWF ${cashDiscrepancy.toLocaleString()}` : "N/A"
+                }, { title: "Drawer Reconciliation Detail", columns: 3 });
+
+                // Discrepancy Alert
                 if (verificationAmount > 0 && Math.abs(cashDiscrepancy) > 0) {
-                    pdfDoc.fontSize(8).fillColor(cashDiscrepancy < 0 ? "#DC2626" : "#059669").text(
-                        `Note: There is a difference of ${Math.abs(cashDiscrepancy).toLocaleString()} Rwf between your physical drawer and recorded cash sales.`
+                    helpers.alert(
+                        `Difference Note: There is a difference of ${cashDiscrepancy.toLocaleString()} Rwf between your physical drawer and recorded cash sales.`,
+                        cashDiscrepancy < 0 ? "error" : "success"
                     );
                 }
 

@@ -144,7 +144,7 @@ const SellerShifts = () => {
                             </button>
                         </div>
 
-                        <div className="flex-1 overflow-y-auto p-8 space-y-8">
+                        <div className="flex-1 overflow-y-auto p-6 md:p-8 space-y-8">
                             {reportLoading ? (
                                 <div className="flex flex-col items-center justify-center py-12 text-gray-500">
                                     <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600 mb-3"></div>
@@ -152,86 +152,166 @@ const SellerShifts = () => {
                                 </div>
                             ) : shiftReport ? (
                                 <>
-                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                        <div className="p-5 bg-indigo-50 dark:bg-indigo-900/20 rounded-2xl border border-indigo-100 dark:border-indigo-800/30">
-                                            <p className="text-[10px] font-bold text-indigo-600 dark:text-indigo-400 uppercase tracking-wider mb-2">Starting Cash</p>
-                                            <p className="text-xl font-black text-gray-900 dark:text-white">{formatCurrency(shiftReport.startingDrawerAmount)}</p>
-                                        </div>
-                                        <div className="p-5 bg-sage-50 dark:bg-sage-900/20 rounded-2xl border border-sage-100 dark:border-sage-800/30">
-                                            <p className="text-[10px] font-bold text-sage-600 dark:text-sage-400 uppercase tracking-wider mb-2">Expected Total</p>
-                                            <p className="text-xl font-black text-gray-900 dark:text-white">{formatCurrency(shiftReport.expectedEndingDrawerAmount)}</p>
-                                        </div>
-                                    </div>
-
+                                    {/* Financial Summary Cards */}
                                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                                        <div className="p-5 bg-gray-50 dark:bg-gray-700/30 rounded-2xl border border-gray-100 dark:border-gray-700/50">
-                                            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Cash Sales</p>
-                                            <p className="text-lg font-black text-gray-900 dark:text-white">{formatCurrency(shiftReport.totalCashSales)}</p>
+                                        <div className="p-6 bg-blue-500/10 rounded-2xl border border-blue-500/20 shadow-sm">
+                                            <p className="text-[10px] font-bold text-blue-500 uppercase tracking-widest mb-1">Total Revenue</p>
+                                            <p className="text-2xl font-black text-gray-900 dark:text-white">
+                                                {formatCurrency((shiftReport.totalCashSales || 0) + (shiftReport.totalMomoSales || 0))}
+                                            </p>
                                         </div>
-                                        <div className="p-5 bg-gray-50 dark:bg-gray-700/30 rounded-2xl border border-gray-100 dark:border-gray-700/50">
-                                            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">MoMo Sales</p>
-                                            <p className="text-lg font-black text-gray-900 dark:text-white">{formatCurrency(shiftReport.totalMomoSales)}</p>
+                                        <div className="p-6 bg-red-500/10 rounded-2xl border border-red-500/20 shadow-sm">
+                                            <p className="text-[10px] font-bold text-red-500 uppercase tracking-widest mb-1">Total Expenses</p>
+                                            <p className="text-2xl font-black text-gray-900 dark:text-white">
+                                                {formatCurrency(shiftReport.totalExpenses || 0)}
+                                            </p>
                                         </div>
-                                        <div className="p-5 bg-gray-50 dark:bg-gray-700/30 rounded-2xl border border-gray-100 dark:border-gray-700/50">
-                                            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Debt Coll.</p>
-                                            <p className="text-lg font-black text-gray-900 dark:text-white">{formatCurrency(shiftReport.totalDebtCollected)}</p>
-                                        </div>
-                                    </div>
-
-                                    <div className="bg-gray-50 dark:bg-gray-900/30 rounded-3xl p-6 border border-gray-100 dark:border-gray-700/50">
-                                        <h3 className="font-black text-gray-900 dark:text-white mb-4 text-sm uppercase tracking-widest">Verification Details</h3>
-                                        <div className="space-y-3">
-                                            <div className="flex justify-between items-center text-sm">
-                                                <span className="text-gray-500 font-medium">Actual Amount Counted:</span>
-                                                <span className="font-bold dark:text-white">{formatCurrency(shiftReport.actualEndingDrawerAmount)}</span>
-                                            </div>
-                                            <div className={`flex justify-between items-center text-sm p-3 rounded-xl ${shiftReport.actualEndingDrawerAmount - shiftReport.expectedEndingDrawerAmount === 0 ? 'bg-sage-50 dark:bg-sage-900/20 text-sage-600' : 'bg-red-50 dark:bg-red-900/20 text-red-600'}`}>
-                                                <span className="font-bold uppercase tracking-wider text-[10px]">Difference:</span>
-                                                <span className="font-black text-lg">
-                                                    {formatCurrency(shiftReport.actualEndingDrawerAmount - shiftReport.expectedEndingDrawerAmount)}
-                                                </span>
-                                            </div>
+                                        <div className="p-6 bg-emerald-500/10 rounded-2xl border border-emerald-500/20 shadow-sm">
+                                            <p className="text-[10px] font-bold text-emerald-500 uppercase tracking-widest mb-1">Net Profit</p>
+                                            <p className="text-2xl font-black text-gray-900 dark:text-white">
+                                                {formatCurrency(((shiftReport.totalCashSales || 0) + (shiftReport.totalMomoSales || 0)) - (shiftReport.totalExpenses || 0))}
+                                            </p>
                                         </div>
                                     </div>
 
-                                    {shiftReport.notes && (
-                                        <div className="p-6 bg-yellow-50 dark:bg-yellow-900/20 rounded-2xl border border-yellow-100 dark:border-yellow-800/30">
-                                            <p className="text-[10px] font-bold text-yellow-600 dark:text-yellow-400 uppercase tracking-wider mb-2">Shift Notes</p>
-                                            <p className="text-sm text-gray-700 dark:text-gray-300 italic">"{shiftReport.notes}"</p>
+                                    {/* Difference Note */}
+                                    {selectedShift.status === 'closed' && (
+                                        <div className="p-4 bg-orange-500/10 rounded-2xl border border-orange-500/20 text-orange-600 dark:text-orange-400 flex items-center gap-4">
+                                            <div className="w-10 h-10 bg-orange-500/20 rounded-xl flex items-center justify-center flex-shrink-0">
+                                                <FaExclamationTriangle />
+                                            </div>
+                                            <p className="text-sm font-medium">
+                                                <span className="font-bold">Difference Note:</span> There is a difference of <span className="font-black underline">{formatCurrency(shiftReport.actualEndingDrawerAmount - shiftReport.expectedEndingDrawerAmount)}</span> between your physical drawer and recorded sales.
+                                            </p>
                                         </div>
                                     )}
 
-                                    <div>
-                                        <h3 className="font-black text-gray-900 dark:text-white mb-4 text-sm uppercase tracking-widest">Shift Orders ({shiftReport.orders?.length || 0})</h3>
-                                        <div className="space-y-2">
-                                            {shiftReport.orders?.map(order => (
-                                                <div key={order.publicId} className="flex justify-between items-center p-3 hover:bg-gray-50 dark:hover:bg-gray-700/50 rounded-xl transition-colors">
-                                                    <div className="flex items-center gap-3">
-                                                        <span className="font-mono text-xs text-indigo-600 dark:text-indigo-400 font-bold">#{order.publicId}</span>
-                                                        <span className="text-xs text-gray-400">{new Date(order.createdAt).toLocaleTimeString()}</span>
-                                                    </div>
-                                                    <div className="flex items-center gap-4">
-                                                        <span className="text-[10px] text-gray-400 font-bold uppercase">{order.paymentMethod}</span>
-                                                        <span className="font-bold dark:text-white">{formatCurrency(order.grandTotal)}</span>
-                                                    </div>
-                                                </div>
-                                            ))}
+                                    {/* Shift Activity Table */}
+                                    <div className="space-y-4">
+                                        <h3 className="font-black text-gray-900 dark:text-white text-xs uppercase tracking-widest px-1">Shift Activity Overview</h3>
+                                        <div className="overflow-hidden rounded-2xl border border-gray-100 dark:border-gray-700">
+                                            <table className="w-full text-left text-sm">
+                                                <thead className="bg-gray-900 dark:bg-gray-950 text-white text-[10px] uppercase font-bold tracking-widest">
+                                                    <tr>
+                                                        <th className="px-4 py-3">Period</th>
+                                                        <th className="px-4 py-3">Opening Cash</th>
+                                                        <th className="px-4 py-3">Closing Cash</th>
+                                                        <th className="px-4 py-3">Status</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
+                                                    <tr className="hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors">
+                                                        <td className="px-4 py-4 text-xs">
+                                                            {new Date(selectedShift.startTime).toLocaleTimeString()} - {selectedShift.endTime ? new Date(selectedShift.endTime).toLocaleTimeString() : "Ongoing"}
+                                                        </td>
+                                                        <td className="px-4 py-4 font-bold">{formatCurrency(shiftReport.startingDrawerAmount)}</td>
+                                                        <td className="px-4 py-4 font-bold">{formatCurrency(shiftReport.actualEndingDrawerAmount)}</td>
+                                                        <td className="px-4 py-4">{getStatusBadge(selectedShift.status)}</td>
+                                                    </tr>
+                                                </tbody>
+                                            </table>
                                         </div>
                                     </div>
+
+                                    {/* Transaction Detail Table */}
+                                    <div className="space-y-4">
+                                        <h3 className="font-black text-gray-900 dark:text-white text-xs uppercase tracking-widest px-1">Transaction Detail</h3>
+                                        <div className="overflow-hidden rounded-2xl border border-gray-100 dark:border-gray-700">
+                                            <table className="w-full text-left text-sm">
+                                                <thead className="bg-gray-900 dark:bg-gray-950 text-white text-[10px] uppercase font-bold tracking-widest">
+                                                    <tr>
+                                                        <th className="px-4 py-3">Item Name</th>
+                                                        <th className="px-4 py-3 text-center">Qty</th>
+                                                        <th className="px-4 py-3">Cash</th>
+                                                        <th className="px-4 py-3">Momo</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
+                                                    {shiftReport.orders?.length > 0 ? (
+                                                        shiftReport.orders.map((order, idx) => (
+                                                            <tr key={order.id} className={idx % 2 === 0 ? 'bg-white dark:bg-gray-800' : 'bg-gray-50/50 dark:bg-gray-700/30'}>
+                                                                <td className="px-4 py-3">
+                                                                    <p className="font-bold text-gray-900 dark:text-white truncate max-w-[150px]">Order #{order.publicId}</p>
+                                                                    <p className="text-[10px] text-gray-400">{new Date(order.createdAt).toLocaleTimeString()}</p>
+                                                                </td>
+                                                                <td className="px-4 py-3 text-center font-medium">{order.items?.length || 0}</td>
+                                                                <td className="px-4 py-3 font-medium">
+                                                                    {order.paymentMethod === 'cash' ? formatCurrency(order.grandTotal) : '-'}
+                                                                </td>
+                                                                <td className="px-4 py-3 font-medium">
+                                                                    {order.paymentMethod === 'momo' ? formatCurrency(order.grandTotal) : '-'}
+                                                                </td>
+                                                            </tr>
+                                                        ))
+                                                    ) : (
+                                                        <tr>
+                                                            <td colSpan="4" className="px-4 py-12 text-center text-gray-400 italic">No transactions found for this shift.</td>
+                                                        </tr>
+                                                    )}
+                                                </tbody>
+                                                <tfoot className="bg-gray-50 dark:bg-gray-900 font-black">
+                                                    <tr>
+                                                        <td colSpan="2" className="px-4 py-3 text-right text-[10px] uppercase tracking-widest text-gray-500">Totals</td>
+                                                        <td className="px-4 py-3 text-blue-600 dark:text-blue-400">{formatCurrency(shiftReport.totalCashSales)}</td>
+                                                        <td className="px-4 py-3 text-emerald-600 dark:text-emerald-400">{formatCurrency(shiftReport.totalMomoSales)}</td>
+                                                    </tr>
+                                                </tfoot>
+                                            </table>
+                                        </div>
+                                    </div>
+
+                                    {/* Expenses Section */}
+                                    {shiftReport.expenses?.length > 0 && (
+                                        <div className="space-y-4">
+                                            <h3 className="font-black text-gray-900 dark:text-white text-xs uppercase tracking-widest px-1">Expenses Breakdown</h3>
+                                            <div className="overflow-hidden rounded-2xl border border-gray-100 dark:border-gray-700">
+                                                <table className="w-full text-left text-sm">
+                                                    <thead className="bg-gray-900 dark:bg-gray-950 text-white text-[10px] uppercase font-bold tracking-widest">
+                                                        <tr>
+                                                            <th className="px-4 py-3">Description</th>
+                                                            <th className="px-4 py-3">Amount</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
+                                                        {shiftReport.expenses.map((exp, idx) => (
+                                                            <tr key={exp.id} className={idx % 2 === 0 ? 'bg-white dark:bg-gray-800' : 'bg-gray-50/50 dark:bg-gray-700/30'}>
+                                                                <td className="px-4 py-3 font-medium">{exp.description}</td>
+                                                                <td className="px-4 py-3 font-black text-red-500">{formatCurrency(exp.amount)}</td>
+                                                            </tr>
+                                                        ))}
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {shiftReport.notes && (
+                                        <div className="p-6 bg-yellow-500/5 rounded-2xl border border-yellow-500/20">
+                                            <p className="text-[10px] font-bold text-yellow-600 uppercase tracking-widest mb-2">Shift Notes</p>
+                                            <p className="text-sm text-gray-700 dark:text-gray-300 italic">"{shiftReport.notes}"</p>
+                                        </div>
+                                    )}
                                 </>
                             ) : (
                                 <p className="text-center text-gray-500 py-12">Failed to load shift details.</p>
                             )}
                         </div>
 
-                        <div className="p-8 border-t dark:border-gray-700 bg-gray-50/50 dark:bg-gray-900/30">
+                        <div className="p-6 md:p-8 border-t dark:border-gray-700 bg-gray-50/50 dark:bg-gray-900/30 flex gap-4">
+                             <button
+                                onClick={() => window.print()}
+                                className="flex-1 py-4 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-white rounded-2xl font-black transition-all active:scale-[0.98]"
+                            >
+                                Print View
+                            </button>
                             <button
                                 onClick={() => { setSelectedShift(null); setShiftReport(null); }}
-                                className="w-full py-4 bg-gray-900 dark:bg-white text-white dark:text-gray-900 rounded-2xl font-black text-lg transition-all active:scale-[0.98]"
+                                className="flex-[2] py-4 bg-blue-600 text-white rounded-2xl font-black shadow-lg shadow-blue-500/20 transition-all active:scale-[0.98]"
                             >
-                                Close Report
+                                Done
                             </button>
                         </div>
+
                     </div>
                 </div>
             )}
