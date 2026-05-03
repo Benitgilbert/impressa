@@ -8,386 +8,225 @@ export const createabelusPDF = ({ title, contentBuilder, signatory, logoPath, co
     const { left, right, top } = doc.page.margins;
     const innerWidth = pageWidth - left - right;
 
-    // Logo centered at top
-    if (logoPath) {
-      try {
-        doc.image(logoPath, pageWidth / 2 - 25, top + 10, { width: 50, height: 50 });
-      } catch (err) {
-        console.warn("Logo not loaded:", err.message);
-      }
-    }
+    // Left Side: Company Branding
+    doc.fillColor("#1E3A8A").fontSize(24).font("Helvetica-Bold")
+       .text((companyName || "ABELUS").toUpperCase(), left, top);
+    
+    doc.fillColor("#6B7280").fontSize(10).font("Helvetica")
+       .text("Custom Solutions", left, top + 28);
 
-    // Company name and title centered - use explicit Y positions
-    const headerStartY = top + (logoPath ? 70 : 20);
-    doc.fillColor("#111827").fontSize(16).font("Helvetica-Bold");
-    doc.text(companyName || "abelus Custom Solutions", left, headerStartY, {
-      width: innerWidth,
-      align: "center",
-      lineBreak: false
-    });
+    // Right Side: Report Title
+    doc.fillColor("#6B7280").fontSize(14).font("Helvetica")
+       .text(title || "Daily Performance Statement", left, top + 5, { align: "right", width: innerWidth });
     
-    doc.font("Helvetica").fontSize(13).fillColor("#374151");
-    doc.text(title, left, headerStartY + 20, {
-      width: innerWidth,
-      align: "center",
-      lineBreak: false
-    });
-    
-    doc.fontSize(9).fillColor("#6B7280");
-    doc.text(subtitle || `Generated: ${new Date().toLocaleDateString()}`, left, headerStartY + 38, {
-      width: innerWidth,
-      align: "center",
-      lineBreak: false
-    });
+    doc.fillColor("#9CA3AF").fontSize(9)
+       .text(subtitle || `Generated: ${new Date().toLocaleDateString()}`, left, top + 25, { align: "right", width: innerWidth });
 
-    // Divider line
-    const dividerY = headerStartY + 52;
-    doc.moveTo(left, dividerY).lineTo(left + innerWidth, dividerY)
-       .strokeColor("#E5E7EB").lineWidth(1).stroke();
+    // Header Border Line
+    doc.moveTo(left, top + 50).lineTo(left + innerWidth, top + 50)
+       .strokeColor("#1E3A8A").lineWidth(2).stroke();
     
-    // Set doc.y to start content after header
-    doc.y = dividerY + 15;
+    doc.y = top + 65;
   };
 
-  const drawFooter = () => {
+  const drawFooter = (pageNumber) => {
     const { left, right, bottom } = doc.page.margins;
     const innerWidth = pageWidth - left - right;
-    // Position footer at the bottom of the page (inside margin)
     const footerY = doc.page.height - bottom - 20;
 
-    // Save current Y position to restore later
-    const savedY = doc.y;
-
-    // Footer divider line
+    doc.save();
     doc.moveTo(left, footerY).lineTo(left + innerWidth, footerY)
-       .strokeColor("#E5E7EB").lineWidth(1).stroke();
+       .strokeColor("#E5E7EB").lineWidth(0.5).stroke();
 
-    // Footer content - single centered line as requested
-    doc.fillColor("#6B7280").fontSize(8);
+    doc.fillColor("#9CA3AF").fontSize(8).font("Helvetica");
     const footerText = "abelus Custom Solutions | Kigali, Rwanda | info@abelus.rw | +250 788 000 000";
-    doc.text(footerText, left, footerY + 5, {
-      width: innerWidth,
-      align: "center",
-      lineBreak: false
-    });
+    doc.text(footerText, left, footerY + 8, { width: innerWidth, align: "center" });
     
-    doc.text(`Page ${doc.page.number || 1}`, left, footerY + 15, {
-      width: innerWidth,
-      align: "right",
-      lineBreak: false
-    });
-
-    // Generation timestamp
-    doc.fontSize(7).fillColor("#9CA3AF");
-    doc.text("Report generated: " + new Date().toLocaleString(), left, footerY + 15, {
-      width: innerWidth,
-      align: "center",
-      lineBreak: false
-    });
-
-    // Restore Y position
-    doc.y = savedY;
+    if (pageNumber) {
+      doc.text(`Page ${pageNumber}`, left, footerY + 18, { width: innerWidth, align: "center" });
+    }
+    doc.restore();
   };
 
-  // Draw header on first page
-  drawHeader();
-  
-  // Header only on first page; do not redraw on subsequent pages
-
-  // Helpers available to content builders
   const helpers = {
     section: (label) => {
-      doc.moveDown(1);
-      doc.fillColor("#374151").fontSize(9).font("Helvetica-Bold")
-         .text(label.toUpperCase(), { lineGap: 4 });
+      doc.moveDown(1.5);
+      doc.fillColor("#1E3A8A").fontSize(11).font("Helvetica-Bold")
+         .text(label.toUpperCase());
       doc.font("Helvetica");
-    },
-    keyValue: (items = {}) => {
-      doc.fillColor("#111827").fontSize(10);
-      Object.entries(items).forEach(([k, v]) => {
-        const val = typeof v === "number" ? v.toLocaleString() : (v ?? "-");
-        doc.text(`${k}: ${val}`);
-      });
-      doc.moveDown(0.4);
+      doc.moveDown(0.5);
     },
     infoBox: (label, text) => {
-      const { left, right } = doc.page.margins;
-      const innerWidth = doc.page.width - left - right;
+      const { left } = doc.page.margins;
+      const innerWidth = pageWidth - (doc.page.margins.left + doc.page.margins.right);
       const padding = 15;
       
       doc.font("Helvetica-Bold").fontSize(9);
-      const labelWidth = doc.widthOfString(`${label}: `);
       const textHeight = doc.heightOfString(`${label}: ${text}`, { width: innerWidth - (padding * 2) - 10 });
       const boxHeight = textHeight + (padding * 2);
 
       doc.save();
-      // Background
-      doc.roundedRect(left, doc.y, innerWidth, boxHeight, 4).fill("#F9FAFB");
-      // Left border accent
-      doc.rect(left, doc.y, 4, boxHeight).fill("#1E40AF");
+      doc.roundedRect(left, doc.y, innerWidth, boxHeight, 4).fill("#F8FAFC");
+      doc.rect(left, doc.y, 4, boxHeight).fill("#1E3A8A");
       doc.restore();
 
-      doc.fillColor("#1F2937").fontSize(9).font("Helvetica-Bold")
-         .text(`${label}: `, left + padding + 5, doc.y + padding, { lineBreak: false });
+      doc.fillColor("#1E293B").fontSize(9).font("Helvetica-Bold")
+         .text(`${label}: `, left + padding, doc.y + padding, { lineBreak: false });
       
-      doc.font("Helvetica").fillColor("#4B5563")
-         .text(text, left + padding + 5 + labelWidth, doc.y + padding, { 
-            width: innerWidth - (padding * 2) - 15 - labelWidth,
-            align: "left"
-         });
+      const labelWidth = doc.widthOfString(`${label}: `);
+      doc.font("Helvetica").fillColor("#475569")
+         .text(text, left + padding + labelWidth, doc.y + padding, { width: innerWidth - (padding * 2) - labelWidth });
       
       doc.y += boxHeight + 15;
     },
     metricCards: (metrics) => {
-      const { left, right } = doc.page.margins;
-      const innerWidth = doc.page.width - left - right;
-      const cardCount = metrics.length;
-      const spacing = 10;
-      const cardWidth = (innerWidth - (spacing * (cardCount - 1))) / cardCount;
-      const cardHeight = 60;
+      const { left } = doc.page.margins;
+      const innerWidth = pageWidth - (doc.page.margins.left + doc.page.margins.right);
+      const spacing = 12;
+      const cardWidth = (innerWidth - (spacing * (metrics.length - 1))) / metrics.length;
+      const cardHeight = 65;
       const startX = left;
       const startY = doc.y;
 
       metrics.forEach((m, idx) => {
         const x = startX + (idx * (cardWidth + spacing));
-        const bg = m.color || "#3B82F6";
+        const color = m.color || "#3B82F6";
         
         doc.save();
-        doc.roundedRect(x, startY, cardWidth, cardHeight, 8).fill(bg + "1A"); 
-        doc.roundedRect(x, startY, cardWidth, cardHeight, 8).lineWidth(0.5).strokeColor(bg).stroke();
+        doc.roundedRect(x, startY, cardWidth, cardHeight, 6).fill(color + "0D"); // 5% opacity
         doc.restore();
 
-        doc.fillColor(bg).fontSize(7).font("Helvetica-Bold")
-           .text(m.label.toUpperCase(), x + 10, startY + 12, { width: cardWidth - 20, align: "left" });
+        doc.fillColor("#64748B").fontSize(8).font("Helvetica")
+           .text(m.label, x, startY + 15, { width: cardWidth, align: "center" });
         
-        doc.fillColor("#111827").fontSize(14).font("Helvetica-Bold")
-           .text(m.value, x + 10, startY + 28, { width: cardWidth - 20, align: "left" });
+        doc.fillColor(color).fontSize(16).font("Helvetica-Bold")
+           .text(m.value, x, startY + 30, { width: cardWidth, align: "center" });
       });
 
       doc.y = startY + cardHeight + 20;
     },
     alert: (text, type = "warning") => {
-      const { left, right } = doc.page.margins;
-      const innerWidth = doc.page.width - left - right;
-      const colors = {
-        warning: { bg: "#FFF7ED", border: "#FED7AA", text: "#9A3412" },
-        success: { bg: "#F0FDF4", border: "#BBF7D0", text: "#166534" },
-        error: { bg: "#FEF2F2", border: "#FECACA", text: "#991B1B" }
+      const { left } = doc.page.margins;
+      const innerWidth = pageWidth - (doc.page.margins.left + doc.page.margins.right);
+      const styles = {
+        warning: { bg: "#FFFBEB", border: "#FDE68A", text: "#92400E" },
+        error: { bg: "#FEF2F2", border: "#FECACA", text: "#B91C1C" },
+        success: { bg: "#F0FDF4", border: "#BBF7D0", text: "#166534" }
       };
-      const theme = colors[type] || colors.warning;
-      
-      const padding = 10;
+      const style = styles[type] || styles.warning;
+      const padding = 12;
       const textHeight = doc.heightOfString(text, { width: innerWidth - (padding * 2) });
       const boxHeight = textHeight + (padding * 2);
 
       doc.save();
-      doc.roundedRect(left, doc.y, innerWidth, boxHeight, 8).fill(theme.bg);
-      doc.roundedRect(left, doc.y, innerWidth, boxHeight, 8).lineWidth(0.5).strokeColor(theme.border).stroke();
+      doc.roundedRect(left, doc.y, innerWidth, boxHeight, 4).fill(style.bg);
+      doc.roundedRect(left, doc.y, innerWidth, boxHeight, 4).lineWidth(0.5).strokeColor(style.border).stroke();
       doc.restore();
 
-      doc.fillColor(theme.text).fontSize(8).font("Helvetica-Bold")
+      doc.fillColor(style.text).fontSize(8.5).font("Helvetica-Bold")
          .text(text, left + padding, doc.y + padding, { width: innerWidth - (padding * 2) });
       
-      doc.y += boxHeight + 15;
-    },
-    card: (items = {}, options = {}) => {
-      const { 
-        backgroundColor = "#F9FAFB", 
-        borderColor = "#E5E7EB",
-        title = null,
-        columns = 2
-      } = options;
-
-      const { left, right } = doc.page.margins;
-      const innerWidth = doc.page.width - left - right;
-      const padding = 15;
-      const startX = left;
-      const startY = doc.y;
-      
-      const entryCount = Object.keys(items).length;
-      const rows = Math.ceil(entryCount / columns);
-      const rowHeight = 18;
-      const titleHeight = title ? 25 : 0;
-      const cardHeight = (rows * rowHeight) + titleHeight + 20;
-
-      doc.save()
-         .roundedRect(startX, startY, innerWidth, cardHeight, 6)
-         .fillAndStroke(backgroundColor, borderColor);
-      doc.restore();
-
-      let currentY = startY + 12;
-
-      if (title) {
-        doc.fillColor("#111827").fontSize(10).font("Helvetica-Bold")
-           .text(title, startX + padding, currentY, { lineBreak: false });
-        currentY += titleHeight;
-      }
-
-      doc.fontSize(9).font("Helvetica");
-      const colWidth = (innerWidth - (padding * 2)) / columns;
-      
-      Object.entries(items).forEach(([k, v], idx) => {
-        const col = idx % columns;
-        const row = Math.floor(idx / columns);
-        const x = startX + padding + (col * colWidth);
-        const y = currentY + (row * rowHeight);
-        
-        const val = typeof v === "number" ? v.toLocaleString() : (v ?? "-");
-        
-        doc.fillColor("#4B5563").font("Helvetica").text(`${k}: `, x, y, { lineBreak: false });
-        const labelWidth = doc.widthOfString(`${k}: `);
-        doc.fillColor("#111827").font("Helvetica-Bold").text(val, x + labelWidth, y, { lineBreak: false });
-      });
-
-      doc.y = startY + cardHeight + 10;
-      doc.font("Helvetica");
+      doc.y += boxHeight + 20;
     },
     table: ({ columns, rows }) => {
       if (!rows || rows.length === 0) return;
       
       const startX = doc.page.margins.left;
       const totalWidth = columns.reduce((s, c) => s + (c.width || 100), 0);
-      const rowHeight = 16;
-      const headerHeight = 18;
+      const headerHeight = 22;
+      const rowHeight = 20;
       let y = doc.y;
 
-      // Draw table header
-      doc.save();
-      doc.rect(startX, y, totalWidth, headerHeight).fill("#F3F4F6");
-      doc.restore();
-      
-      doc.fillColor("#374151").fontSize(9).font("Helvetica-Bold");
-      let x = startX + 4;
-      columns.forEach((c) => {
-        doc.text(c.header || c.key, x, y + 5, { 
-          width: (c.width || 100) - 8, 
-          ellipsis: true,
-          lineBreak: false
-        });
+      // Header
+      doc.save().rect(startX, y, totalWidth, headerHeight).fill("#1E3A8A").restore();
+      doc.fillColor("#FFFFFF").fontSize(8).font("Helvetica-Bold");
+      let x = startX + 8;
+      columns.forEach(c => {
+        doc.text(c.header.toUpperCase(), x, y + 7, { width: (c.width || 100) - 10, ellipsis: true });
         x += (c.width || 100);
       });
       y += headerHeight;
 
-      // Draw table rows
-      doc.font("Helvetica").fontSize(9);
+      // Rows
+      doc.font("Helvetica").fontSize(8.5);
       rows.forEach((row, idx) => {
-        // Check if we need a new page (leave space for footer)
-        if (y + rowHeight > doc.page.height - doc.page.margins.bottom - 80) {
+        if (y + rowHeight > doc.page.height - 100) {
           doc.addPage();
-          y = doc.y;
-          
-          // Redraw header on new page
-          doc.save();
-          doc.rect(startX, y, totalWidth, headerHeight).fill("#F3F4F6");
-          doc.restore();
-          doc.fillColor("#374151").fontSize(9).font("Helvetica-Bold");
-          x = startX + 4;
-          columns.forEach((c) => {
-            doc.text(c.header || c.key, x, y + 5, { 
-              width: (c.width || 100) - 8, 
-              ellipsis: true,
-              lineBreak: false
-            });
-            x += (c.width || 100);
-          });
-          y += headerHeight;
-          doc.font("Helvetica");
+          y = doc.page.margins.top;
         }
 
-        // Zebra striping
-        if (idx % 2 === 1) {
-          doc.save();
-          doc.rect(startX, y, totalWidth, rowHeight).fill("#FAFAFA");
-          doc.restore();
-        }
+        doc.save().moveTo(startX, y + rowHeight).lineTo(startX + totalWidth, y + rowHeight).strokeColor("#F1F5F9").lineWidth(0.5).stroke().restore();
 
-        // Draw row data
-        doc.fillColor("#111827").fontSize(9);
-        x = startX + 4;
-        columns.forEach((c) => {
-          const val = row[c.key];
-          const txt = typeof val === "number" ? val.toLocaleString() : String(val ?? "-");
-          doc.text(txt, x, y + 3, { 
-            width: (c.width || 100) - 8, 
-            ellipsis: true,
-            lineBreak: false
-          });
+        doc.fillColor("#334155");
+        x = startX + 8;
+        columns.forEach(c => {
+          let val = row[c.key];
+          if (c.key === "status") {
+            const isSuccess = String(val).toLowerCase().includes("closed") || String(val).toLowerCase().includes("delivered");
+            doc.save();
+            const badgeWidth = 45;
+            const badgeX = x + ((c.width || 100) - badgeWidth - 16);
+            doc.roundedRect(badgeX, y + 4, badgeWidth, 12, 6).fill(isSuccess ? "#DCFCE7" : "#FEE2E2");
+            doc.fillColor(isSuccess ? "#166534" : "#991B1B").fontSize(7).font("Helvetica-Bold")
+               .text(String(val).toUpperCase(), badgeX, y + 6, { width: badgeWidth, align: "center" });
+            doc.restore();
+          } else {
+            doc.text(String(val ?? "-"), x, y + 6, { width: (c.width || 100) - 10 });
+          }
           x += (c.width || 100);
         });
         y += rowHeight;
       });
-      
-      // Update doc.y to current position
-      doc.y = y;
-      doc.moveDown(0.5);
+      doc.y = y + 10;
+    },
+    card: (items, { title, columns = 3 } = {}) => {
+      const { left } = doc.page.margins;
+      const innerWidth = pageWidth - (doc.page.margins.left + doc.page.margins.right);
+      const padding = 15;
+      const rowHeight = 20;
+      const rows = Math.ceil(Object.keys(items).length / columns);
+      const titleHeight = title ? 25 : 0;
+      const boxHeight = (rows * rowHeight) + titleHeight + (padding * 2);
+
+      doc.save();
+      doc.roundedRect(left, doc.y, innerWidth, boxHeight, 6).lineWidth(0.5).strokeColor("#E2E8F0").stroke();
+      doc.restore();
+
+      let currentY = doc.y + padding;
+      if (title) {
+        doc.fillColor("#1E293B").fontSize(10).font("Helvetica-Bold").text(title.toUpperCase(), left + padding, currentY);
+        currentY += titleHeight;
+      }
+
+      doc.fontSize(8.5).font("Helvetica");
+      const colWidth = (innerWidth - (padding * 2)) / columns;
+      Object.entries(items).forEach(([k, v], idx) => {
+        const col = idx % columns;
+        const row = Math.floor(idx / columns);
+        const x = left + padding + (col * colWidth);
+        const y = currentY + (row * rowHeight);
+        doc.fillColor("#64748B").text(`${k}: `, x, y, { lineBreak: false });
+        const labelWidth = doc.widthOfString(`${k}: `);
+        doc.fillColor("#1E293B").font("Helvetica-Bold").text(String(v), x + labelWidth, y);
+        doc.font("Helvetica");
+      });
+
+      doc.y += boxHeight + 15;
     }
   };
 
-  // Content
+  drawHeader();
+
   try {
-    // Call with helpers for new builders; legacy builders that only accept doc still work
     contentBuilder(doc, helpers);
-  } catch (error) {
-    // Fallback to legacy signature
-    console.warn("ContentBuilder error, trying legacy signature:", error.message);
-    try {
-      contentBuilder(doc);
-    } catch (legacyError) {
-      console.error("ContentBuilder failed:", legacyError);
-      doc.fillColor("#DC2626").fontSize(10).text("Error generating content");
-    }
+  } catch (err) {
+    console.error("PDF Builder Error:", err);
   }
 
-  // Signature block
-  doc.moveDown(3);
-  doc.fillColor("#111827").fontSize(12).font("Helvetica-Bold");
-  doc.text("Approval & Authorization", { underline: true });
-  doc.font("Helvetica").moveDown(1);
-
-  // Signatory info
-  doc.fillColor("#374151").fontSize(10);
-  doc.text(`Prepared by: ${signatory.name || "N/A"}`);
-  doc.text(`Title: ${signatory.title || "abelus Administrator"}`);
-  doc.moveDown(1);
-
-  // Signature and stamp section
-  const sigYStart = doc.y;
-  const leftMargin = doc.page.margins.left;
-
-  // Signature
-  if (signatory.signatureImage) {
-    try {
-      doc.image(signatory.signatureImage, leftMargin, sigYStart, { width: 120, height: 40 });
-      doc.y = sigYStart + 45;
-    } catch (err) {
-      console.warn("Signature image failed:", err.message);
-      doc.fillColor("#6B7280").fontSize(9);
-      doc.text("Signature: ______________________", leftMargin, sigYStart);
-    }
-  } else {
-    doc.fillColor("#6B7280").fontSize(9);
-    doc.text("Signature: ______________________", leftMargin, sigYStart);
-  }
-
-  // Stamp (next to signature)
-  if (signatory.stampImage) {
-    try {
-      doc.image(signatory.stampImage, leftMargin + 200, sigYStart, { width: 80, height: 80 });
-    } catch (err) {
-      console.warn("Stamp image failed:", err.message);
-      doc.fillColor("#6B7280").fontSize(9);
-      doc.text("Official Stamp: __________", leftMargin + 200, sigYStart);
-    }
-  } else {
-    doc.fillColor("#6B7280").fontSize(9);
-    doc.text("Official Stamp: __________", leftMargin + 200, sigYStart);
-  }
-
-  // Draw footer on all pages
-  const totalPages = doc.bufferedPageRange().count;
-  for (let i = 0; i < totalPages; i++) {
+  const pages = doc.bufferedPageRange();
+  for (let i = 0; i < pages.count; i++) {
     doc.switchToPage(i);
-    drawFooter();
+    drawFooter(i + 1);
   }
 
   return doc;

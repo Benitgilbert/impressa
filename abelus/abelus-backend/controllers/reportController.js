@@ -115,32 +115,25 @@ export const generateReport = async (req, res) => {
             companyName: user.storeName || "abelus Custom Solutions",
             subtitle: user.title || `Performance Statement – Generated on ${new Date().toLocaleDateString()}`,
             contentBuilder: (pdfDoc, helpers) => {
-                // 1. Strategic AI Insights (Top of report as requested)
+                // 1. Strategic AI Insights (Top)
                 helpers.infoBox("Strategic AI Insights", aiSummary);
 
-                // 2. Financial Summary Blocks (Premium Cards)
-                helpers.section("Financial Summary");
+                // 2. Financial Summary (Metric Cards)
                 helpers.metricCards([
-                    { label: "Total Revenue", value: `RWF ${summary.totalRevenue?.toLocaleString()}`, color: "#2563EB" },
-                    { label: "Total Expenses", value: `RWF ${summary.totalExpenses?.toLocaleString()}`, color: "#DC2626" },
+                    { label: "Total Revenue", value: `RWF ${summary.totalRevenue?.toLocaleString()}`, color: "#1E40AF" },
+                    { label: "Total Expenses", value: `RWF ${summary.totalExpenses?.toLocaleString()}`, color: "#1F2937" },
                     { label: "Net Profit", value: `RWF ${summary.netProfit?.toLocaleString()}`, color: "#059669" }
                 ]);
 
-                // 3. Discrepancy Alert & Verification (If verified)
+                // 3. Discrepancy Note (Alert Box)
                 if (verificationAmount > 0) {
                     helpers.alert(
                         `Discrepancy Note: There is a difference of ${cashDiscrepancy.toLocaleString()} RWF between your physical drawer (RWF ${verificationAmount.toLocaleString()}) and recorded cash sales.`,
                         cashDiscrepancy === 0 ? "success" : "warning"
                     );
-                    
-                    helpers.card({
-                        "Physical Drawer Count": `RWF ${verificationAmount.toLocaleString()}`,
-                        "System Cash Expected": `RWF ${summary.cashRevenue?.toLocaleString()}`,
-                        "Cash Difference": `${cashDiscrepancy >= 0 ? '+' : ''} RWF ${cashDiscrepancy.toLocaleString()}`
-                    }, { title: "Drawer Audit Detail", columns: 3 });
                 }
 
-                // 4. Shift Activity Table
+                // 4. Shift Activity Overview
                 if (type === "daily" && filters.shifts && filters.shifts.length > 0) {
                     helpers.section("Shift Activity Overview");
                     helpers.table({
@@ -153,21 +146,20 @@ export const generateReport = async (req, res) => {
                         ],
                         rows: filters.shifts.map((shift, idx) => ({
                             index: idx + 1,
-                            period: `${new Date(shift.startTime).toLocaleTimeString()} - ${shift.endTime ? new Date(shift.endTime).toLocaleTimeString() : "STILL OPENED"}`,
+                            period: `${new Date(shift.startTime).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit', second:'2-digit'})} - ${shift.endTime ? new Date(shift.endTime).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit', second:'2-digit'}) : "Still Open"}`,
                             opening: `RWF ${shift.startingDrawerAmount?.toLocaleString()}`,
                             closing: `RWF ${(shift.actualEndingDrawerAmount || shift.expectedEndingDrawerAmount)?.toLocaleString()}`,
-                            status: shift.status.toUpperCase()
+                            status: shift.status
                         }))
                     });
                 }
 
-                // 5. Transaction Detail Table
+                // 5. Transaction Detail
                 helpers.section("Transaction Detail");
                 const flattenedItems = orders.flatMap(o => o.items.map(i => ({
                     ...i,
                     orderDate: new Date(o.createdAt).toLocaleDateString(),
-                    paymentMethod: (o.paymentMethod || "Cash").toLowerCase(),
-                    publicId: o.publicId
+                    paymentMethod: (o.paymentMethod || "Cash").toLowerCase()
                 })));
 
                 helpers.table({
@@ -190,14 +182,14 @@ export const generateReport = async (req, res) => {
                     })
                 });
 
-                // Totals aligned with table columns
+                // Totals Summary
                 pdfDoc.moveDown(0.2);
-                pdfDoc.fontSize(9).font("Helvetica-Bold").fillColor("#111827");
-                const startX = pdfDoc.page.margins.left + 290; // Align with Cash/Momo columns
-                pdfDoc.text("TOTALS", startX - 50, pdfDoc.y, { width: 50, align: "right" });
-                pdfDoc.text(`RWF ${summary.cashRevenue.toLocaleString()}`, startX, pdfDoc.y - 12, { width: 80, align: "left" });
-                pdfDoc.text(`RWF ${summary.momoRevenue.toLocaleString()}`, startX + 80, pdfDoc.y - 12, { width: 80, align: "left" });
-                pdfDoc.moveDown(1);
+                pdfDoc.fontSize(9).font("Helvetica-Bold").fillColor("#1E293B");
+                const summaryX = pdfDoc.page.margins.left + 290;
+                pdfDoc.text("TOTALS", summaryX - 60, pdfDoc.y, { width: 50, align: "right" });
+                pdfDoc.text(`RWF ${summary.cashRevenue.toLocaleString()}`, summaryX, pdfDoc.y - 12, { width: 80, align: "left" });
+                pdfDoc.text(`RWF ${summary.momoRevenue.toLocaleString()}`, summaryX + 80, pdfDoc.y - 12, { width: 80, align: "left" });
+                pdfDoc.moveDown(1.5);
 
                 // 6. Expenses Breakdown
                 if (filters.expenses && filters.expenses.length > 0) {
@@ -216,6 +208,35 @@ export const generateReport = async (req, res) => {
                             amount: `RWF ${e.amount.toLocaleString()}`
                         }))
                     });
+                }
+
+                // 7. Approval & Authorization (Signatory Block)
+                pdfDoc.moveDown(2);
+                helpers.section("Approval & Authorization");
+                pdfDoc.save().moveTo(pdfDoc.page.margins.left, pdfDoc.y).lineTo(pdfDoc.page.width - pdfDoc.page.margins.right, pdfDoc.y).strokeColor("#E2E8F0").lineWidth(0.5).stroke().restore();
+                pdfDoc.moveDown(1);
+                
+                pdfDoc.fillColor("#1E293B").fontSize(10).font("Helvetica-Bold").text(`Prepared by: `, { lineBreak: false });
+                pdfDoc.font("Helvetica").fillColor("#475569").text(user.name);
+                
+                pdfDoc.font("Helvetica-Bold").fillColor("#1E293B").text(`Title: `, { lineBreak: false });
+                pdfDoc.font("Helvetica").fillColor("#475569").text(user.role?.toUpperCase() || "ADMIN");
+
+                // Signatures and Stamps
+                const sigY = pdfDoc.y + 40;
+                pdfDoc.save().moveTo(pdfDoc.page.margins.left, sigY).lineTo(pdfDoc.page.margins.left + 150, sigY).strokeColor("#1E293B").lineWidth(1).stroke().restore();
+                pdfDoc.fontSize(8).text("Signature", pdfDoc.page.margins.left, sigY + 5);
+
+                if (user.signatureImage) {
+                    try { pdfDoc.image(user.signatureImage, pdfDoc.page.margins.left, sigY - 45, { width: 100, height: 40 }); } catch (e) {}
+                }
+
+                const stampX = pdfDoc.page.width - pdfDoc.page.margins.right - 120;
+                pdfDoc.save().rect(stampX, sigY - 60, 100, 60).dash(2, {space: 2}).strokeColor("#CBD5E1").stroke().restore();
+                pdfDoc.fillColor("#94A3B8").fontSize(8).text("Official Stamp", stampX, sigY - 30, { width: 100, align: "center" });
+
+                if (user.stampImage) {
+                    try { pdfDoc.image(user.stampImage, stampX + 10, sigY - 55, { width: 80, height: 50 }); } catch (e) {}
                 }
             },
             signatory: {
