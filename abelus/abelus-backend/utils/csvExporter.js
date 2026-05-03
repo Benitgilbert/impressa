@@ -1,15 +1,30 @@
-const convertToCSV = (orders) => {
-  const headers = ["Order ID", "Product", "Customer", "Qty", "Status", "Date"];
-  const rows = orders.map(order => [
-    order.id.toString(),
-    order.product?.name || "",
-    order.customer?.email || "",
-    order.quantity,
-    order.status,
+const convertToCSV = (orders, expenses = []) => {
+  const orderHeaders = ["Public ID", "Customer", "Date", "Items", "Total", "Status"];
+  const orderRows = orders.map(order => [
+    order.publicId || order.id.toString(),
+    order.customer?.name || (order.guestInfo ? (typeof order.guestInfo === 'string' ? JSON.parse(order.guestInfo).name : order.guestInfo.name) : "Guest"),
     new Date(order.createdAt).toLocaleDateString(),
+    order.items?.map(i => i.productName).join("; ") || "N/A",
+    order.grandTotal?.toString() || "0",
+    order.status
   ]);
 
-  return [headers, ...rows].map(row => row.join(",")).join("\n");
+  let csvContent = [orderHeaders, ...orderRows].map(row => row.join(",")).join("\n");
+
+  if (expenses.length > 0) {
+    csvContent += "\n\nEXPENSES\n";
+    const expenseHeaders = ["Description", "Category", "Date", "Amount", "Recorded By"];
+    const expenseRows = expenses.map(exp => [
+      exp.description,
+      exp.category,
+      new Date(exp.date).toLocaleDateString(),
+      exp.amount.toString(),
+      exp.user?.name || "System"
+    ]);
+    csvContent += [expenseHeaders, ...expenseRows].map(row => row.join(",")).join("\n");
+  }
+
+  return csvContent;
 };
 
 export default convertToCSV;

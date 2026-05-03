@@ -14,6 +14,16 @@ const getRangeReport = async (start, end, sellerId) => {
     include: { items: { include: { product: true } }, customer: true }
   });
 
+  // Fetch Expenses in the same range
+  const expenseWhere = { date: { gte: start, lt: end } };
+  if (sellerId) {
+    expenseWhere.userId = sellerId;
+  }
+  const expenses = await prisma.expense.findMany({
+    where: expenseWhere,
+    include: { user: { select: { name: true } } }
+  });
+
   // Fetch Abonne Debt Collections in the same range
   const abonneWhere = { createdAt: { gte: start, lt: end } };
   if (sellerId) {
@@ -37,6 +47,11 @@ const getRangeReport = async (start, end, sellerId) => {
   const customizationCount = { customText: 0, customFile: 0, cloudLink: 0 };
   let totalRevenue = 0;
   let totalDebtCollected = 0;
+  let totalExpenses = 0;
+
+  expenses.forEach(exp => {
+    totalExpenses += (exp.amount || 0);
+  });
 
   orders.forEach(order => {
     order.items.forEach(item => {
@@ -68,6 +83,8 @@ const getRangeReport = async (start, end, sellerId) => {
     total: orders.length,
     totalRevenue,
     totalDebtCollected,
+    totalExpenses,
+    netProfit: totalRevenue - totalExpenses,
     delivered: orders.filter(o => o.status === "delivered").length,
     pending: orders.filter(o => o.status === "pending").length,
     cancelled: orders.filter(o => o.status === "cancelled").length,
@@ -75,7 +92,7 @@ const getRangeReport = async (start, end, sellerId) => {
     topCustomization,
   };
 
-  return { orders, summary };
+  return { orders, summary, expenses };
 };
 
 /**

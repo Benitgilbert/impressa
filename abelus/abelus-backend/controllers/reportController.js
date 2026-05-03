@@ -61,6 +61,10 @@ export const generateReport = async (req, res) => {
             const result = await buildReportData(type, filters);
             orders = result.orders;
             summary = result.summary;
+            const expenses = result.expenses; // Extract expenses
+            
+            // Pass expenses to doc generation if needed
+            filters.expenses = expenses; 
         } catch (buildError) {
             console.error("buildReportData error:", buildError);
             return res.status(500).json({ message: `Failed to build report data: ${buildError.message}` });
@@ -92,7 +96,7 @@ export const generateReport = async (req, res) => {
 
         // Export as CSV
         if (format === "csv") {
-            const csv = convertToCSV(orders);
+            const csv = convertToCSV(orders, filters.expenses);
             res.setHeader("Content-Type", "text/csv");
             res.setHeader("Content-Disposition", `attachment; filename=${type}-report.csv`);
             return res.send(csv);
@@ -113,8 +117,9 @@ export const generateReport = async (req, res) => {
                 helpers.keyValue({
                     "Total Orders": orders.length,
                     "Gross Revenue": `RWF ${summary.totalRevenue?.toLocaleString()}`,
-                    "Average Order Value": `RWF ${summary.averageOrderValue?.toLocaleString()}`,
-                    "Top Product": summary.topSellingProduct?.name || "N/A"
+                    "Total Expenses": `RWF ${summary.totalExpenses?.toLocaleString()}`,
+                    "Net Profit": `RWF ${summary.netProfit?.toLocaleString()}`,
+                    "Top Product": summary.topSellingProduct?.name || summary.topProduct || "N/A"
                 });
 
                 pdfDoc.moveDown(1);
@@ -138,6 +143,26 @@ export const generateReport = async (req, res) => {
                 });
 
                 pdfDoc.moveDown(1);
+
+                // Expenses Table (New)
+                if (filters.expenses && filters.expenses.length > 0) {
+                    helpers.section("Expenses Breakdown");
+                    helpers.table({
+                        columns: [
+                            { header: "Description", key: "description", width: 180 },
+                            { header: "Category", key: "category", width: 100 },
+                            { header: "Date", key: "date", width: 100 },
+                            { header: "Amount", key: "amount", width: 100 }
+                        ],
+                        rows: filters.expenses.map(e => ({
+                            description: e.description,
+                            category: e.category,
+                            date: new Date(e.date).toLocaleDateString(),
+                            amount: `RWF ${e.amount.toLocaleString()}`
+                        }))
+                    });
+                    pdfDoc.moveDown(1);
+                }
                 
                 // AI Insights
                 helpers.section("Strategic AI Insights");

@@ -589,6 +589,17 @@ export const createPOSOrder = async (req, res) => {
       return res.status(400).json({ message: "Order must contain items" });
     }
 
+    // 🕒 MANDATORY: Check for active shift before anything else
+    const activeShift = await prisma.shift.findFirst({
+      where: { userId: userId, status: "open" }
+    });
+
+    if (!activeShift) {
+      return res.status(403).json({ 
+        message: "Action Required: You cannot process sales without an open shift. Please open a shift first." 
+      });
+    }
+
     // Fetch contract prices if clientId is provided
     let contractPrices = [];
     if (clientId) {
@@ -636,8 +647,6 @@ export const createPOSOrder = async (req, res) => {
           if (!variation) throw new Error(`Variation ${item.variationId} not found`);
           
           // 📦 Multi-unit Stock Logic:
-          // We use a "Single Source of Truth" pool (product.stock).
-          // If selling a Packet (Factor 5), we subtract 5 from the pool.
           if (product.type !== 'service') {
             const decrementQty = Number(item.quantity) * (variation.conversionFactor || 1);
             
@@ -646,8 +655,6 @@ export const createPOSOrder = async (req, res) => {
               throw new Error(`Insufficient total stock for ${product.name}`);
             }
 
-            // We update the variation stock too just for display/legacy consistency, 
-            // but the master pool is the Product record.
             await tx.productVariation.update({
               where: { id: variation.id },
               data: { stock: { decrement: Number(item.quantity) } }
@@ -667,7 +674,7 @@ export const createPOSOrder = async (req, res) => {
           }
         }
 
-        // Update product sales count (and stock for variations, since updateMany above only handles non-variation)
+        // Update product sales count
         if (item.variationId || product.type === 'service') {
           const variation = item.variationId ? product.variations.find(v => v.sku === item.variationId) : null;
           const decrementQty = Number(item.quantity) * (item.conversionFactor || variation?.conversionFactor || 1);
@@ -709,11 +716,13 @@ export const createPOSOrder = async (req, res) => {
           status: "delivered",
           items: {
             create: txOrderItemsData
-          }
+          },
+          // 🕒 Link to shift immediately during creation
+          shifts: { connect: { id: activeShift.id } }
         }
       });
 
-      // 👥 Abonne Debt Recording (Inside Transaction)
+      // 👥 Abonne Debt Recording
       if (clientId) {
         const cashCollected = Number(req.body.upfrontCashPaid) || 0;
         let remainingUpfront = cashCollected;
@@ -734,7 +743,7 @@ export const createPOSOrder = async (req, res) => {
             clientId: clientId,
             orderId: txOrder.id,
             responsibleId: userId,
-            // shiftId will be linked later or we can fetch it here if needed
+            shiftId: activeShift.id, // Linked during creation
             designation: item.productName,
             quantity: item.quantity,
             pu: item.price,
@@ -758,38 +767,23 @@ export const createPOSOrder = async (req, res) => {
       return { order: txOrder, orderItemsData: txOrderItemsData, subtotal: txSubtotal };
     }); // End $transaction
 
-    const activeShift = await prisma.shift.findFirst({
-      where: { userId: userId, status: "open" }
-    });
-
-    // Link transactions to shift if active
-    if (activeShift && clientId) {
-      await prisma.abonneTransaction.updateMany({
-        where: { orderId: order.id },
-        data: { shiftId: activeShift.id }
-      });
-    }
-
-    // 🕒 Shift Update
+    // 🕒 Update Shift Totals
     try {
-      if (activeShift) {
-        const cashCollected = paymentMethod === "client_abonne" ? (Number(req.body.upfrontCashPaid) || 0) : (paymentMethod === "cash" || !paymentMethod ? subtotal : 0);
-        const momoCollected = paymentMethod === "mtn_momo" ? subtotal : 0;
-        const otherCollected = (paymentMethod !== "cash" && paymentMethod !== "mtn_momo" && paymentMethod !== "client_abonne") ? subtotal : 0;
+      const cashCollected = paymentMethod === "client_abonne" ? (Number(req.body.upfrontCashPaid) || 0) : (paymentMethod === "cash" || !paymentMethod ? subtotal : 0);
+      const momoCollected = paymentMethod === "mtn_momo" ? subtotal : 0;
+      const otherCollected = (paymentMethod !== "cash" && paymentMethod !== "mtn_momo" && paymentMethod !== "client_abonne") ? subtotal : 0;
 
-        await prisma.shift.update({
-          where: { id: activeShift.id },
-          data: {
-            orders: { connect: { id: order.id } },
-            totalCashSales: { increment: cashCollected },
-            expectedEndingDrawerAmount: { increment: cashCollected },
-            totalMomoSales: { increment: momoCollected },
-            totalOtherSales: { increment: otherCollected }
-          }
-        });
-      }
+      await prisma.shift.update({
+        where: { id: activeShift.id },
+        data: {
+          totalCashSales: { increment: cashCollected },
+          expectedEndingDrawerAmount: { increment: cashCollected },
+          totalMomoSales: { increment: momoCollected },
+          totalOtherSales: { increment: otherCollected }
+        }
+      });
     } catch (shiftErr) {
-      console.error("Shift update failed:", shiftErr);
+      console.error("Shift totals update failed:", shiftErr);
     }
 
     // 💰 Financials

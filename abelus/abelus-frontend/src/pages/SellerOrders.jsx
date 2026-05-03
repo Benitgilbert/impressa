@@ -120,7 +120,12 @@ const SellerOrders = () => {
                                                         </span>
                                                     </td>
                                                     <td className="px-6 py-4 text-sm text-gray-900 dark:text-white font-medium">{order.user?.name || order.guestInfo?.name || 'Guest'}</td>
-                                                    <td className="px-6 py-4 text-sm text-gray-600 dark:text-gray-400">{order.items?.length || 0} items</td>
+                                                    <td className="px-6 py-4 text-sm text-gray-600 dark:text-gray-400">
+                                                        <div className="max-w-[200px] truncate" title={order.items?.map(i => i.productName).join(", ")}>
+                                                            {order.items?.map(i => i.productName).join(", ") || "No items"}
+                                                        </div>
+                                                        <div className="text-[10px] text-gray-400 mt-0.5">{order.items?.length || 0} items</div>
+                                                    </td>
                                                     <td className="px-6 py-4 text-sm font-medium text-gray-900 dark:text-white">RWF {order.totals?.grandTotal?.toLocaleString() || order.grandTotal?.toLocaleString()}</td>
                                                     <td className="px-6 py-4">{getStatusBadge(order.status)}</td>
                                                     <td className="px-6 py-4">
