@@ -142,7 +142,7 @@ export const generateReport = async (req, res) => {
                     "Total Expenses": `RWF ${summary.totalExpenses?.toLocaleString()}`,
                     "Net Profit": `RWF ${summary.netProfit?.toLocaleString()}`,
                     "Physical Drawer": verificationAmount > 0 ? `RWF ${verificationAmount.toLocaleString()}` : "Not Verified",
-                    "Discrepancy": verificationAmount > 0 ? `${cashDiscrepancy >= 0 ? '+' : ''} RWF ${cashDiscrepancy.toLocaleString()}` : "N/A"
+                    "Difference": verificationAmount > 0 ? `${cashDiscrepancy >= 0 ? '+' : ''} RWF ${cashDiscrepancy.toLocaleString()}` : "N/A"
                 });
 
                 if (verificationAmount > 0 && Math.abs(cashDiscrepancy) > 0) {
@@ -184,6 +184,8 @@ export const generateReport = async (req, res) => {
                 // Total Row for Transaction Table
                 pdfDoc.moveDown(0.2);
                 pdfDoc.fontSize(9).font("Helvetica-Bold").fillColor("#374151")
+                    .text(`TOTALS:  Cash: RWF ${summary.cashRevenue.toLocaleString()}  |  Momo: RWF ${summary.momoRevenue.toLocaleString()}`, { align: "right" });
+                pdfDoc.fontSize(9).font("Helvetica-Bold").fillColor("#111827")
                     .text(`Total Transaction Value: RWF ${summary.totalRevenue.toLocaleString()}`, { align: "right" });
 
                 pdfDoc.moveDown(1);
