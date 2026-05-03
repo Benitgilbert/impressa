@@ -164,15 +164,15 @@ const SellerOrderDetails = () => {
                                     <div className="border-t dark:border-gray-700 mt-6 pt-6 space-y-3">
                                         <div className="flex justify-between text-gray-600 dark:text-gray-400">
                                             <span>Subtotal</span>
-                                            <span className="font-medium">{order.totals.subtotal.toLocaleString()} Rwf</span>
+                                            <span className="font-medium">{(order.subtotal || 0).toLocaleString()} Rwf</span>
                                         </div>
                                         <div className="flex justify-between text-gray-600 dark:text-gray-400">
                                             <span>Delivery</span>
-                                            <span className="font-medium">{order.totals.shipping.toLocaleString()} Rwf</span>
+                                            <span className="font-medium">{(order.shippingCost || 0).toLocaleString()} Rwf</span>
                                         </div>
                                         <div className="flex justify-between text-xl font-bold text-gray-900 dark:text-white pt-3 border-t dark:border-gray-700">
                                             <span>Total (Grand Total)</span>
-                                            <span className="text-indigo-600 dark:text-indigo-400">{order.totals.grandTotal.toLocaleString()} Rwf</span>
+                                            <span className="text-indigo-600 dark:text-indigo-400">{(order.grandTotal || 0).toLocaleString()} Rwf</span>
                                         </div>
                                     </div>
                                 </div>
@@ -271,15 +271,15 @@ const SellerOrderDetails = () => {
                                     <div className="space-y-3 text-sm">
                                         <div className="flex justify-between items-center">
                                             <span className="text-gray-500 dark:text-gray-400">Method:</span>
-                                            <span className="font-bold capitalize dark:text-white">{order.payment?.method?.replace("_", " ")}</span>
+                                            <span className="font-bold capitalize dark:text-white">{order.paymentMethod?.replace("_", " ")}</span>
                                         </div>
                                         <div className="flex justify-between items-center">
                                             <span className="text-gray-500 dark:text-gray-400">Status:</span>
-                                            <span className={`px-2 py-0.5 rounded text-xs font-bold ${order.payment?.status === 'completed'
+                                            <span className={`px-2 py-0.5 rounded text-xs font-bold ${order.paymentStatus === 'completed'
                                                 ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400'
                                                 : 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400'
                                                 }`}>
-                                                {order.payment?.status}
+                                                {order.paymentStatus}
                                             </span>
                                         </div>
                                     </div>
